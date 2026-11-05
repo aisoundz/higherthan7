@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Higher Than 7: music, movies, shows, sports, radio and live events. Stream on HigherThan7.com, shop HT7 merch, and hire the team.">
+<meta name="description" content="Higher Than 7: music, movies, shows and merch. Stream It. Hear It. Wear It. Hire The Team.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Higher Than 7">
 <meta property="og:url" content="https://aisoundz.github.io/higherthan7/">
@@ -19,7 +19,21 @@
 <meta name="twitter:image" content="https://aisoundz.github.io/higherthan7/og-image-v2.png">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<style>html{color-scheme:dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>html{color-scheme:dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+.embeds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:24px}
+.embeds iframe{width:100%;border:0;border-radius:12px;background:var(--panel)}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.join{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:32px;align-items:center}
+.join-form{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.join-form input{flex:1 1 220px;min-width:0;background:var(--ink);border:1px solid var(--line);color:var(--chrome);font:inherit;padding:12px 14px}
+.join-form input:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.join-form .form-status{flex-basis:100%}
+.page-hero{padding-block:64px 24px}
+.page-hero h1{font-size:clamp(40px,7vw,80px);font-weight:900}
+.page-hero p{color:var(--steel);font-size:18px;max-width:60ch;margin:18px 0 0}
+@media (max-width:900px){.embeds,.join{grid-template-columns:minmax(0,1fr)}}
+</style>
 </head>
 <body>
 <title>Higher Than 7</title>
@@ -277,15 +291,16 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
 
 <nav class="nav" aria-label="Main">
   <div class="wrap">
-    <a class="brand" href="#top"><img src="data:image/webp;base64,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" alt=""><span>Higher Than 7</span></a>
+    <a class="brand" href="index.html#top"><img src="data:image/webp;base64,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" alt=""><span>Higher Than 7</span></a>
     <div class="links">
-      <a href="#music">Music</a>
-      <a href="#subscribe">Subscribe</a>
-      <a href="#merch">Merch</a>
-      <a href="#gametime">Gametime</a>
-      <a href="#hire">Hire</a>
-      <a href="#contact">Contact</a>
-      <a href="#playbook">Playbook</a>
+      <a href="index.html#music">Music</a>
+      <a href="index.html#subscribe">Subscribe</a>
+      <a href="index.html#merch">Merch</a>
+      <a href="index.html#gametime">Gametime</a>
+      <a href="ai-consulting.html">AI Consulting</a>
+      <a href="index.html#hire">Hire</a>
+      <a href="index.html#contact">Contact</a>
+      <a href="playbook.html">Playbook</a>
     </div>
     <a class="btn primary cta" href="https://higherthan7.com" target="_blank" rel="noopener">Subscribe</a>
   </div>
@@ -317,7 +332,7 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
     <div class="sec-head">
       <div class="eyebrow">Built by one founder</div>
       <h2>One person. A whole media company.</h2>
-      <p class="lede">Higher Than 7 runs a streaming platform, a music catalog, a merch store and two fan engagement games. It is built and run by one founder working with AI agents, with engineers who review the work. This page is the proof, and the playbook below shows the business behind it.</p>
+      <p class="lede">Higher Than 7 runs a streaming platform, a music catalog, a merch store and two fan engagement games. It is built and run by one founder working with AI agents, with engineers who review the work. This site is the proof, and the <a href="playbook.html" style="color:var(--chrome)">playbook</a> shows the business behind it.</p>
     </div>
     <div class="solo-grid">
       <div class="t"><div class="n">12</div><div class="l">Shows, podcasts and docuseries streaming on HigherThan7.com</div></div>
@@ -331,9 +346,9 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
       <div class="box"><h3>Play it</h3><p>STATS GAMETIME and FANS GAMETIME keep fans engaged between releases, and brands can license the engine.</p></div>
     </div>
     <div class="cta-row">
-      <a class="btn primary" href="#hire" data-service="AI &amp; Agentic AI consulting">Build yours with AI consulting</a>
-      <a class="btn" href="#gametime">License fan engagement</a>
-      <a class="btn" href="#playbook">See the playbook</a>
+      <a class="btn primary" href="ai-consulting.html">Build yours with AI consulting</a>
+      <a class="btn" href="gametime.html">License fan engagement</a>
+      <a class="btn" href="playbook.html">See the playbook</a>
     </div>
   </div>
 </section>
@@ -374,6 +389,10 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
           </div>
         </div>
       </article>
+    </div>
+    <div class="embeds">
+      <iframe title="We Go Hard (Latino) on Spotify" src="https://open.spotify.com/embed/album/5kZcdvNuV9ewQe9FYRlvl4?theme=0" height="152" loading="lazy" allow="encrypted-media; clipboard-write; fullscreen; picture-in-picture"></iframe>
+      <iframe title="Amo A Mi Panama on Spotify" src="https://open.spotify.com/embed/album/1wKNaYtpUWygri5jEWUp82?theme=0" height="152" loading="lazy" allow="encrypted-media; clipboard-write; fullscreen; picture-in-picture"></iframe>
     </div>
     <div class="bundle">
       <div><strong>Get both singles · $2.58</strong><div class="note" style="margin:4px 0 0">Buy We Go Hard (Latino) and Amo A Mi Panamá on iTunes or Amazon, then follow Udini La Voz on Spotify.</div></div>
@@ -433,23 +452,14 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
     <div class="sec-head">
       <div class="eyebrow">Merch</div>
       <h2>HT7 merch</h2>
-      <p class="lede">Rep the studio. Tees, hoodies, hats and posters tied to the music, printed to order and shipped to your door.</p>
+      <p class="lede">Rep the studio. Apparel and gear tied to the music and the shows, printed to order and shipped to your door.</p>
     </div>
     <div class="store-cta">
-      <div><strong>Shop the HT7 store</strong><span class="s">Tees, hoodies, hats and posters. Printed to order and shipped to your door.</span></div>
+      <div><strong>Shop the HT7 store</strong><span class="s">21 products: Latino, We Go Hard, Amo A Mi Panamá, Trust The Creative Process, All Gas No Breaks and the HT7 chrome logo.</span></div>
       <a class="btn primary" href="https://higher-than-7.printify.me" target="_blank" rel="noopener">Shop merch now</a>
     </div>
-    <div class="eyebrow" style="margin:40px 0 12px">From our playbook · The numbers behind each product</div>
-    <div class="merch-wrap">
-      <table>
-        <thead><tr><th>Product</th><th>Design</th><th class="r">Est. base cost</th><th class="r">Retail</th><th class="r">Profit / unit</th></tr></thead>
-        <tbody id="merchRows"></tbody>
-      </table>
-    </div>
-    <div class="cols">
-      <div class="box"><h3>Start free</h3><p>Printify's Free plan costs $0 a month. Launch with the free Printify Pop-Up Store, or link the products from HigherThan7.com. No Shopify bill until volume justifies it.</p></div>
-      <div class="box"><h3>Upgrade on a number</h3><p>Premium is $39 a month, or $24.99 a month billed yearly, for up to about 20% off base costs. At roughly $2.80 saved per tee, it pays for itself around 15 units a month. Wait until you hit that.</p></div>
-      <div class="box"><h3>Drop, don't stock</h3><p>Release merch with each song: a We Go Hard tee the week the single pushes, an Amo A Mi Panamá tee for Panamá's November holidays. Limited windows create urgency.</p></div>
+    <div class="uses">
+      <span class="chip">Tees</span><span class="chip">Hoodies</span><span class="chip">Crewnecks</span><span class="chip">Long sleeves</span><span class="chip">Tanks</span><span class="chip">Women's tees</span><span class="chip">Mugs</span><span class="chip">Tumblers</span><span class="chip">Phone cases</span><span class="chip">Totes</span><span class="chip">Stickers</span><span class="chip">Posters</span><span class="chip">Desk mats</span>
     </div>
   </div>
 </section>
@@ -476,7 +486,7 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
         <div class="btns"><a class="btn primary" href="https://statsgametime.com" target="_blank" rel="noopener">Play STATS GAMETIME</a></div>
       </article>
       <article class="gt-card">
-        <div class="tag">Prototype · Concerts and live shows</div>
+        <div class="tag">Concept demo · Concerts and live shows</div>
         <h3>FANS GAMETIME</h3>
         <div class="line">The game that pays to be there</div>
         <ul>
@@ -486,6 +496,7 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
           <li>Follows fans home on Spotify the next week so the night sticks</li>
           <li>Scales from a 250-cap club to a 70,000-seat stadium or a live broadcast</li>
         </ul>
+        <p class="note" style="margin:0">Artists and venues in the demo are examples only. No affiliation or endorsement.</p>
         <div class="btns"><a class="btn primary" href="https://fansgametime.com" target="_blank" rel="noopener">See the FANS GAMETIME demo</a></div>
       </article>
     </div>
@@ -552,11 +563,11 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
         <a class="btn primary" href="#contact" data-service="AI &amp; Agentic AI consulting">Book AI consulting</a>
       </article>
       <article class="svc-card">
-        <div class="role">Consulting</div>
+        <div class="role">Operator consulting</div>
         <h3>Business and operator consulting</h3>
         <p>Launch plans, operations, go-to-market and cash flow for founders and small teams, from an operator who has run a payments company.</p>
         <div class="rates">
-          <div class="rate"><span>Strategy session (90 min)</span><b><small>from</small>$300</b></div>
+          <div class="rate"><span>Operations and finance review (90 min)</span><b><small>from</small>$300</b></div>
           <div class="rate"><span>Hourly advisory</span><b><small>from</small>$175/hr</b></div>
           <div class="rate"><span>Project (launch plan, GTM, financial model)</span><b><small>from</small>$2,500</b></div>
           <div class="rate"><span>Monthly retainer (fractional operator)</span><b><small>from</small>$3,500/mo</b></div>
@@ -604,15 +615,33 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
   </div>
 </section>
 
+<section id="join">
+  <div class="wrap join">
+    <div>
+      <div class="eyebrow">The HT7 list</div>
+      <h2>Get new drops first</h2>
+      <p class="lede">New music, shows, merch drops and game nights, straight to your inbox. No spam. Unsubscribe any time.</p>
+    </div>
+    <form class="join-form" id="joinForm" novalidate>
+      <label class="sr" for="jEmail">Email address</label>
+      <input id="jEmail" type="email" autocomplete="email" placeholder="you@email.com" required maxlength="160">
+      <div class="hp" aria-hidden="true"><input id="jWebsite" tabindex="-1" autocomplete="off"></div>
+      <button class="btn primary" type="submit" id="jSubmit">Join the list</button>
+      <span class="form-status" id="jStatus" role="status" aria-live="polite"></span>
+    </form>
+  </div>
+</section>
+
 <section id="contact">
   <div class="wrap">
     <div class="sec-head">
       <div class="eyebrow">Contact</div>
       <h2>Start a project</h2>
-      <p class="lede">Tell us what you are building. Anis reads every inquiry and replies within two business days.</p>
+      <p class="lede">Tell us what you are building. The form opens a ready-to-send email so your inquiry comes straight from your inbox to Anis, who replies within two business days.</p>
     </div>
     <div class="contact">
       <form class="inq" id="inqForm" novalidate>
+        <div class="hp" aria-hidden="true"><label>Leave this empty<input id="fWebsite" name="website" tabindex="-1" autocomplete="off"></label></div>
         <label>Name<input id="fName" name="name" autocomplete="name" required maxlength="120"></label>
         <label>Email<input id="fEmail" name="email" type="email" autocomplete="email" required maxlength="160"></label>
         <label>Phone (optional)<input id="fPhone" name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
@@ -640,7 +669,7 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
         </label>
         <label class="full">Project details<textarea id="fMsg" name="message" required maxlength="3000" placeholder="What are you making, when do you need it, and where will it live?"></textarea></label>
         <div class="full" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
-          <button class="btn primary" type="submit" id="fSubmit">Send inquiry</button>
+          <button class="btn primary" type="submit" id="fSubmit">Write my inquiry email</button>
           <span class="form-status" id="fStatus" role="status" aria-live="polite"></span>
         </div>
       </form>
@@ -664,229 +693,67 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
   </div>
 </section>
 
-<section id="playbook" class="pb-intro">
-  <div class="wrap">
-    <div class="sec-head" style="margin-bottom:0">
-      <div class="eyebrow">Our playbook · As presented at the Solopreneur Talk</div>
-      <h2>How we built HT7 to cash flow</h2>
-      <p class="lede">Every solo founder has the same three problems: no audience, no recurring revenue, no time. Here is the exact system HT7 runs, the math behind it, and a checklist you can steal for your own business.</p>
-    </div>
-  </div>
-</section>
-
-<section id="moves">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow">Playbook · Part 1</div>
-      <h2>Six moves, in order</h2>
-      <p class="lede">Every solo founder has the same three problems: no audience, no recurring revenue, no time. Each step below solves one of them, and each one feeds the next.</p>
-    </div>
-    <div class="steps">
-      <div class="step"><div class="n">1</div><h3>Own the brand</h3><p>Register the entity, lock the logo, colors and type. HT7 already has a full style guide, so every product looks like one company.</p><div class="tag">Cost: one time</div></div>
-      <div class="step"><div class="n">2</div><h3>Lead with a product</h3><p>Two singles by Udini La Voz, released June 17, 2026 on HT7. Music is the cheapest way to get discovered and the easiest thing to share.</p><div class="tag">Job: get attention</div></div>
-      <div class="step"><div class="n">3</div><h3>Add recurring revenue</h3><p>HigherThan7.com at $8.99 a month. Subscriptions pay you every month without a new sale, which is what makes cash flow predictable.</p><div class="tag">Job: keep the fan</div></div>
-      <div class="step"><div class="n">4</div><h3>Sell without inventory</h3><p>Print-on-demand merch through Printify. Nothing is printed until someone pays, so there is no stock to buy and no garage full of boxes.</p><div class="tag">Job: raise order value</div></div>
-      <div class="step"><div class="n">5</div><h3>Capture every fan</h3><p>Every link points to one email list. Social platforms rent you an audience. An email list is the audience you own.</p><div class="tag">Job: own the relationship</div></div>
-      <div class="step"><div class="n">6</div><h3>Watch the cash weekly</h3><p>Separate business account, one sheet, one number: did cash go up this week? Cut what does not pay back within 90 days.</p><div class="tag">Job: stay alive</div></div>
-    </div>
-    <div class="loop" aria-label="Flywheel">
-      <span class="node">Song</span><span class="arr">→</span>
-      <span class="node">Email list</span><span class="arr">→</span>
-      <span class="node">Subscription</span><span class="arr">→</span>
-      <span class="node">Merch drop</span><span class="arr">→</span>
-      <span class="node">Next song</span>
-    </div>
-  </div>
-</section>
-
-<section id="cashflow">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow">Playbook · Part 2 · 12 months, Jan to Dec 2027</div>
-      <h2>Cash flow board</h2>
-      <p class="lede">Move the sliders to see how the three streams add up against the 2027 goal of $100K. Starting values are examples for the talk, not reported results.</p>
-    </div>
-    <div class="board">
-      <div class="controls">
-        <fieldset>
-          <legend><i style="background:var(--chrome)"></i>Music</legend>
-          <div class="ctl"><label for="dl">Downloads per song / month</label><output id="dlO"></output><input type="range" id="dl" min="0" max="500" step="5" value="25"></div>
-          <div class="ctl"><label for="st">Streams / month (both songs)</label><output id="stO"></output><input type="range" id="st" min="0" max="500000" step="5000" value="20000"></div>
-          <div class="ctl"><label for="gm">Music growth / month</label><output id="gmO"></output><input type="range" id="gm" min="0" max="20" step="1" value="4"></div>
-        </fieldset>
-        <fieldset>
-          <legend><i style="background:var(--red)"></i>Subscriptions</legend>
-          <div class="ctl"><label for="s0">Subscribers in January</label><output id="s0O"></output><input type="range" id="s0" min="0" max="3000" step="10" value="200"></div>
-          <div class="ctl"><label for="gs">Net subscriber growth / month</label><output id="gsO"></output><input type="range" id="gs" min="-5" max="25" step="1" value="8"></div>
-          <div class="ctl"><label for="an">Share on annual plan</label><output id="anO"></output><input type="range" id="an" min="0" max="100" step="5" value="30"></div>
-          <div class="ctl"><label for="pf">Platform + payment fees</label><output id="pfO"></output><input type="range" id="pf" min="0" max="30" step="1" value="10"></div>
-        </fieldset>
-        <fieldset>
-          <legend><i style="background:var(--steel)"></i>Merch</legend>
-          <div class="ctl"><label for="mu">Units sold in January</label><output id="muO"></output><input type="range" id="mu" min="0" max="1000" step="5" value="40"></div>
-          <div class="ctl"><label for="gu">Merch growth / month</label><output id="guO"></output><input type="range" id="gu" min="0" max="25" step="1" value="6"></div>
-          <div class="ctl"><label for="mp">Avg profit per unit</label><output id="mpO"></output><input type="range" id="mp" min="5" max="40" step="1" value="15"></div>
-        </fieldset>
-        <fieldset>
-          <legend>Costs</legend>
-          <div class="ctl"><label for="fx">Fixed costs / month</label><output id="fxO"></output><input type="range" id="fx" min="0" max="2000" step="25" value="250"></div>
-          <div class="ctl"><label for="ad">Marketing / month</label><output id="adO"></output><input type="range" id="ad" min="0" max="5000" step="50" value="400"></div>
-          <div class="ctl"><label for="sc">Starting cash</label><output id="scO"></output><input type="range" id="sc" min="0" max="25000" step="500" value="2000"></div>
-        </fieldset>
-      </div>
-      <div class="results">
-        <div class="kpis">
-          <div class="kpi"><div class="k">2027 revenue</div><div class="v" id="kRev"></div></div>
-          <div class="kpi"><div class="k">2027 net profit</div><div class="v" id="kNet"></div></div>
-          <div class="kpi"><div class="k">Dec subscribers</div><div class="v" id="kSub"></div></div>
-          <div class="kpi"><div class="k">Cash at Dec 31</div><div class="v" id="kCash"></div></div>
-        </div>
-        <div class="goal">
-          <div class="goal-top"><span>Progress to the $100K revenue goal</span><span class="num" id="gPct"></span></div>
-          <div class="bar"><i id="gBar"></i></div>
-          <p id="gNote"></p>
-        </div>
-        <div class="chart">
-          <svg id="chart" viewBox="0 0 720 300" role="img" aria-label="Monthly revenue by stream against monthly costs"></svg>
-          <div class="legend">
-            <span style="--c:var(--chrome)">Music</span>
-            <span style="--c:var(--red)">Subscriptions</span>
-            <span style="--c:var(--steel)">Merch</span>
-            <span class="line" style="--c:var(--good)">Monthly costs (bars above the line = profit)</span>
-          </div>
-        </div>
-        <div class="pnl-wrap"><table id="pnl"></table></div>
-        <p class="disclaim">Assumptions: $1.29 per download on iTunes or Amazon with about 30% kept by the store, $0.004 per stream, $8.99 monthly or $89.99 annual subscription, merch profit after Printify base cost. Shipping is charged to the customer. Taxes are not included.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
 <footer>
   <div class="wrap">
     <img src="data:image/webp;base64,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" alt="HT7">
-    <span>Higher Than 7 · <a href="https://higherthan7.com" target="_blank" rel="noopener">HigherThan7.com</a> · <a href="https://higher-than-7.printify.me" target="_blank" rel="noopener">Merch</a> · <a href="#contact">Hire us</a></span>
+    <span>Higher Than 7 · <a href="https://higherthan7.com" target="_blank" rel="noopener">HigherThan7.com</a> · <a href="https://higher-than-7.printify.me" target="_blank" rel="noopener">Merch</a> · <a href="index.html#contact">Hire us</a> · <a href="ai-consulting.html">AI consulting</a> · <a href="gametime.html">Gametime licensing</a> · <a href="playbook.html">Playbook</a></span>
   </div>
 </footer>
-
 <script>
+
 (function(){
   const $=id=>document.getElementById(id);
-  const usd=(n,d=0)=>(n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
-  const short=n=>{const a=Math.abs(n),s=n<0?'-':'';return a>=1000?s+'$'+(a/1000).toFixed(a>=100000?0:1)+'K':s+'$'+Math.round(a)};
-
-  /* Merch line */
-  const merch=[
-    ['Heavy cotton tee','Gildan 5000','HT7 3D chrome logo, front',9.5,30],
-    ['"We Go Hard" tee','Gildan 5000','Song title across chest, red 7 on sleeve',9.5,30],
-    ['"Amo A Mi Panamá" tee','Bella+Canvas 3001','Panamá colors with HT7 sub mark',11,32],
-    ['HT7 hoodie','Gildan 18500','Flat white logo, oxblood or black',21,55],
-    ['HT7 snapback','Yupoong 6089','Embroidered HT7 sub mark',14,32],
-    ['Single cover poster','Matte poster 18×24','We Go Hard cover art, signed edition later',9,25]
-  ];
-  $('merchRows').innerHTML=merch.map(m=>`<tr><td>${m[0]}<span class="sub">${m[1]}</span></td><td>${m[2]}</td><td class="r">${usd(m[3],2)}</td><td class="r">${usd(m[4])}</td><td class="r margin">${usd(m[4]-m[3],2)}</td></tr>`).join('');
-
-  /* Cash flow model */
-  const ids=['dl','st','gm','s0','gs','an','pf','mu','gu','mp','fx','ad','sc'];
-  const fmt={dl:v=>v,st:v=>(+v).toLocaleString(),gm:v=>v+'%',s0:v=>(+v).toLocaleString(),gs:v=>v+'%',an:v=>v+'%',pf:v=>v+'%',mu:v=>v,gu:v=>v+'%',mp:v=>usd(+v),fx:v=>usd(+v),ad:v=>usd(+v),sc:v=>usd(+v)};
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const PRICE=1.29, NET_DL=0.70, PER_STREAM=0.004, MO=8.99, YR=89.99;
-
-  function model(p){
-    const rows=[];let cash=p.sc;
-    const arpu=((1-p.an/100)*MO+(p.an/100)*YR/12)*(1-p.pf/100);
-    for(let m=0;m<12;m++){
-      const gM=Math.pow(1+p.gm/100,m), gS=Math.pow(1+p.gs/100,m), gU=Math.pow(1+p.gu/100,m);
-      const music=(p.dl*2*PRICE*NET_DL+p.st*PER_STREAM)*gM;
-      const subs=p.s0*gS, subRev=subs*arpu;
-      const units=p.mu*gU, merchRev=units*p.mp;
-      const rev=music+subRev+merchRev, cost=p.fx+p.ad, net=rev-cost; cash+=net;
-      rows.push({m:months[m],music,subRev,merchRev,subs,units,rev,cost,net,cash});
-    }
-    return {rows,arpu};
-  }
-
-  function chart(rows){
-    const W=720,H=300,L=56,R=16,T=16,B=34,iw=W-L-R,ih=H-T-B;
-    const maxBar=Math.max(...rows.map(r=>r.rev),1);
-    const top=Math.max(maxBar,...rows.map(r=>r.cost),1), bot=0;
-    const nice=v=>{const e=Math.pow(10,Math.floor(Math.log10(v||1)));const f=v/e;return (f<=1?1:f<=2?2:f<=5?5:10)*e};
-    const step=nice((top-bot)/4); const yMax=Math.ceil(top/step)*step, yMin=Math.floor(bot/step)*step;
-    const y=v=>T+ih-(v-yMin)/(yMax-yMin)*ih;
-    const bw=iw/12; let s='';
-    for(let v=yMin;v<=yMax+1e-6;v+=step){s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${y(v)+4}" fill="var(--steel)" font-family="IBM Plex Mono,monospace" font-size="11" text-anchor="end">${short(v)}</text>`}
-    rows.forEach((r,i)=>{
-      const x=L+i*bw+bw*0.18,w=bw*0.64;let base=0;
-      [['music','var(--chrome)'],['subRev','var(--red)'],['merchRev','var(--steel)']].forEach(([k,c])=>{
-        const h=y(base)-y(base+r[k]);s+=`<rect x="${x}" y="${y(base+r[k])}" width="${w}" height="${Math.max(h,0)}" fill="${c}"/>`;base+=r[k];
-      });
-      s+=`<text x="${L+i*bw+bw/2}" y="${H-12}" fill="var(--steel)" font-family="IBM Plex Mono,monospace" font-size="11" text-anchor="middle">${r.m}</text>`;
-    });
-    const pts=rows.map((r,i)=>`${L+i*bw+bw/2},${y(r.cost)}`).join(' ');
-    s+=`<polyline points="${pts}" fill="none" stroke="var(--good)" stroke-width="2" stroke-dasharray="6 5"/>`;
-    $('chart').innerHTML=s;
-  }
-
-  function render(){
-    const p={};ids.forEach(k=>{p[k]=+$(k).value;$(k+'O').textContent=fmt[k]($(k).value)});
-    const {rows,arpu}=model(p);
-    const sum=k=>rows.reduce((a,r)=>a+r[k],0);
-    const rev=sum('rev'),net=sum('net'),cash=rows[11].cash;
-    $('kRev').textContent=short(rev);
-    $('kNet').textContent=short(net);$('kNet').classList.toggle('neg',net<0);
-    $('kSub').textContent=Math.round(rows[11].subs).toLocaleString();
-    $('kCash').textContent=short(cash);$('kCash').classList.toggle('neg',cash<0);
-    const pct=Math.min(rev/100000*100,100);
-    $('gPct').textContent=Math.round(rev/1000)+'K of 100K · '+Math.round(rev/1000)+'%';
-    $('gBar').style.width=pct+'%';
-    const other=sum('music')+sum('merchRev');
-    const needSubs=Math.max(0,(100000-other)/(12*arpu));
-    $('gNote').innerHTML=rev>=100000
-      ? `<b>Goal reached.</b> Subscriptions are ${Math.round(sum('subRev')/rev*100)}% of revenue.`
-      : `With music and merch where they are, HT7 needs about <b>${Math.round(needSubs).toLocaleString()} paying subscribers on average</b> across 2027 to reach $100K. Each subscriber is worth about <b>${usd(arpu*12)}</b> a year after fees.`;
-    chart(rows);
-    const tr=(label,k,cls='')=>`<tr class="${cls}"><td>${label}</td>${rows.map(r=>`<td class="r ${r[k]<0?'neg':''}">${short(r[k])}</td>`).join('')}<td class="r">${k==='cash'?short(cash):short(sum(k))}</td></tr>`;
-    $('pnl').innerHTML=`<thead><tr><th></th>${rows.map(r=>`<th class="r">${r.m}</th>`).join('')}<th class="r">2027</th></tr></thead><tbody>`+
-      tr('Music','music')+tr('Subscriptions','subRev')+tr('Merch','merchRev')+tr('Revenue','rev','tot')+
-      `<tr><td>Costs</td>${rows.map(r=>`<td class="r neg">${short(-r.cost)}</td>`).join('')}<td class="r neg">${short(-sum('cost'))}</td></tr>`+
-      tr('Net cash flow','net','tot')+tr('Cash balance','cash')+'</tbody>';
-  }
-  ids.forEach(k=>$(k).addEventListener('input',render));
-  render();
-
-})();
-
-/* Inquiries: sent to Anis by email through FormSubmit */
-(function(){
-  const $=id=>document.getElementById(id);
-  const form=$('inqForm'), status=$('fStatus');
   const TO='atsoundz@higherthan7.com';
-  const say=(t,c)=>{status.textContent=t;status.className='form-status'+(c?' '+c:'')};
-  document.querySelectorAll('[data-service]').forEach(a=>a.addEventListener('click',()=>{
-    const v=a.getAttribute('data-service'); const s=$('fService');
-    [...s.options].forEach(o=>{if(o.textContent===v)s.value=o.value});
-  }));
-  $('copyEmail').addEventListener('click',()=>{
+  const pre=document.body.getAttribute('data-service');
+  const setSvc=v=>{const s=$('fService');if(!s)return;[...s.options].forEach(o=>{if(o.textContent===v)s.value=o.value})};
+  if(pre) setSvc(pre);
+  document.querySelectorAll('[data-service]').forEach(a=>{if(a!==document.body)a.addEventListener('click',()=>setSvc(a.getAttribute('data-service')))});
+  const ce=$('copyEmail');
+  if(ce) ce.addEventListener('click',()=>{
     const t=$('emailAddr').textContent;
     const sel=()=>{const r=document.createRange();r.selectNodeContents($('emailAddr'));const s=getSelection();s.removeAllRanges();s.addRange(r)};
-    try{navigator.clipboard.writeText(t).then(()=>{$('copyEmail').textContent='Copied'},()=>{sel();$('copyEmail').textContent='Selected'})}catch(e){sel();$('copyEmail').textContent='Selected'}
+    try{navigator.clipboard.writeText(t).then(()=>{ce.textContent='Copied'},()=>{sel();ce.textContent='Selected'})}catch(e){sel();ce.textContent='Selected'}
   });
-  form.addEventListener('submit',async e=>{
-    e.preventDefault();
-    const name=$('fName').value.trim(), email=$('fEmail').value.trim(), msg=$('fMsg').value.trim();
-    if(!name||!email||!msg){say('Add your name, email and project details, then send again.','err');return}
-    if(!/^\S+@\S+\.\S+$/.test(email)){say('That email address looks incomplete. Check it and send again.','err');return}
-    $('fSubmit').disabled=true;say('Sending...');
-    try{
-      const r=await fetch('https://formsubmit.co/ajax/'+TO,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},
-        body:JSON.stringify({_subject:'New HT7 inquiry: '+$('fService').value,_template:'table',_captcha:'false',name,email,phone:$('fPhone').value.trim(),service:$('fService').value,budget:$('fBudget').value,message:msg})});
-      if(!r.ok) throw new Error(r.status);
-      form.reset();say('Sent. Anis will reply by email within two business days.','ok');
-    }catch(err){say('This inquiry could not be sent. Email '+TO+' and it will reach Anis directly.','err')}
-    finally{$('fSubmit').disabled=false}
-  });
+  const form=$('inqForm');
+  if(form){
+    const status=$('fStatus');
+    const say=(t,c)=>{status.textContent=t;status.className='form-status'+(c?' '+c:'')};
+    form.addEventListener('submit',e=>{
+      e.preventDefault();
+      if($('fWebsite')&&$('fWebsite').value){say('Thanks.','ok');return}
+      const name=$('fName').value.trim(), email=$('fEmail').value.trim(), msg=$('fMsg').value.trim();
+      if(!name||!email||!msg){say('Add your name, email and project details, then try again.','err');return}
+      if(!/^\S+@\S+\.\S+$/.test(email)){say('That email address looks incomplete. Check it and try again.','err');return}
+      const svc=$('fService').value, bud=$('fBudget').value, ph=$('fPhone').value.trim();
+      const body=['Name: '+name,'Email: '+email,ph?'Phone: '+ph:'','Service: '+svc,'Budget: '+bud,'','Project details:',msg].filter(x=>x!=='').join('\n');
+      const href='mailto:'+TO+'?subject='+encodeURIComponent('HT7 inquiry: '+svc+' from '+name)+'&body='+encodeURIComponent(body);
+      window.location.href=href;
+      say('Your email app should open with the inquiry ready. Press send there. If nothing opened, email '+TO+' directly.','ok');
+    });
+  }
+  const jf=$('joinForm');
+  if(jf){
+    const js=$('jStatus');
+    const say=(t,c)=>{js.textContent=t;js.className='form-status'+(c?' '+c:'')};
+    jf.addEventListener('submit',async e=>{
+      e.preventDefault();
+      if($('jWebsite').value){say('Thanks.','ok');return}
+      const em=$('jEmail').value.trim();
+      if(!/^\S+@\S+\.\S+$/.test(em)){say('Enter a full email address, like you@email.com.','err');return}
+      $('jSubmit').disabled=true;say('Joining...');
+      try{
+        const fd=new FormData();fd.append('fields[email]',em);fd.append('ml-submit','1');fd.append('anticsrf','true');
+        const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),12000);
+        const r=await fetch('https://assets.mailerlite.com/jsonp/2549193/forms/203334646391375384/subscribe',{method:'POST',body:fd,signal:ctl.signal});
+        clearTimeout(t);const d=await r.json().catch(()=>({}));
+        if(!r.ok||!d.success) throw new Error('no');
+        jf.reset();say('Almost done. Check your inbox and confirm your email to join the list.','ok');
+      }catch(err){say('That did not go through. Try again in a minute, or email '+TO+'.','err')}
+      finally{$('jSubmit').disabled=false}
+    });
+  }
 })();
-</script>
 
+</script>
 </body>
 </html>
