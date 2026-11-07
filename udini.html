@@ -330,7 +330,8 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
 .reel.ig .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
 .reel.ig b{font-family:var(--display);font-style:italic;font-weight:900;text-transform:uppercase;font-size:26px;line-height:1.05}
 .reel.ig .play{width:72px;height:72px;border-radius:50%;border:2px solid var(--chrome);display:grid;place-items:center;font-size:24px;padding-left:4px}
-.reel.ig:hover .play{background:var(--red);border-color:var(--red)}
+.reel.ig .play{color:inherit;text-decoration:none}
+.reel.ig .play:hover,.reel.ig:hover .play{background:var(--red);border-color:var(--red)}
 .reel.ig:focus-visible{outline:2px solid var(--red);outline-offset:3px}
 @media (max-width:900px){.gallery{columns:2}.reels{grid-template-columns:repeat(2,minmax(0,1fr))}.ulv-photo{max-width:360px;order:-1;justify-self:start}}
 @media (max-width:560px){.gallery{columns:1}.reels{grid-template-columns:minmax(0,1fr)}.reel video,.reel.ig{aspect-ratio:9/14}}
@@ -397,6 +398,7 @@ ul.tick b{color:var(--chrome);font-weight:600}
       <p>Born in Panama City. Built in Philadelphia. Heard in Spanish and English. Udini La Voz carries the flag of Panamá onto festival stages, film sets, national ad campaigns and the airwaves, and he brings the whole culture with him every time.</p>
       <div class="hero-ctas">
         <a class="btn primary" href="https://open.spotify.com/artist/68Ra8VCDNPrxXVn3jMsGO7" target="_blank" rel="noopener">Listen on Spotify</a>
+        <a class="btn" href="https://www.instagram.com/udinilavoz/" target="_blank" rel="noopener">Follow @udinilavoz</a>
         <a class="btn" href="#spotlight">Watch him live</a>
         <a class="btn" href="#story">His story</a>
         <a class="btn" href="#book">Bookings and press</a>
@@ -443,12 +445,13 @@ ul.tick b{color:var(--chrome);font-weight:600}
     <div class="reels">
       <figure class="reel"><video controls playsinline preload="none" poster="ulv-awards-stage.jpg" aria-label="Premios Hispanos de Delaware 2026 finale on stage"><source src="ulv-awards-stage.mp4" type="video/mp4"></video><figcaption>Finale on stage with the flags · Premios Hispanos de Delaware 2026</figcaption></figure>
       <figure class="reel"><video controls playsinline preload="none" poster="ulv-interview.jpg" aria-label="Udini La Voz interview at the Premios Hispanos de Delaware"><source src="ulv-interview.mp4" type="video/mp4"></video><figcaption>Behind the scenes of his awards night interview</figcaption></figure>
-      <a class="reel ig" href="https://www.instagram.com/reel/Deps5wtu5Zd/" target="_blank" rel="noopener">
-        <span class="k">Instagram reel</span>
+      <div class="reel ig">
+        <span class="k">Instagram · @udinilavoz</span>
         <b>Watch Udini La Voz on Instagram</b>
-        <span class="play" aria-hidden="true">▶</span>
-        <span class="btn primary">Open the reel</span>
-      </a>
+        <a class="play" href="https://www.instagram.com/reel/Deps5wtu5Zd/" target="_blank" rel="noopener" aria-label="Play the Instagram reel">▶</a>
+        <a class="btn primary" href="https://www.instagram.com/reel/Deps5wtu5Zd/" target="_blank" rel="noopener">Open the reel</a>
+        <a class="btn" href="https://www.instagram.com/udinilavoz/" target="_blank" rel="noopener">Follow @udinilavoz</a>
+      </div>
     </div>
   </div>
 </section>
@@ -494,6 +497,7 @@ ul.tick b{color:var(--chrome);font-weight:600}
         <a class="btn primary" href="https://music.apple.com/us/album/we-go-hard-latino-single/6781982847?app=itunes" target="_blank" rel="noopener">Buy We Go Hard</a>
         <a class="btn primary" href="https://music.apple.com/us/album/amo-a-mi-panama-single/6782002613?app=itunes" target="_blank" rel="noopener">Buy Amo A Mi Panamá</a>
         <a class="btn" href="https://open.spotify.com/artist/68Ra8VCDNPrxXVn3jMsGO7" target="_blank" rel="noopener">Follow on Spotify</a>
+        <a class="btn" href="https://www.instagram.com/udinilavoz/" target="_blank" rel="noopener">Instagram</a>
       </div>
     </div>
   </div>
@@ -739,6 +743,7 @@ ul.tick b{color:var(--chrome);font-weight:600}
         <div class="box">
           <h3>Press and media</h3>
           <p>Interviews, features and photo requests. Choose "Press or interview" in the form.</p>
+          <div class="email-row"><a class="btn" href="https://www.instagram.com/udinilavoz/" target="_blank" rel="noopener">@udinilavoz on Instagram</a></div>
         </div>
         <div class="box">
           <h3>Home base</h3>
