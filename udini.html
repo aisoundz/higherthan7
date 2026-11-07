@@ -336,6 +336,33 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
 @media (max-width:900px){.gallery{columns:2}.reels{grid-template-columns:repeat(2,minmax(0,1fr))}.ulv-photo{max-width:360px;order:-1;justify-self:start}}
 @media (max-width:560px){.gallery{columns:1}.reels{grid-template-columns:minmax(0,1fr)}.reel video,.reel.ig{aspect-ratio:9/14}}
 .reel .song{color:var(--red);display:inline-block;margin-top:4px}
+.anthem{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);gap:40px;align-items:center}
+.anthem h2{font-size:clamp(36px,6vw,64px)}.anthem h2 .r{color:var(--red)}
+.reel.feature{border-color:var(--red);max-width:380px;width:100%;justify-self:center}
+ul.why{list-style:none;padding:0;margin:22px 0 24px;display:grid;gap:10px}
+ul.why li{border-left:3px solid var(--red);padding:6px 0 6px 14px;color:var(--steel)}
+ul.why b{color:var(--chrome);display:block;font-family:var(--display);font-style:italic;text-transform:uppercase;font-size:17px}
+.reels.two{grid-template-columns:repeat(2,minmax(0,1fr));max-width:760px}
+#vision{background:radial-gradient(ellipse at 15% 30%,rgba(201,162,39,.16),transparent 55%),var(--ink)}
+.vision-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:28px;align-items:center;margin-bottom:36px}
+.big10{font-family:var(--display);font-style:italic;font-weight:900;font-size:clamp(110px,18vw,200px);line-height:.8;background:linear-gradient(180deg,#f4d67a,#b8862b 55%,#6e4a12);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 10px 30px rgba(201,162,39,.25))}
+ol.plan-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+ol.plan-steps li{background:var(--ink);padding:24px;display:grid;gap:10px;align-content:start}
+ol.plan-steps .n{font-family:var(--mono);color:#d9b45a;font-size:13px;letter-spacing:.12em}
+ol.plan-steps h3{font-size:20px}
+ol.plan-steps p{margin:0;color:var(--steel);font-size:15px}
+.support{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:start}
+.sup-col{display:grid;gap:12px}
+.sup-col h3{margin-bottom:4px}
+a.sup{display:grid;gap:4px;text-decoration:none;border:1px solid var(--line);background:var(--panel);padding:16px 18px 16px 18px;position:relative;transition:border-color .15s}
+a.sup::after{content:"\2192";position:absolute;right:18px;top:16px;color:var(--red);font-size:18px}
+a.sup b{font-family:var(--display);font-style:italic;font-weight:800;text-transform:uppercase;font-size:17px;padding-right:28px}
+a.sup span{color:var(--steel);font-size:14px}
+a.sup:hover{border-color:var(--red)}
+a.sup:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.sup-join{border:1px dashed var(--line);padding:16px 18px}
+@media (max-width:900px){.anthem,.support{grid-template-columns:minmax(0,1fr)}.reel.feature{justify-self:start;max-width:320px}ol.plan-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.vision-head{grid-template-columns:minmax(0,1fr);gap:8px}}
+@media (max-width:560px){ol.plan-steps,.reels.two{grid-template-columns:minmax(0,1fr)}}
 section.tight{padding-block:0 56px;border-top:0}
 .book-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
 .bk{border:1px solid var(--line);background:var(--panel);padding:24px;display:grid;gap:12px;align-content:start;grid-template-rows:auto auto 1fr auto}
@@ -393,22 +420,21 @@ ul.tick b{color:var(--chrome);font-weight:600}
 <header class="ulv-hero" id="top">
   <div class="wrap ulv-grid">
     <div>
-      <div class="eyebrow">International star · From Panamá to the world</div>
+      <div class="eyebrow">Recording artist · Panamá to the world</div>
       <h1>Udini <span class="r">La Voz</span></h1>
-      <div class="ulv-sub">Recording artist · Actor · TV and radio host · Model · Entrepreneur</div>
-      <p>Born in Panama City. Built in Philadelphia. Heard in Spanish and English. Udini La Voz carries the flag of Panamá onto festival stages, film sets, national ad campaigns and the airwaves, and he brings the whole culture with him every time.</p>
+      <div class="ulv-sub">Panamá started it. La Voz carries it forward.</div>
+      <p>Panamá is widely credited as the birthplace of reggae en español, the sound that grew into reggaeton. Udini La Voz is a Panamanian recording artist rapping in Spanish and English, carrying that legacy from Panama City to world stages like the FIFA Fan Festival.</p>
       <div class="hero-ctas">
         <a class="btn primary" href="https://open.spotify.com/artist/68Ra8VCDNPrxXVn3jMsGO7" target="_blank" rel="noopener">Listen on Spotify</a>
-        <a class="btn" href="https://www.instagram.com/udinilavoz/" target="_blank" rel="noopener">Follow @udinilavoz</a>
-        <a class="btn" href="#spotlight">Watch him live</a>
-        <a class="btn" href="#story">His story</a>
-        <a class="btn" href="#book">Bookings and press</a>
+        <a class="btn" href="#anthem">Watch We Go Hard</a>
+        <a class="btn" href="#support">Support the movement</a>
+        <a class="btn" href="udini-epk.html">Press kit</a>
       </div>
       <div class="streams">
+        <span class="chip"><b>10 Años</b> A decade in music</span>
         <span class="chip"><b>World stage</b> FIFA Fan Fest</span>
-        <span class="chip"><b>Film</b> CREED II</span>
-        <span class="chip"><b>Campaigns</b> 76ers · Hulu · AT&amp;T</span>
-        <span class="chip"><b>On air</b> TV and radio host</span>
+        <span class="chip"><b>Bilingual</b> Spanish and English</span>
+        <span class="chip"><b>Screen</b> CREED II · 76ers · Hulu</span>
       </div>
     </div>
     <figure class="ulv-photo">
@@ -429,6 +455,28 @@ ul.tick b{color:var(--chrome);font-weight:600}
   </div>
 </section>
 
+<section id="anthem">
+  <div class="wrap anthem">
+    <figure class="reel feature"><video controls playsinline preload="metadata" poster="ulv-awards-stage.jpg" aria-label="We Go Hard (Latino) over the Premios Hispanos de Delaware 2026 finale"><source src="ulv-awards-stage-v3.mp4" type="video/mp4"></video><figcaption>Premios Hispanos de Delaware 2026 finale<br><span class="song">♪ We Go Hard (Latino) · the hook</span></figcaption></figure>
+    <div>
+      <div class="eyebrow">The signature record</div>
+      <h2>We Go Hard <span class="r">(Latino)</span></h2>
+      <p class="lede">A unity anthem for every Latino who keeps going when people count them out. He closed the 2026 Premios Hispanos de Delaware with it. It is the record Higher Than 7 is putting everything behind.</p>
+      <ul class="why">
+        <li><b>A hook crowds chant back.</b> Two words a whole arena can shout.</li>
+        <li><b>Built for game day.</b> Stadiums, gyms, warmups and highlight reels.</li>
+        <li><b>Bilingual by design.</b> Spanish and English, so it travels across borders.</li>
+        <li><b>A message brands can stand behind.</b> Pride, unity and hard work.</li>
+      </ul>
+      <div class="btns">
+        <a class="btn primary" href="https://music.apple.com/us/album/we-go-hard-latino-single/6781982847?app=itunes" target="_blank" rel="noopener">Buy the single · $1.29</a>
+        <a class="btn" href="https://open.spotify.com/album/5kZcdvNuV9ewQe9FYRlvl4" target="_blank" rel="noopener">Save on Spotify</a>
+        <a class="btn" href="https://higher-than-7.printify.me" target="_blank" rel="noopener">Wear it · We Go Hard merch</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="spotlight">
   <div class="wrap">
     <div class="sec-head">
@@ -443,8 +491,7 @@ ul.tick b{color:var(--chrome);font-weight:600}
       <figure class="g tall"><img src="ulv-premios-program.jpg" alt="Premios Hispanos de Delaware 2026 program page featuring Udini La Voz among the Artistas de la Noche" loading="lazy" width="1200" height="1600"><figcaption>Featured in the Premios Hispanos de Delaware 2026 program</figcaption></figure>
       <figure class="g tall"><img src="ulv-red-carpet-interview.jpg" alt="Udini La Voz being interviewed on camera at the Premios Hispanos de Delaware" loading="lazy" width="900" height="1600"><figcaption>On camera in the interview area · Premios Hispanos de Delaware</figcaption></figure>
     </div>
-    <div class="reels">
-      <figure class="reel"><video controls playsinline preload="none" poster="ulv-awards-stage.jpg" aria-label="Premios Hispanos de Delaware 2026 finale on stage"><source src="ulv-awards-stage-v3.mp4" type="video/mp4"></video><figcaption>Finale on stage with the flags · Premios Hispanos de Delaware 2026<br><span class="song">♪ We Go Hard (Latino) · the hook</span></figcaption></figure>
+    <div class="reels two">
       <figure class="reel"><video controls playsinline preload="none" poster="ulv-interview.jpg" aria-label="Udini La Voz interview at the Premios Hispanos de Delaware"><source src="ulv-interview-v3.mp4" type="video/mp4"></video><figcaption>Behind the scenes of his awards night interview<br><span class="song">♪ Amo A Mi Panamá · the chorus</span></figcaption></figure>
       <div class="reel ig">
         <span class="k">Instagram · @udinilavoz</span>
@@ -469,6 +516,59 @@ ul.tick b{color:var(--chrome);font-weight:600}
         <p>He records in Spanish and English, and he collaborated with Michael D. Ellis, an originator of reggaeton. He has performed at the FIFA Fan Fest and Philadelphia's Fourth of July celebration, closed the Delaware Hispanic Awards, and taken the stage in Panamá. He has also appeared in CREED II and in national campaigns alongside Joel Embiid, Ben Simmons and Jay Wright.</p>
         <p>He hosts on television and radio, walks runways, and runs his own company for young people. Everything he does carries the same message: Latino unity, Panamanian pride and a seat at the international table.</p>
         <div class="quote">La voz de Panamá. Para el mundo.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="vision">
+  <div class="wrap">
+    <div class="vision-head">
+      <div class="big10" aria-hidden="true">10</div>
+      <div class="sec-head" style="margin:0">
+        <div class="eyebrow">The vision · 10 Años</div>
+        <h2>Ten years of building. Now breaking.</h2>
+        <p class="lede">Udini has spent a decade earning every stage he has stood on. Year ten is about taking Panamá's sound to the world. This is the plan.</p>
+      </div>
+    </div>
+    <ol class="plan-steps">
+      <li><span class="n">01</span><h3>One anthem, everywhere</h3><p>Make "We Go Hard" the Latino game-day chant: stadiums, gyms and creator videos, one hook at a time.</p></li>
+      <li><span class="n">02</span><h3>New music every six weeks</h3><p>A steady run of releases in Spanish and English, each with short vertical videos made to be shared.</p></li>
+      <li><span class="n">03</span><h3>Panamá to the world</h3><p>Collaborations with rising and established Latin artists, starting with Panamá's own scene.</p></li>
+      <li><span class="n">04</span><h3>Big moments, big screens</h3><p>Sync for sports and brand campaigns, festival stages, and the 10 Años live show.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="support">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Support the movement</div>
+      <h2>Every stream is a vote</h2>
+      <p class="lede">Breaking an independent artist takes fans who move first. Here is how to help, whether you are a fan or you work in music.</p>
+    </div>
+    <div class="support">
+      <div class="sup-col">
+        <h3>For fans</h3>
+        <a class="sup" href="https://open.spotify.com/album/5kZcdvNuV9ewQe9FYRlvl4" target="_blank" rel="noopener"><b>Save "We Go Hard" on Spotify</b><span>Saves and playlist adds tell Spotify to push the song to more people.</span></a>
+        <a class="sup" href="https://music.apple.com/us/album/we-go-hard-latino-single/6781982847?app=itunes" target="_blank" rel="noopener"><b>Buy the single for $1.29</b><span>One purchase pays the artist about what 200 streams pay.</span></a>
+        <a class="sup" href="https://www.instagram.com/udinilavoz/" target="_blank" rel="noopener"><b>Follow @udinilavoz and use the sound</b><span>Post your workout, your game day or your flag with "We Go Hard" and tag him.</span></a>
+        <a class="sup" href="https://higher-than-7.printify.me" target="_blank" rel="noopener"><b>Wear the culture</b><span>Latino, We Go Hard and Amo A Mi Panamá merch, printed to order.</span></a>
+        <form class="join-form sup-join" id="joinForm" novalidate>
+          <div class="hp" aria-hidden="true"><label>Leave this empty<input id="jWebsite" tabindex="-1" autocomplete="off"></label></div>
+          <label class="sr" for="jEmail">Email address</label>
+          <input id="jEmail" type="email" autocomplete="email" placeholder="Your email for new releases" maxlength="160" required>
+          <button class="btn primary" type="submit" id="jSubmit">Get new music first</button>
+          <span class="form-status" id="jStatus" role="status" aria-live="polite"></span>
+        </form>
+      </div>
+      <div class="sup-col">
+        <h3>For the industry</h3>
+        <a class="sup" href="udini-epk.html"><b>Labels and A&amp;R</b><span>Open the press kit: the story, the record, live footage and contacts.</span></a>
+        <a class="sup" href="#book" data-type="Sync licensing"><b>Sync and licensing</b><span>License "We Go Hard" for sports broadcasts, ads and games.</span></a>
+        <a class="sup" href="#book" data-type="Brand partnership"><b>Brands</b><span>Hispanic Heritage Month, sports and culture campaigns with an authentic voice.</span></a>
+        <a class="sup" href="#book" data-type="Live performance"><b>Promoters and festivals</b><span>A proven closer for festivals, galas, halftime shows and awards nights.</span></a>
+        <a class="sup" href="#book" data-type="Press or interview"><b>Media</b><span>Interviews, features and photo requests.</span></a>
       </div>
     </div>
   </div>
@@ -715,6 +815,9 @@ ul.tick b{color:var(--chrome);font-weight:600}
             <option>Speaking or appearance</option>
             <option>Press or interview</option>
             <option>Music feature or collaboration</option>
+            <option>Label or distribution partnership</option>
+            <option>Sync licensing</option>
+            <option>Brand partnership</option>
             <option>Something else</option>
           </select>
         </label>
@@ -755,12 +858,12 @@ ul.tick b{color:var(--chrome);font-weight:600}
   </div>
 </section>
 
-</section>
 <footer>
   <div class="wrap">
     <img src="data:image/webp;base64,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" alt="HT7">
     <span>Higher Than 7 · <a href="https://higherthan7.com" target="_blank" rel="noopener">HigherThan7.com</a> · <a href="https://higher-than-7.printify.me" target="_blank" rel="noopener">Merch</a> · <a href="index.html#contact">Hire us</a> · <a href="ai-consulting.html">AI consulting</a> · <a href="gametime.html">Gametime licensing</a> · <a href="udini.html">Udini La Voz</a> · <a href="playbook.html">Playbook</a></span>
   </div>
+</footer>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -787,6 +890,27 @@ ul.tick b{color:var(--chrome);font-weight:600}
     window.location.href='mailto:'+TO+'?subject='+encodeURIComponent('Udini La Voz: '+type+' from '+name)+'&body='+encodeURIComponent(body);
     say('Your email app should open with the request ready. Press send there. If nothing opened, email '+TO+' directly.','ok');
   });
+  const jf=$('joinForm');
+  if(jf){
+    const js=$('jStatus');
+    const sj=(t,c)=>{js.textContent=t;js.className='form-status'+(c?' '+c:'')};
+    jf.addEventListener('submit',async e=>{
+      e.preventDefault();
+      if($('jWebsite').value){sj('Thanks.','ok');return}
+      const em=$('jEmail').value.trim();
+      if(!/^\S+@\S+\.\S+$/.test(em)){sj('Enter a full email address, like you@email.com.','err');return}
+      $('jSubmit').disabled=true;sj('Joining...');
+      try{
+        const fd=new FormData();fd.append('fields[email]',em);fd.append('ml-submit','1');fd.append('anticsrf','true');
+        const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),12000);
+        const r=await fetch('https://assets.mailerlite.com/jsonp/2549193/forms/203334646391375384/subscribe',{method:'POST',body:fd,signal:ctl.signal});
+        clearTimeout(t);const d=await r.json().catch(()=>({}));
+        if(!r.ok||!d.success) throw new Error('no');
+        jf.reset();sj('Almost done. Check your inbox and confirm your email.','ok');
+      }catch(err){sj('That did not go through. Try again in a minute.','err')}
+      finally{$('jSubmit').disabled=false}
+    });
+  }
 })();
 </script>
 </body>
