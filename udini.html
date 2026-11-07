@@ -314,6 +314,26 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
 .story-txt p:first-child{color:var(--chrome);font-size:21px}
 .quote{margin-top:24px;font-family:var(--display);font-style:italic;font-weight:900;text-transform:uppercase;font-size:clamp(26px,3.6vw,38px);line-height:1.05;color:var(--red);border-left:4px solid var(--red);padding-left:18px}
 @media (max-width:900px){.story{grid-template-columns:minmax(0,1fr);gap:16px}}
+.ulv-photo{margin:0;position:relative;justify-self:center;width:100%;max-width:460px;border:1px solid var(--line);box-shadow:0 30px 60px rgba(0,0,0,.6);overflow:hidden}
+.ulv-photo img{display:block;width:100%;height:auto;aspect-ratio:1200/1363;object-fit:cover}
+.ulv-photo figcaption{position:absolute;left:0;right:0;bottom:0;padding:40px 16px 14px;background:linear-gradient(transparent,rgba(8,8,10,.92));font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--chrome);display:flex;align-items:center;gap:10px}
+.flag-mini{display:inline-grid;grid-template-columns:1fr 1fr;width:20px;height:20px;flex:none;border:1px solid rgba(255,255,255,.4)}
+.flag-mini i:nth-child(1),.flag-mini i:nth-child(4){background:#ecebe6}.flag-mini i:nth-child(2){background:#c80f2e}.flag-mini i:nth-child(3){background:#003b7a}
+.gallery{columns:3;column-gap:16px}
+.gallery .g{break-inside:avoid;margin:0 0 16px;position:relative;border:1px solid var(--line);background:var(--panel)}
+.gallery img{display:block;width:100%;height:auto}
+.gallery figcaption,.reel figcaption{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);padding:10px 12px}
+.reels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:8px}
+.reel{margin:0;border:1px solid var(--line);background:var(--panel)}
+.reel video{display:block;width:100%;aspect-ratio:9/16;background:#000;object-fit:cover}
+.reel.ig{display:grid;place-content:center;justify-items:center;gap:14px;text-align:center;text-decoration:none;padding:28px;aspect-ratio:9/16;background:linear-gradient(160deg,var(--oxblood),var(--ink) 55%,var(--navy));border-color:var(--red)}
+.reel.ig .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+.reel.ig b{font-family:var(--display);font-style:italic;font-weight:900;text-transform:uppercase;font-size:26px;line-height:1.05}
+.reel.ig .play{width:72px;height:72px;border-radius:50%;border:2px solid var(--chrome);display:grid;place-items:center;font-size:24px;padding-left:4px}
+.reel.ig:hover .play{background:var(--red);border-color:var(--red)}
+.reel.ig:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+@media (max-width:900px){.gallery{columns:2}.reels{grid-template-columns:repeat(2,minmax(0,1fr))}.ulv-photo{max-width:360px;order:-1;justify-self:start}}
+@media (max-width:560px){.gallery{columns:1}.reels{grid-template-columns:minmax(0,1fr)}.reel video,.reel.ig{aspect-ratio:9/14}}
 section.tight{padding-block:0 56px;border-top:0}
 .book-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
 .bk{border:1px solid var(--line);background:var(--panel);padding:24px;display:grid;gap:12px;align-content:start;grid-template-rows:auto auto 1fr auto}
@@ -377,6 +397,7 @@ ul.tick b{color:var(--chrome);font-weight:600}
       <p>Born in Panama City. Built in Philadelphia. Heard in Spanish and English. Udini La Voz carries the flag of Panamá onto festival stages, film sets, national ad campaigns and the airwaves, and he brings the whole culture with him every time.</p>
       <div class="hero-ctas">
         <a class="btn primary" href="https://open.spotify.com/artist/68Ra8VCDNPrxXVn3jMsGO7" target="_blank" rel="noopener">Listen on Spotify</a>
+        <a class="btn" href="#spotlight">Watch him live</a>
         <a class="btn" href="#story">His story</a>
         <a class="btn" href="#book">Bookings and press</a>
       </div>
@@ -387,11 +408,10 @@ ul.tick b{color:var(--chrome);font-weight:600}
         <span class="chip"><b>On air</b> TV and radio host</span>
       </div>
     </div>
-    <div class="ulv-cover" aria-hidden="true">
-      <div class="q q1"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.7 7.3L12 17.6 5.7 21.5l1.7-7.3L2 9.5l7.1-.6z" fill="#003b7a"/></svg></div><div class="q q2"></div>
-      <div class="q q3"></div><div class="q q4"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.7 7.3L12 17.6 5.7 21.5l1.7-7.3L2 9.5l7.1-.6z" fill="#c80f2e"/></svg></div>
-      <div class="ulv-cover-txt"><span>Udini</span><b>La Voz</b><i>Spanish · English · Worldwide</i></div>
-    </div>
+    <figure class="ulv-photo">
+      <img src="ulv-fanfest-stage.jpg" alt="Udini La Voz performing on the main stage at the FIFA Fan Festival in Philadelphia" width="1200" height="1363" fetchpriority="high">
+      <figcaption><span class="flag-mini" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Live at the FIFA Fan Festival · Philadelphia 2026</figcaption>
+    </figure>
   </div>
 </header>
 
@@ -402,6 +422,33 @@ ul.tick b{color:var(--chrome);font-weight:600}
       <div class="t"><div class="n">33</div><div class="l">Live performance credits across Philadelphia, New York, New Jersey, Delaware, Maryland and Panamá</div></div>
       <div class="t"><div class="n r">7</div><div class="l">Brand and commercial campaigns, including the 76ers, Hulu, Lowe's and AT&amp;T</div></div>
       <div class="t"><div class="n">2</div><div class="l">Countries he calls home: Panamá and the United States</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="spotlight">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">In the spotlight</div>
+      <h2>World stages. Red carpets. Big screens.</h2>
+      <p class="lede">From the FIFA Fan Festival main stage to the 2026 Premios Hispanos de Delaware, where he was featured among the Artistas de la Noche.</p>
+    </div>
+    <div class="gallery">
+      <figure class="g tall"><img src="ulv-fanfest-screen.jpg" alt="Udini La Voz on the giant screen above the FIFA Fan Festival Philadelphia 2026 stage" loading="lazy" width="1180" height="1600"><figcaption>On the big screen · FIFA Fan Festival Philadelphia 2026</figcaption></figure>
+      <figure class="g"><img src="ulv-live-brasil.jpg" alt="Udini La Voz performing live in a Brasil jersey" loading="lazy" width="1200" height="1425"><figcaption>Live and in his element</figcaption></figure>
+      <figure class="g"><img src="ulv-10-anos.jpg" alt="Udini La Voz 10 Años live performance poster" loading="lazy" width="1200" height="1099"><figcaption>10 Años · Live performance</figcaption></figure>
+      <figure class="g tall"><img src="ulv-premios-program.jpg" alt="Premios Hispanos de Delaware 2026 program page featuring Udini La Voz among the Artistas de la Noche" loading="lazy" width="1200" height="1600"><figcaption>Featured in the Premios Hispanos de Delaware 2026 program</figcaption></figure>
+      <figure class="g tall"><img src="ulv-red-carpet-interview.jpg" alt="Udini La Voz being interviewed on camera at the Premios Hispanos de Delaware" loading="lazy" width="900" height="1600"><figcaption>On camera in the interview area · Premios Hispanos de Delaware</figcaption></figure>
+    </div>
+    <div class="reels">
+      <figure class="reel"><video controls playsinline preload="none" poster="ulv-awards-stage.jpg" aria-label="Premios Hispanos de Delaware 2026 finale on stage"><source src="ulv-awards-stage.mp4" type="video/mp4"></video><figcaption>Finale on stage with the flags · Premios Hispanos de Delaware 2026</figcaption></figure>
+      <figure class="reel"><video controls playsinline preload="none" poster="ulv-interview.jpg" aria-label="Udini La Voz interview at the Premios Hispanos de Delaware"><source src="ulv-interview.mp4" type="video/mp4"></video><figcaption>Behind the scenes of his awards night interview</figcaption></figure>
+      <a class="reel ig" href="https://www.instagram.com/reel/Deps5wtu5Zd/" target="_blank" rel="noopener">
+        <span class="k">Instagram reel</span>
+        <b>Watch Udini La Voz on Instagram</b>
+        <span class="play" aria-hidden="true">▶</span>
+        <span class="btn primary">Open the reel</span>
+      </a>
     </div>
   </div>
 </section>
