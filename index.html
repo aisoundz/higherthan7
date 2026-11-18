@@ -143,6 +143,12 @@ h3{font-size:22px}
 .lib li{break-inside:avoid;margin-bottom:4px}
 
 /* MERCH */
+.book{display:grid;grid-template-columns:260px minmax(0,1fr);gap:28px;align-items:start;background:var(--panel);border:1px solid var(--line);padding:24px}
+.book img{width:100%;height:auto;display:block;border:1px solid var(--line)}
+.book h3{margin:0 0 10px}
+.book p{margin:0 0 16px;color:var(--steel)}
+.book .uses{margin:0 0 20px}
+@media (max-width:700px){.book{grid-template-columns:minmax(0,1fr)}.book img{max-width:240px}}
 .merch-wrap{overflow-x:auto;border:1px solid var(--line)}
 table{border-collapse:collapse;width:100%;min-width:680px;font-size:15px}
 th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -227,9 +233,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .nav .wrap{display:flex;align-items:center;gap:20px;padding-block:10px}
 .nav .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--display);font-style:italic;font-weight:800;text-transform:uppercase;letter-spacing:.02em}
 .nav .brand img{width:34px;height:auto}
-.nav .links{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.nav .links{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
 .nav .links::-webkit-scrollbar{display:none}
-.nav .links a{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;color:var(--steel);padding:8px 10px;white-space:nowrap}
+.nav .links a{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;color:var(--steel);padding:8px 6px;white-space:nowrap}
 .nav .links a:hover,.nav .links a:focus-visible{color:var(--chrome)}
 .nav .cta{flex:none;padding:8px 14px;font-size:14px}
 @media (max-width:720px){.nav .brand span{display:none}.nav .cta{display:none}.nav .links{margin-left:0}}
@@ -306,6 +312,7 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
       <a href="udini.html">Udini La Voz</a>
       <a href="index.html#subscribe">Subscribe</a>
       <a href="index.html#merch">Merch</a>
+      <a href="index.html#book">Book</a>
       <a href="index.html#gametime">Gametime</a>
       <a href="ai-consulting.html">AI Consulting</a>
       <a href="index.html#hire">Hire</a>
@@ -493,6 +500,31 @@ form.inq input:focus-visible,form.inq select:focus-visible,form.inq textarea:foc
     </div>
     <div class="uses">
       <span class="chip">Tees</span><span class="chip">Hoodies</span><span class="chip">Crewnecks</span><span class="chip">Long sleeves</span><span class="chip">Tanks</span><span class="chip">Women's tees</span><span class="chip">Mugs</span><span class="chip">Tumblers</span><span class="chip">Phone cases</span><span class="chip">Totes</span><span class="chip">Stickers</span><span class="chip">Posters</span><span class="chip">Desk mats</span>
+    </div>
+  </div>
+</section>
+
+<section id="book">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Books · Higher Than 7 Athlete</div>
+      <h2>90 Days to Take Your Game to the Next Level</h2>
+      <p class="lede">Book 1 in the Higher Than 7 Athlete series. A 90-day bodyweight program for strength, speed, bounce and conditioning, written by Anis Taylor, former NCAA D1 guard.</p>
+    </div>
+    <div class="book">
+      <img src="book-90-days-cover.jpg" width="800" height="1200" loading="lazy" alt="Cover of 90 Days to Take Your Game to the Next Level by Anis Taylor">
+      <div>
+        <div class="eyebrow">Coming soon</div>
+        <h3>Book 1: Blacktop</h3>
+        <p>Blacktop is where every hooper starts: no gym, no equipment, just you and the work. Six days a week, three phases and nothing but your body. Every movement is illustrated and explained, every week is laid out, and a six-test Combine shows exactly how far you have come by Day 90.</p>
+        <div class="uses">
+          <span class="chip">90 days</span><span class="chip">3 phases</span><span class="chip">46 movements</span><span class="chip">No equipment</span><span class="chip">Rookie, Varsity and Pro levels</span><span class="chip">In-season plan</span><span class="chip">Full logbook</span>
+        </div>
+        <div class="btns">
+          <a class="btn primary" href="#join">Get notified at launch</a>
+          <a class="btn" href="#contact">Team and bulk orders</a>
+        </div>
+      </div>
     </div>
   </div>
 </section>
