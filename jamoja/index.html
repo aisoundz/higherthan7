@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jamoja V1 Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: confident, hype, a teammate talking. A shipped sports app, not a pitch page.
+   IDEA: a phone in your hand at the gym: full-bleed game clips with broadcast-style stat cards.
+   PICTURE: the working app itself, drawn sport scenes (court, pitch, field, net) as the "video".
+   COLOUR and TYPE: black base, Jamoja Orange hero, one accent per sport. Bebas Neue / Oswald / Inter.
+   LAYOUT: phone frame centred on desktop with a short brief beside it; full screen on a phone. */
+:root{color-scheme:dark;--bg:#0a0a0b;--p:#151517;--p2:#1d1d20;--ln:#2a2a2e;--ink:#f5f5f4;--mu:#a1a1aa;--o:#ff5a1f}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:#050506;color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px solid var(--o);outline-offset:2px;border-radius:8px}
+.stage{height:100%;display:flex;align-items:center;justify-content:center;gap:56px;padding:20px}
+.brief{max-width:340px}
+.brief h1{font:52px/1 'Bebas Neue',sans-serif;margin:0 0 12px;letter-spacing:.5px}
+.brief p{color:var(--mu);margin:0 0 14px}
+.brief li{color:var(--mu);margin-bottom:6px}
+.brief small{color:#71717a;font-size:13px}
+.phone{position:relative;width:390px;height:min(844px,calc(100vh - 40px));background:var(--bg);border-radius:44px;border:10px solid #1a1a1c;box-shadow:0 30px 80px #000c,0 0 0 1px #333;overflow:hidden;display:grid;grid-template-rows:54px 1fr 66px}
+@media(max-width:900px){.brief{display:none}.stage{padding:0}.phone{width:100%;height:100dvh;border:0;border-radius:0;box-shadow:none;grid-template-rows:calc(54px + env(safe-area-inset-top)) 1fr calc(66px + env(safe-area-inset-bottom))}.top{padding-top:env(safe-area-inset-top)}.nav{padding-bottom:env(safe-area-inset-bottom)}}
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--bg);border-bottom:1px solid var(--ln);z-index:5}
+.logo{font:30px/1 'Bebas Neue',Impact,sans-serif;letter-spacing:1px;display:flex;align-items:center}
+.logo i{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--o);margin:0 1px 2px}
+.logo i:after{content:"";border-left:8px solid #0a0a0b;border-top:5px solid transparent;border-bottom:5px solid transparent;margin-left:2px}
+.ib{width:44px;height:44px;display:grid;place-items:center;position:relative}
+.ib svg{width:24px;height:24px}
+.dot{position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--o);border:2px solid var(--bg)}
+main{position:relative;overflow:hidden}
+#view{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain}
+.nav{display:grid;grid-template-columns:repeat(5,1fr);background:var(--bg);border-top:1px solid var(--ln)}
+.nav button{display:grid;justify-items:center;align-content:center;gap:3px;font-size:11px;color:var(--mu)}
+.nav button svg{width:24px;height:24px}
+.nav button[aria-current=true]{color:var(--ink)}
+.nav .plus span{width:48px;height:34px;border-radius:12px;background:var(--o);display:grid;place-items:center;color:#0a0a0b}
+svg.i{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* feed */
+.feed{scroll-snap-type:y mandatory}
+.card{position:relative;height:100%;scroll-snap-align:start;overflow:hidden;background:#000}
+.card>svg{position:absolute;inset:0;width:100%;height:100%}
+.shade{position:absolute;inset:0;background:linear-gradient(#0008,#0000 22%,#0000 50%,#000d)}
+.ftop{position:absolute;left:0;right:0;top:0;z-index:3;padding:10px 0 6px;background:linear-gradient(#000c,#0000)}
+.tabs{display:flex;justify-content:center;gap:22px;font-weight:600}
+.tabs button{color:#fffa;padding:6px 0;border-bottom:2px solid transparent}
+.tabs button[aria-pressed=true]{color:#fff;border-color:#fff}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 12px 2px;scrollbar-width:none}
+.chip{flex:none;padding:7px 12px;border-radius:999px;background:#ffffff1f;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;min-height:34px}
+.chip b{width:8px;height:8px;border-radius:50%}
+.chip[aria-pressed=true]{background:#fff;color:#0a0a0b}
+.rail{position:absolute;right:8px;bottom:96px;display:grid;gap:14px;justify-items:center;z-index:2}
+.rail button{display:grid;justify-items:center;font-size:12px;font-weight:600;text-shadow:0 1px 3px #000}
+.rail svg{width:32px;height:32px;filter:drop-shadow(0 1px 3px #000a)}
+.rail .on svg{fill:var(--o);stroke:var(--o)}
+.av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font:20px 'Bebas Neue',Impact,sans-serif;border:2px solid #fff;position:relative}
+.av em{position:absolute;bottom:-9px;width:20px;height:20px;border-radius:50%;background:var(--o);display:grid;place-items:center;font:700 15px/1 Inter;font-style:normal;color:#0a0a0b}
+.meta{position:absolute;left:14px;right:76px;bottom:18px;z-index:2;text-shadow:0 1px 4px #000}
+.meta .h{font-weight:700;font-size:16px;display:flex;align-items:center;gap:5px}
+.vf{width:16px;height:16px;border-radius:50%;background:var(--o);display:inline-grid;place-items:center}
+.vf svg{width:10px;height:10px;stroke:#0a0a0b;stroke-width:4}
+.sub{font-size:13px;color:#e4e4e7}
+.cap{margin:6px 0 8px}
+.stat{display:inline-flex;align-items:stretch;font:600 14px/1 Oswald,sans-serif;text-transform:uppercase;border-radius:6px;overflow:hidden;box-shadow:0 4px 14px #0008}
+.stat span{padding:7px 9px;background:var(--c,var(--o));color:#0a0a0b}
+.stat span+span{background:#0a0a0bdd;color:#fff}
+.bar{position:absolute;left:0;bottom:0;height:3px;background:var(--o);width:0;z-index:3;animation:play 9s linear infinite}
+@keyframes play{to{width:100%}}
+.burst{position:absolute;left:50%;top:45%;width:110px;height:110px;margin:-55px;z-index:4;fill:var(--o);pointer-events:none;animation:pop .7s ease-out forwards}
+@keyframes pop{0%{transform:scale(.3);opacity:0}30%{transform:scale(1.15);opacity:1}100%{transform:scale(1) translateY(-40px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.bar,.burst{animation:none}.burst{display:none}}
+/* pages */
+.pg{padding:16px 16px 28px}
+h2{font:32px/1.05 'Bebas Neue',Impact,sans-serif;letter-spacing:.5px;margin:6px 0 10px}
+h3{font:600 15px/1.3 Inter;margin:22px 0 10px}
+.mu{color:var(--mu);font-size:13px}
+.search{display:flex;align-items:center;gap:8px;background:var(--p);border:1px solid var(--ln);border-radius:12px;padding:0 12px;height:46px}
+.search input{flex:1;background:none;border:0;outline:0;font-size:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.chan{position:relative;height:92px;border-radius:14px;overflow:hidden;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;text-align:left;background:var(--p)}
+.chan:before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,var(--c),#0000 75%);opacity:.55}
+.chan>*{position:relative}.chan b{font:22px/1 'Bebas Neue',Impact,sans-serif;letter-spacing:.5px}
+.row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.ctry{flex:none;background:var(--p);border:1px solid var(--ln);border-radius:12px;padding:10px 12px;min-width:116px;text-align:left}
+.ctry b{display:block;font-size:14px}
+.panel{background:var(--p);border:1px solid var(--ln);border-radius:16px;padding:14px}
+.f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+select{width:100%;height:44px;border-radius:10px;background:var(--p2);border:1px solid var(--ln);padding:0 10px;font-size:16px}
+label.ck{display:flex;align-items:center;gap:8px;min-height:40px;font-size:14px}
+label.ck input{width:20px;height:20px;accent-color:var(--o)}
+.btn{min-height:44px;border-radius:12px;padding:0 16px;font-weight:700;background:var(--o);color:#0a0a0b;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.g{background:var(--p2);color:var(--ink);border:1px solid var(--ln)}
+.btn.w{width:100%}
+.res{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--ln)}
+.res .av{width:44px;height:44px;border-width:0}
+.res .btn{min-height:36px;padding:0 10px;font-size:13px}
+.ch{border-radius:16px;overflow:hidden;background:var(--p);border:1px solid var(--ln);margin-bottom:12px}
+.ch .thumb{height:120px;position:relative}.ch .thumb svg{width:100%;height:100%;display:block}
+.ch .thumb .tag{position:absolute;left:10px;top:10px}
+.ch .bd{padding:12px 14px 14px}
+.ch .bd b{font:24px/1 'Bebas Neue',Impact,sans-serif;letter-spacing:.5px}
+.kv{display:flex;gap:14px;margin:6px 0 12px;font-size:13px;color:var(--mu)}
+.seg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:6px}
+.seg button{flex:none;min-height:36px;padding:0 12px;border-radius:999px;background:var(--p);border:1px solid var(--ln);font-size:13px;font-weight:600}
+.seg button[aria-pressed=true]{background:var(--ink);color:#0a0a0b}
+.lb{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)}
+.lb .n{font:24px 'Bebas Neue',Impact,sans-serif;color:var(--mu)}.lb:first-child .n{color:var(--o)}
+.lb .s{font:600 16px Oswald,sans-serif;white-space:nowrap}
+.ban{height:110px;margin:-16px -16px 0;background:linear-gradient(120deg,var(--o),#7a2108 70%,#0a0a0b)}
+.pav{width:88px;height:88px;border-radius:50%;border:4px solid var(--bg);margin-top:-44px;font-size:38px;background:#2a1408;color:var(--o)}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.bdg{font-size:12px;font-weight:600;padding:5px 9px;border-radius:999px;background:var(--p2);border:1px solid var(--ln);display:inline-flex;gap:5px;align-items:center}
+.bdg.o{border-color:var(--o);color:var(--o)}
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.nums div{background:var(--p);border:1px solid var(--ln);border-radius:12px;padding:10px;text-align:center}
+.nums b{display:block;font:600 24px/1.1 Oswald,sans-serif}
+.alert{display:flex;gap:10px;align-items:center;background:#ff5a1f18;border:1px solid #ff5a1f55;border-radius:12px;padding:10px 12px;font-size:14px}
+.alert svg{width:22px;height:22px;flex:none;color:var(--o)}
+.conn{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--ln);font-size:14px}
+.tg{width:46px;height:28px;border-radius:999px;background:var(--ln);position:relative}
+.tg:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s}
+.tg[aria-pressed=true]{background:var(--o)}.tg[aria-pressed=true]:after{left:21px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;margin:0 -16px}
+.tile{aspect-ratio:9/14;position:relative;overflow:hidden}.tile svg{width:100%;height:100%;display:block}
+.tile span{position:absolute;left:6px;bottom:5px;font:600 12px Oswald,sans-serif;text-shadow:0 1px 3px #000}
+/* sheet + toast */
+.sheet{position:absolute;inset:0;z-index:20;background:#000a;display:flex;align-items:flex-end}
+.sheet>div{width:100%;max-height:92%;overflow-y:auto;background:var(--bg);border-radius:22px 22px 0 0;border-top:1px solid var(--ln);padding:8px 16px 22px}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--ln);margin:4px auto 8px}
+.drop{border:2px dashed var(--ln);border-radius:16px;padding:22px 14px;text-align:center;display:grid;gap:10px;justify-items:center}
+.drop svg{width:40px;height:40px;color:var(--o)}
+.step{display:flex;gap:10px;align-items:center;padding:8px 0;font-size:14px;color:var(--mu)}
+.step i{width:22px;height:22px;border-radius:50%;border:2px solid var(--ln);flex:none;display:grid;place-items:center}
+.step.on{color:var(--ink)}.step.on i{border-color:var(--o)}
+.step.ok{color:var(--ink)}.step.ok i{background:var(--o);border-color:var(--o)}
+.step.ok i:after{content:"";width:8px;height:4px;border:solid #0a0a0b;border-width:0 0 2px 2px;transform:rotate(-45deg) translate(1px,-1px)}
+.pbar{height:8px;border-radius:9px;background:var(--p2);overflow:hidden;margin:6px 0 4px}.pbar b{display:block;height:100%;background:var(--o);width:0;transition:width .4s}
+.fmt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.fmt button{border:1px solid var(--ln);background:var(--p);border-radius:12px;padding:10px 6px;text-align:center;font-size:12px;color:var(--mu)}
+.fmt button b{display:block;font:22px/1 'Bebas Neue',Impact,sans-serif;color:var(--ink)}
+.fmt button[aria-pressed=true]{border-color:var(--o);background:#ff5a1f18}
+.mom{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--ln)}
+.mom .tile{aspect-ratio:1;border-radius:10px}
+.mom input{width:22px;height:22px;accent-color:var(--o)}
+.cm{display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;padding:8px 0}
+.cm .av{width:36px;height:36px;font-size:16px;border:0}
+.onb{position:absolute;inset:0;z-index:25;background:var(--bg);overflow-y:auto;padding:22px 20px 24px;display:flex;flex-direction:column}
+.onb .big{font:60px/.95 'Bebas Neue',Impact,sans-serif;margin:18px 0 12px}
+.dots{display:flex;gap:6px;margin-bottom:18px}.dots i{height:4px;flex:1;border-radius:4px;background:var(--ln)}.dots i.on{background:var(--o)}
+.roles{display:grid;gap:10px}
+.role{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;align-items:center;text-align:left;background:var(--p);border:1px solid var(--ln);border-radius:14px;padding:14px}
+.role[aria-pressed=true]{border-color:var(--o);background:#ff5a1f18}
+.role svg{width:28px;height:28px;color:var(--o)}
+.tx{width:100%;height:46px;border-radius:10px;background:var(--p2);border:1px solid var(--ln);padding:0 12px;font-size:16px;margin-bottom:10px}
+.foot{margin-top:auto;padding-top:18px;display:grid;gap:8px}
+.gd{position:absolute;left:14px;right:14px;bottom:22px;z-index:2;background:#0a0a0bd9;border:1px solid var(--ln);border-radius:18px;padding:16px}
+.gd .t{font:34px/1 'Bebas Neue',Impact,sans-serif;display:block;margin:8px 0 4px}
+.gd .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.btn[aria-pressed=true]{background:#22c55e}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;color:var(--mu);font-weight:600}
+.game{background:var(--p);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:10px}
+.game b.v{font:26px/1 'Bebas Neue',Impact,sans-serif;display:block}
+.game .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.rc{background:linear-gradient(150deg,#1d1d20,#2a1408);border:1px solid var(--o);border-radius:18px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:12px}
+.rc .tile{border-radius:10px;aspect-ratio:9/14}
+.lnk{display:flex;gap:8px;align-items:center;margin-top:12px}.lnk code{flex:1;background:var(--p2);border:1px solid var(--ln);border-radius:10px;padding:12px;font-size:14px}
+.vf2{position:relative;height:min(420px,52vh);border-radius:18px;overflow:hidden;border:2px solid #ef4444}.vf2 svg{width:100%;height:100%;display:block}
+.rec{position:absolute;top:12px;left:12px;background:#000b;padding:6px 10px;border-radius:999px;font:600 14px Oswald,sans-serif;display:flex;gap:6px;align-items:center}
+.rec i{width:10px;height:10px;border-radius:50%;background:#ef4444}
+.vtip{position:absolute;left:12px;right:12px;bottom:12px;background:#000c;border-radius:12px;padding:10px 12px;font-size:14px}
+.gp{position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000}.gp>svg{position:absolute;inset:0;width:100%;height:100%}
+.gp .pl{position:absolute;inset:0;display:grid;place-items:center;width:100%}.gp .pl span{width:58px;height:58px;border-radius:50%;background:#000b;display:grid;place-items:center}
+.gp .pl span:after{content:"";border-left:18px solid #fff;border-top:11px solid transparent;border-bottom:11px solid transparent;margin-left:5px}.gp .pl.on span:after{border:0;width:16px;height:20px;border-left:5px solid #fff;border-right:5px solid #fff;margin:0}
+.gp .tm{position:absolute;left:10px;bottom:10px;font:600 13px Oswald,sans-serif;background:#000b;padding:4px 8px;border-radius:6px}
+.gp .yt{position:absolute;right:10px;top:10px;font-size:12px;font-weight:600;background:#000b;padding:4px 8px;border-radius:6px}
+.scrub{position:relative;height:36px;margin:8px 0 2px;cursor:pointer;touch-action:none}.scrub .tr,.scrub .pr{position:absolute;left:0;bottom:6px;height:6px;border-radius:6px}.scrub .tr{right:0;background:var(--p2)}.scrub .pr{background:var(--o)}
+.scrub i{position:absolute;bottom:14px;width:5px;margin-left:-2px;border-radius:2px;background:#ff5a1fa0}
+.clipb{width:100%;min-height:52px;border-radius:14px;background:var(--o);color:#0a0a0b;font:22px 'Bebas Neue',Impact,sans-serif;letter-spacing:1px;margin:8px 0 4px}
+.pr2{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln);text-align:left;width:100%}
+.pr2 .t{font:600 15px Oswald,sans-serif;background:var(--p2);border-radius:8px;padding:6px 0;text-align:center}
+.bx{width:100%;border-collapse:collapse;font-size:14px}.bx th,.bx td{padding:8px 5px;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}.bx th{color:var(--mu);font-weight:600;font-size:12px}.bx th:first-child,.bx td:first-child{text-align:left}
+.shot{width:100%;max-width:340px;display:block;margin:8px auto}
+.cam{position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000}.cam>svg{position:absolute;inset:0;width:100%;height:100%}
+.livep{position:absolute;top:10px;left:10px;display:flex;gap:6px}.livep b{background:#ef4444;color:#fff;font:600 12px Oswald,sans-serif;padding:3px 8px;border-radius:5px}.livep span{background:#000b;font:600 12px Oswald,sans-serif;padding:3px 8px;border-radius:5px}
+.sbo{position:absolute;left:10px;right:10px;bottom:10px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;align-items:stretch;font:600 15px Oswald,sans-serif;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px #0009}
+.sbo span{padding:6px 8px;background:#0a0a0bee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sbo .sc{background:var(--o);color:#0a0a0b;min-width:34px;text-align:center}.sbo .cl{background:#fff;color:#0a0a0b}
+.pad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}.pad button{min-height:48px;border-radius:10px;background:var(--p2);border:1px solid var(--ln);font:600 16px Oswald,sans-serif}.pad .pt{background:var(--o);color:#0a0a0b;border:0}
+.log{max-height:180px;overflow-y:auto}
+.pban{height:130px;margin:-16px -16px 0;background:url(banner.jpg) center/cover;position:relative}.pban:after{content:"";position:absolute;inset:0;background:linear-gradient(#0a0a0b33,#0a0a0b)}
+.ptile{border:0;background:var(--p) center/cover;padding:0}
+.reel{width:100%;display:block;border-radius:14px;aspect-ratio:9/16;max-height:470px;object-fit:cover;background:#000}
+.vm{position:absolute;inset:0;z-index:22;background:#000;display:flex;flex-direction:column}.vm video{flex:1;min-height:0;width:100%;object-fit:contain}.vm .bar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}
+#sres:empty{display:none}#sres{margin-top:8px}
+.chip,.seg button{min-height:40px}
+.toast{position:absolute;left:12px;right:12px;top:64px;z-index:30;background:#fff;color:#0a0a0b;border-radius:14px;padding:12px 14px;font-size:14px;font-weight:600;box-shadow:0 10px 30px #000a}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="tro" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4a3 3 0 0 0 4 4M16 6h4a3 3 0 0 1-4 4M12 13v4M8 21h8M9 17h6"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.5-9 9-9 9z"/></symbol>
+<symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+<symbol id="ans" viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></symbol>
+<symbol id="share" viewBox="0 0 24 24"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></symbol>
+<symbol id="bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></symbol>
+<symbol id="srch" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="chk" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+<symbol id="eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="up" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4"/></symbol>
+<symbol id="team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2 20a7 7 0 0 1 14 0M15 14.5a5 5 0 0 1 7 4.5"/></symbol>
+<symbol id="clip" viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 5H5v16h14V5h-2M8 12h8M8 16h5"/></symbol>
+<symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+<symbol id="cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="3"/><path d="M6 10v5M18 10v5"/></symbol>
+<symbol id="hf" viewBox="0 0 24 24"><path d="M12 21s-8-5-10-10a5.5 5.5 0 0 1 10-3.5A5.5 5.5 0 0 1 22 11c-2 5-10 10-10 10z"/></symbol>
+</svg>
+<div class="stage">
+  <div class="brief">
+    <h1>Jamoja V1</h1>
+    <p>The video platform for every sport, at every level, everywhere. Built by an athlete, for athletes.</p>
+    <ul><li>Social feed for every sport</li><li>Go live with a free scoreboard</li><li>Film a Run, upload a game, or share a YouTube link</li><li>Auto highlights, game tape and stats</li><li>Player profiles, clubs, scouts and earnings</li></ul>
+    <small><a href="profile/" style="color:#ff5a1f">See a full player profile</a><br>Clickable prototype. Athletes, stats and coaches are sample data.</small>
+  </div>
+  <div class="phone" id="app">
+    <header class="top">
+      <div class="logo" aria-label="Jamoja">JAM<i></i>JA</div>
+      <div style="display:flex;align-items:center"><button id="golive" style="background:#ef4444;color:#fff;font:600 13px Oswald,sans-serif;padding:6px 10px;border-radius:8px;margin-right:4px;min-height:32px">GO LIVE</button><button class="ib" id="wal" aria-label="Earnings"><svg class="i"><use href="#cash"/></svg></button><button class="ib" id="bell" aria-label="Notifications"><svg class="i"><use href="#bell"/></svg><span class="dot"></span></button></div>
+    </header>
+    <main><div id="view"></div></main>
+    <nav class="nav" id="nav">
+      <button data-t="home"><svg class="i"><use href="#home"/></svg>Home</button>
+      <button data-t="disc"><svg class="i"><use href="#disc"/></svg>Discover</button>
+      <button data-t="up" class="plus" aria-label="Upload"><span><svg class="i"><use href="#plus"/></svg></span>Upload</button>
+      <button data-t="ch"><svg class="i"><use href="#tro"/></svg>Challenges</button>
+      <button data-t="me"><svg class="i"><use href="#user"/></svg>Profile</button>
+    </nav>
+  </div>
+</div>
+<script>
+{
+const SP={bball:['Basketball','#ff5a1f'],soccer:['Soccer','#22c55e'],flag:['Flag Football','#3b82f6'],vball:['Volleyball','#facc15'],track:['Track','#f472b6'],base:['Baseball','#ef4444']};
+const S={t:'home',feed:'fy',sport:'all',like:{},fol:{},status:'Coaching',conn:{TikTok:true,Instagram:true,YouTube:false},lbs:'bball'};
+let posts=[
+{id:1,n:'Marcus Bell',h:'marcus.buckets',sp:'bball',lv:'HS · Class of 2027',pl:'Anaheim, CA',cap:'Left-hand finish through contact. Coaches, I go both ways.',st:['And-1','28 PTS tonight'],l:4210,c:183,v:1},
+{id:2,n:'Lucas Ferreira',h:'lucasf10',sp:'soccer',lv:'Recreation',pl:'São Paulo, BR',cap:'Rua game, Sunday morning. Top bins off the wall.',st:['Goal','3rd of the day'],l:12904,c:640,v:0},
+{id:3,n:'Aaliyah Grant',h:'aaliyah.qb',sp:'flag',lv:'HS · Class of 2026',pl:'Long Beach, CA',cap:'Rolled right, threw back across. LA28 is the goal.',st:['TD pass','42 yds'],l:8733,c:301,v:1},
+{id:4,n:'Sione Tafuna',h:'sione.spikes',sp:'vball',lv:'College · Portal',pl:'Honolulu, HI',cap:'In the portal. 6\'5" outside, two years left.',st:['Kill','.341 hit %'],l:5122,c:212,v:1},
+{id:5,n:'Dre Coleman',h:'dre.overseas',sp:'bball',lv:'Pro · Overseas',pl:'Lisbon, PT',cap:'Second season in Portugal. Agents, my full tape is pinned.',st:['Step-back 3','5/8 from deep'],l:3018,c:96,v:1},
+{id:6,n:'Kemi Adebayo',h:'kemi.runs',sp:'track',lv:'HS · Class of 2027',pl:'Lagos, NG',cap:'200m PR at regionals. Looking at US colleges.',st:['200m','22.9s PR'],l:6640,c:254,v:1}];
+const ini=n=>n.split(' ').map(w=>w[0]).join('');
+const fmt=n=>n>=1000?(n/1000).toFixed(n>=10000?0:1)+'K':n;
+let gid=0;
+function scene(sp,big){
+  const c=SP[sp][1],g='g'+(++gid);let s=`<svg viewBox="0 0 390 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#111"/><stop offset="1" stop-color="${c}" stop-opacity=".55"/></linearGradient><radialGradient id="${g}l" cx=".5" cy=".3" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="390" height="700" fill="url(#${g})"/>`;
+  const L='stroke="#ffffff55" stroke-width="3" fill="none"';
+  if(sp==='bball'){for(let i=0;i<14;i++)s+=`<rect x="0" y="${330+i*28}" width="390" height="27" fill="#c2702d" opacity="${.12+(i%3)*.04}"/>`;s+=`<path d="M60 700 L60 470 Q195 330 330 470 L330 700" ${L}/><rect x="135" y="520" width="120" height="180" ${L}/><rect x="150" y="150" width="90" height="62" fill="#fff2" stroke="#fffa" stroke-width="3"/><ellipse cx="195" cy="232" rx="30" ry="7" fill="none" stroke="${c}" stroke-width="5"/><path d="M168 236 L180 280 M222 236 L210 280 M182 238 L190 278 M208 238 L200 278" stroke="#fff8" stroke-width="2"/><circle cx="262" cy="300" r="26" fill="${c}"/><path d="M236 300h52M262 274v52M244 282q18 18 0 36M280 282q-18 18 0 36" stroke="#3a1a08" stroke-width="2" fill="none"/>`}
+  else if(sp==='soccer'){for(let i=0;i<8;i++)s+=`<rect x="0" y="${300+i*50}" width="390" height="50" fill="#16a34a" opacity="${i%2?.25:.15}"/>`;s+=`<rect x="70" y="190" width="250" height="110" fill="none" stroke="#fffc" stroke-width="5"/><path d="M70 190l30 30h190l30-30M100 220v80M290 220v80" stroke="#fff5" stroke-width="2"/>`;for(let i=0;i<9;i++)s+=`<path d="M${100+i*24} 220v80" stroke="#fff3"/>`;s+=`<path d="M20 330 H370 M90 330 V420 H300 V330" ${L}/><circle cx="250" cy="240" r="20" fill="#fff"/><path d="M243 233l7-4 7 4-2 8h-10z" fill="#222"/>`}
+  else if(sp==='flag'){for(let i=0;i<7;i++)s+=`<path d="M0 ${300+i*60} H390" stroke="#ffffff44" stroke-width="${i%2?2:4}"/><text x="24" y="${294+i*60}" fill="#fff6" font-family="Oswald" font-size="22">${[50,40,30,20,10,'G','']?.[i]}</text>`;s+=`<ellipse cx="220" cy="230" rx="30" ry="17" fill="#7a3b16" transform="rotate(-25 220 230)"/><path d="M205 236l30-14M212 224l4 8M220 220l4 8M228 216l4 8" stroke="#fff" stroke-width="2"/><path d="M120 470q20 40 0 90M150 470q-20 40 0 90" stroke="${c}" stroke-width="10" fill="none" stroke-linecap="round"/>`}
+  else if(sp==='vball'){s+=`<rect x="0" y="420" width="390" height="280" fill="#e8c27a" opacity=".35"/><rect x="0" y="250" width="390" height="14" fill="#fffd"/>`;for(let i=0;i<14;i++)s+=`<path d="M${i*30} 264v110" stroke="#fff4"/>`;for(let i=0;i<4;i++)s+=`<path d="M0 ${290+i*24}H390" stroke="#fff4"/>`;s+=`<rect x="0" y="372" width="390" height="6" fill="#fffa"/><circle cx="150" cy="170" r="24" fill="#fff"/><path d="M130 160q20 10 40 0M136 184q14-16 30-28" stroke="${c}" stroke-width="4" fill="none"/>`}
+  else{for(let i=0;i<6;i++)s+=`<path d="M${-60+i*70} 700 L${150+i*25} 260" stroke="#fff8" stroke-width="3"/>`;s+=`<rect x="0" y="260" width="390" height="440" fill="${c}" opacity=".12"/><text x="300" y="640" fill="#fff8" font-family="Oswald" font-size="40">${sp==='base'?'':'200'}</text>`}
+  return s+`<rect width="390" height="700" fill="url(#${g}l)"/></svg>`;
+}
+const V=document.getElementById('view');
+const toast=m=>{document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=m;document.getElementById('app').append(t);setTimeout(()=>t.remove(),2800)};
+const APP=document.getElementById('app');
+const closeSheets=()=>document.querySelectorAll('.sheet,.vm').forEach(x=>x.remove());
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CLUB={n:'Eastside FC',sp:'soccer',pl:'Long Beach, CA',mem:1240,games:[{id:'g1',vs:'Rio Ruas',when:'Sat, Nov 28 · 7:00 PM',where:'Pier Park, Long Beach',go:186},{id:'g2',vs:'Harbor United',when:'Sun, Dec 6 · 10:00 AM',where:'Silverado Park, Long Beach',go:74}]};
+Object.assign(S,{rsvp:{},boost:{},earn:{tips:true,club:true},applied:{}});
+function gdCard(){const g=CLUB.games[0],on=S.rsvp[g.id];return `<article class="card">${scene(CLUB.sp)}<div class="shade"></div><div class="gd"><span class="chip" style="background:${SP[CLUB.sp][1]};color:#0a0a0b;display:inline-flex">Game day · ${CLUB.n}</span><b class="t">${CLUB.n} vs ${g.vs}</b><div class="sub">${g.when}<br>${g.where} · Free entry</div><div class="mu" style="margin-top:6px">${g.go+(on?1:0)} going · Every tagged player gets an AI tape after the match</div><div class="acts"><button class="btn" data-rsvp="${g.id}" aria-pressed="${!!on}">${on?'Going':'RSVP'}</button><button class="btn g" data-club="1">Open club</button></div></div></article>`}
+function home(){feedHTML();if(S.feed==='fy'&&(S.sport==='all'||S.sport===CLUB.sp)){const cs=V.querySelectorAll('.card'),t=document.createElement('div');t.innerHTML=gdCard();if(cs.length>=2)cs[1].after(t.firstElementChild);else if(cs.length)cs[0].after(t.firstElementChild)}}
+function feedHTML(){
+  const list=posts.filter(p=>(S.sport==='all'||p.sp===S.sport)&&(S.feed!=='fl'||S.fol[p.id]));
+  const chips=[['all','All sports']].concat(Object.entries(SP).map(([k,v])=>[k,v[0]]));
+  V.className='feed';
+  V.innerHTML=`<div class="ftop"><div class="tabs">${[['fl','Following'],['fy','For You'],['cr','Crews']].map(([k,n])=>`<button data-feed="${k}" aria-pressed="${S.feed===k}">${n}</button>`).join('')}</div><div class="chips">${chips.map(([k,n])=>`<button class="chip" data-sp="${k}" aria-pressed="${S.sport===k}">${k!=='all'?`<b style="background:${SP[k][1]}"></b>`:''}${n}</button>`).join('')}</div></div>`+
+  (S.feed==='cr'?`<div class="pg" style="padding-top:110px"><h2>Crews</h2><p class="mu">Your pickup group, team or club gets one shared page. Crews open in the next build.</p></div>`:
+  list.length?list.map(p=>`<article class="card" data-id="${p.id}" style="--c:${SP[p.sp][1]}">${scene(p.sp)}<div class="shade"></div>
+  <div class="rail"><button data-fol="${p.id}" aria-label="Follow ${p.n}"><span class="av" style="background:${SP[p.sp][1]}33">${ini(p.n)}${S.fol[p.id]||p.me?'':'<em>+</em>'}</span></button>
+  <button data-like="${p.id}" class="${S.like[p.id]?'on':''}" aria-label="Like"><svg class="i"><use href="#heart"/></svg>${fmt(p.l+(S.like[p.id]?1:0))}</button>
+  <button data-cm="${p.id}" aria-label="Comments"><svg class="i"><use href="#chat"/></svg>${fmt(p.c)}</button>
+  <button data-ans="${p.id}" aria-label="Answer this clip"><svg class="i"><use href="#ans"/></svg>Answer</button>
+  <button data-tip="${p.id}" aria-label="Tip ${p.n}"><svg class="i"><use href="#cash"/></svg>Tip</button>
+  <button data-sh="${p.id}" aria-label="Share"><svg class="i"><use href="#share"/></svg>Share</button></div>
+  <div class="meta"><div class="h">@${p.h}${p.v?'<span class="vf" title="Verified stats"><svg class="i"><use href="#chk"/></svg></span>':''}</div><div class="sub">${p.lv} · ${p.pl} · ${SP[p.sp][0]}</div><div class="cap">${p.cap}</div><div class="stat"><span>${p.st[0]}</span><span>${p.st[1]}</span></div></div><div class="bar"></div></article>`).join(''):
+  (S.feed==='fl'?`<div class="pg" style="padding-top:110px"><h2>Nothing here yet</h2><p class="mu">Follow some athletes from For You and their clips land here.</p></div>`:`<div class="pg" style="padding-top:110px"><h2>No ${SP[S.sport]?SP[S.sport][0].toLowerCase():''} clips yet</h2><p class="mu">Be the first. Post a clip or film a game and it shows up here for everyone who follows ${SP[S.sport]?SP[S.sport][0]:'this sport'}.</p><button class="btn" data-mkopen style="margin-top:10px">Create</button></div>`));
+}
+function disc(){
+  V.className='';
+  V.innerHTML=`<div class="pg"><label class="search"><svg class="i" width="20" height="20"><use href="#srch"/></svg><input id="q" placeholder="Search athletes, sports, places" aria-label="Search" autocomplete="off"></label><div id="sres" aria-live="polite"></div>
+  <h3>Channels</h3><div class="grid2">${Object.entries(SP).map(([k,[n,c]],i)=>`<button class="chan" data-go="${k}" style="--c:${c}"><b>${n}</b><span class="mu">${[48,61,19,22,14,17][i]}K members</span></button>`).join('')}</div>
+  <h3>Around the world</h3><div class="row">${[['Brazil','Street soccer, futsal'],['USA','Hoops, flag, track'],['Nigeria','Track, hoops'],['Philippines','Hoops, volleyball'],['Spain','Soccer, hoops'],['Japan','Baseball, volleyball']].map(([a,b])=>`<button class="ctry" data-ctry="${a}"><b>${a}</b><span class="mu">${b}</span></button>`).join('')}</div>
+  <h3>Courts tonight</h3>${COURTS.map((c,i)=>`<div class="conn"><span><b>${c[0]}</b><br><span class="mu">${c[1]} · ${c[2]+(S.chk[i]?1:0)} checked in</span></span><span></span><button class="btn ${S.chk[i]?'g':''}" data-chk="${i}" style="min-height:36px;font-size:13px;padding:0 10px">${S.chk[i]?'Checked in':'Check in'}</button></div>`).join('')}
+  <h3>Clubs and leagues</h3><button class="ctry" data-club="1" style="width:100%;display:flex;justify-content:space-between;align-items:center;min-height:56px"><span><b>${CLUB.n}</b><span class="mu">${SP[CLUB.sp][0]} · ${CLUB.pl} · next game Sat</span></span><span class="bdg o">Game day</span></button>
+  <h3>Scout search</h3><div class="panel"><p class="mu" style="margin:0 0 10px">For verified coaches and scouts. Find athletes by what they actually do. Searching is free. Scout Pro ($29 a month) adds alerts, full tapes and contact requests.</p>
+  <div class="f"><select id="fs" aria-label="Sport">${Object.entries(SP).map(([k,[n]])=>`<option value="${k}">${n}</option>`).join('')}</select><select id="fl" aria-label="Level"><option>Any level</option><option>HS</option><option>College</option><option>Pro</option></select><select aria-label="Class"><option>Class of 2027</option><option>Class of 2026</option><option>Class of 2028</option></select><select aria-label="Region"><option>Anywhere</option><option>US West</option><option>Europe</option><option>Africa</option><option>South America</option></select></div>
+  <label class="ck"><input type="checkbox" id="fv" checked> Verified stats only</label><button class="btn w" id="go"><svg class="i" width="18" height="18"><use href="#srch"/></svg>Search athletes</button><div id="res"></div></div></div>`;
+}
+function search(){
+  const sp=document.getElementById('fs').value,lv=document.getElementById('fl').value,vo=document.getElementById('fv').checked;
+  const r=posts.filter(p=>p.sp===sp&&(lv==='Any level'||p.lv.startsWith(lv))&&(!vo||p.v));
+  document.getElementById('res').innerHTML=`<p class="mu" style="margin:12px 0 4px">${r.length} athlete${r.length===1?'':'s'} found</p>`+(r.map(p=>`<div class="res"><span class="av" style="background:${SP[p.sp][1]}33">${ini(p.n)}</span><div><b>${p.n}</b><div class="mu">${p.lv} · ${p.pl}</div><div class="mu">${p.st[1]}</div></div><button class="btn" data-req="${p.id}">Contact</button></div>`).join('')||'<p class="mu">Try another level or turn off verified only.</p>');
+}
+const CH=[['bball','Crossover of the Week','1,284','3 days','$250 gear pack from a local sponsor'],['soccer','Top Bins Challenge','3,902','5 days','Featured on the Jamoja homepage'],['flag','One-Hand Grab','611','6 days','Flag team jerseys for your crew']];
+const LB={bball:[['Marcus Bell','Anaheim, CA',982],['Tyrese Okafor','Houston, TX',944],['Jonah Reyes','Manila, PH',921],['Dre Coleman','Lisbon, PT',899]],soccer:[['Lucas Ferreira','São Paulo, BR',1204],['Mateo Ruiz','Sevilla, ES',1110],['Amara Diallo','Dakar, SN',1032]],flag:[['Aaliyah Grant','Long Beach, CA',870],['Bri Thompson','Atlanta, GA',845],['Nia Brooks','Miami, FL',802]]};
+function ch(){
+  V.className='';
+  V.innerHTML=`<div class="pg"><h2>This week's challenges</h2>${CH.map(([k,t,e,d,p])=>`<div class="ch"><div class="thumb">${scene(k)}<span class="chip tag" style="background:${SP[k][1]};color:#0a0a0b">${SP[k][0]}</span></div><div class="bd"><b>${t}</b><div class="kv"><span>${e} entries</span><span>Ends in ${d}</span></div><p class="mu" style="margin:0 0 12px">Prize: ${p}</p><button class="btn w" data-enter="${k}">Answer the challenge</button></div></div>`).join('')}
+  <h3>Rankings</h3><div class="seg">${Object.keys(LB).map(k=>`<button data-lb="${k}" aria-pressed="${S.lbs===k}">${SP[k][0]}</button>`).join('')}</div>
+  <div>${LB[S.lbs].map(([n,pl,s],i)=>`<div class="lb"><span class="n">${i+1}</span><div><b>${n}</b><div class="mu">${pl}</div></div><span class="s">${s} pts</span></div>`).join('')}</div><p class="mu">Points come from verified stats and challenge results, not popularity votes.</p></div>`;
+}
+S.pf='hl';
+const PL=[['Transition bucket',0,7.1],['Pull-up from deep',7.1,14.6],['Crowd erupts',14.6,20.6],['Run-out finish',20.6,28.1],['Quick hitter',28.1,32.85],['Late-game play',32.85,40.85]];
+function me(){V.className='';const mine=posts.filter(p=>p.me);const reach=1284+(S.conn.TikTok?18000:0)+(S.conn.Instagram?6100:0)+(S.conn.YouTube?900:0);
+  const tabs=[['hl','Highlights'],['gm','Games'],['cr','Career'],['ab','About']];let sec='';
+  if(S.pf==='hl')sec=`<video class="reel" src="reel.mp4" poster="poster.jpg" controls playsinline preload="metadata"></video><p class="mu">44-second reel cut automatically from 5 uploaded clips of Salem vs Sussex.</p>
+    <h3>Plays</h3><div class="tiles" style="margin:0">${PL.map((p,i)=>`<button class="tile ptile" data-pv="${i}" style="background-image:url(t${i}.jpg)" aria-label="Play ${i+1}: ${p[0]}"><span>${p[0]}</span></button>`).join('')}${mine.map(p=>`<div class="tile">${scene(p.sp)}<span>${p.st[0]}</span></div>`).join('')}</div>
+    <p class="mu" style="margin-top:8px">Play names are the AI's first guess. Tap and hold to rename.</p>`;
+  else if(S.pf==='gm')sec=`<button class="card" data-opengame style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;background:var(--p);border:1px solid var(--ln);border-radius:14px;padding:10px;width:100%;text-align:left;margin-bottom:8px"><span style="border-radius:10px;background:url(banner.jpg) center/cover;aspect-ratio:16/10"></span><span><b>Salem vs Sussex</b><br><span class="mu">HigherThan7TV · Nov 14, 2026<br>Open the game page</span></span></button>
+    <a class="btn g w" href="https://www.youtube.com/live/cBsYKpeUWvU" target="_blank" rel="noopener">Watch the full game on YouTube</a>
+    ${RUN?`<button class="btn g w" data-lastrun style="margin-top:8px">Open my last Run (${RUN.f[1]})</button>`:''}
+    <div class="panel" style="margin-top:12px"><b>Unlock the full game tape</b><p class="mu" style="margin:4px 0 0">Upload the original Salem vs Sussex file and the AI builds every possession, a box score and a shot chart.</p></div>`;
+  else if(S.pf==='cr')sec=`<div class="lb"><span class="n">P</span><div><b>Pro</b><div class="mu">Boston Blizzards (ABA) · Philadelphia Destroyers (APBL)</div></div><span></span></div>
+    <div class="lb"><span class="n">C</span><div><b>College</b><div class="mu">Division I, after junior college</div></div><span></span></div>
+    <h3>Street career</h3><div class="nums"><div><b>${RUN?1:0}</b><span class="mu">Runs</span></div><div><b>${RUN?'1-0':'0-0'}</b><span class="mu">Record</span></div><div><b>${RUN?RUN.pts[0]:'-'}</b><span class="mu">Best game</span></div></div>
+    <h3>Open to</h3><div class="seg">${['Coaching','Scouting','Pro runs','Not looking'].map(x=>`<button data-st="${x}" aria-pressed="${S.status===x}">${x}</button>`).join('')}</div>
+    <h3>Total reach: ${fmt(reach)}</h3><div class="conn"><b>Jamoja</b><span class="mu">1.3K</span><span></span></div>${[['TikTok','18K'],['Instagram','6.1K'],['YouTube','900']].map(([k,f])=>`<div class="conn"><span>${k}</span><span class="mu">${S.conn[k]?f:'Not linked'}</span><button class="tg" data-cn="${k}" aria-pressed="${S.conn[k]}" aria-label="Connect ${k}"></button></div>`).join('')}`;
+  else sec=`<p>I started Jamoja in 2005 when people said nobody would ever post their life online. The mission is the same now: give every athlete a place to be seen.</p>
+    <div class="lb"><span class="n">1</span><div><b>Featured in ESPN Page 2</b><div class="mu">Scoop Jackson column on Jamoja's mission, 2007</div></div><span></span></div>
+    <div class="lb"><span class="n">2</span><div><b>Higher Than 7</b><div class="mu">Co-founder · streams games on HigherThan7TV</div></div><span></span></div>
+    <button class="back" data-replay>Replay the sign-up intro</button>`;
+  V.innerHTML=`<div class="pg"><div class="pban"></div><div class="av pav">AT</div>
+  <h2 style="margin-top:8px">Anis Taylor</h2><div class="mu">@anis.taylor · Guard · Anaheim, CA</div>
+  <p style="margin:8px 0">Played D1, then pro in the ABA and APBL. Started Jamoja in 2005 so more athletes get seen.</p>
+  <div class="badges"><span class="bdg o">Jamoja founder since 2005</span><span class="bdg">Former pro</span><span class="bdg">Helped 30+ athletes earn scholarships</span></div>
+  <div class="grid2"><button class="btn" data-card>Recruiting card</button><button class="btn g" data-earn>Earnings</button></div>
+  <div class="nums"><div><b>1,284</b><span class="mu">Followers</span></div><div><b>${6+mine.length}</b><span class="mu">Highlights</span></div><div><b>${1+(RUN?1:0)}</b><span class="mu">Games</span></div></div>
+  <div class="seg" style="margin-top:14px">${tabs.map(([k,n])=>`<button data-pf="${k}" aria-pressed="${S.pf===k}">${n}</button>`).join('')}</div>
+  ${sec}<p class="mu" style="margin-top:14px">The reel, plays and game are real. Follower and reach numbers are sample data.</p></div>`}
+function pv(i){const p=PL[i],el=document.createElement('div');el.className='vm';el.setAttribute('role','dialog');el.setAttribute('aria-label','Play viewer');
+  el.innerHTML=`<div class="bar"><b>Play ${i+1}: ${p[0]}</b><button class="btn g" data-vx style="min-height:38px">Close</button></div><video src="reel.mp4" playsinline controls preload="metadata"></video><div class="bar"><span class="mu">From Salem vs Sussex</span></div>`;
+  APP.append(el);const v=el.querySelector('video'),go=()=>{v.currentTime=p[1];v.play().catch(()=>{})};
+  v.addEventListener('loadedmetadata',go,{once:true});v.addEventListener('timeupdate',()=>{if(v.currentTime>=p[2])v.pause()});
+  el.onclick=e=>{if(e.target.closest('[data-vx]')){v.pause();el.remove()}}}
+function upload(from){
+  closeSheets();const sh=document.createElement('div');sh.className='sheet';sh.innerHTML=`<div role="dialog" aria-label="AI highlight studio"><div class="grab"></div><h2>AI Highlight Studio</h2><p class="mu" style="margin-top:0">${from?`Answering: <b style="color:var(--ink)">${from}</b>. `:''}Drop in a full game. We find the plays and cut the tape.</p>
+  <div id="stg"><div class="drop"><svg class="i"><use href="#up"/></svg><b>Upload full game video</b><span class="mu">Phone, GoPro, or the camera in the stands</span><label class="btn">Choose video<input type="file" accept="video/*" id="file" hidden></label><button class="btn g" id="sample">Use sample game</button></div>
+  <h3>Your jersey number</h3><select id="jn" aria-label="Jersey number"><option>#3</option><option selected>#23</option><option>#11</option></select></div>
+  <button class="btn g w" id="cls" style="margin-top:14px">Cancel</button></div>`;
+  document.getElementById('app').append(sh);
+  const close=()=>sh.remove();
+  sh.addEventListener('click',e=>{if(e.target===sh||e.target.id==='cls')close()});
+  const run=name=>{
+    const jn=sh.querySelector('#jn').value,stg=sh.querySelector('#stg');
+    const steps=['Uploading '+name,'Listening for crowd spikes and whistles','Reading the scoreboard','Tracking '+jn+' through the game','Cutting your plays and adding stat cards'];
+    stg.innerHTML=`<div class="pbar"><b id="pb"></b></div>`+steps.map((s,i)=>`<div class="step" id="s${i}"><i></i>${s}</div>`).join('');
+    let k=0;const tick=()=>{if(k>0)stg.querySelector('#s'+(k-1)).className='step ok';if(k<steps.length){stg.querySelector('#s'+k).className='step on';stg.querySelector('#pb').style.width=((k+1)/steps.length*100)+'%';k++;setTimeout(tick,750)}else done()};tick();
+    const done=()=>{
+      const M=[['1:42','Steal and coast-to-coast layup'],['6:10','Step-back three'],['11:35','And-1 through contact'],['18:02','No-look dime'],['24:47','Pull-up jumper at the buzzer'],['29:13','Chase-down block']];
+      let f='hype';
+      stg.innerHTML=`<p class="mu" style="margin:0 0 8px">Found <b style="color:var(--ink)">${M.length} plays</b> for ${jn}: 14 pts, 5 ast, 2 stl in this clip.</p><h3>Pick a style</h3><div class="fmt">${[['hype','30s','Hype reel'],['rec','2 min','Recruiting · Pro'],['mix','Season','Mixtape · Pro']].map(([k,a,b])=>`<button data-f="${k}" aria-pressed="${k===f}"><b>${a}</b>${b}</button>`).join('')}</div>
+      <h3>Plays in your tape</h3>${M.map(([t,d],i)=>`<label class="mom"><div class="tile">${scene('bball')}</div><div><b style="font:600 15px Oswald,sans-serif">${t}</b><div class="mu">${d}</div></div><input type="checkbox" checked aria-label="Include ${d}"></label>`).join('')}
+      <h3>Also post to</h3>${['TikTok','Instagram','YouTube'].map(k=>`<div class="conn"><span>${k}</span><span class="mu">${S.conn[k]?'Linked':'Not linked'}</span><button class="tg" data-x="${k}" aria-pressed="${S.conn[k]}" aria-label="Cross-post to ${k}"></button></div>`).join('')}
+      <p class="mu">Shared clips carry a Jamoja watermark that links back to your profile. Pro styles are free during beta.</p>
+      <button class="btn w" id="post" style="margin-top:14px">Post to Jamoja</button>`;
+      stg.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{f=b.dataset.f;stg.querySelectorAll('[data-f]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+      stg.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true'));
+      stg.querySelector('#post').onclick=()=>{
+        const n=stg.querySelectorAll('.mom input:checked').length,x=[...stg.querySelectorAll('[data-x][aria-pressed=true]')].map(b=>b.dataset.x);
+        posts.unshift({id:Date.now(),n:'Anis Taylor',h:'anis.taylor',sp:'bball',lv:'Former pro · Guard',pl:'Anaheim, CA',cap:{hype:'Fresh hype reel. ',rec:'Full recruiting tape is up. ',mix:'Season mixtape. '}[f]+(from?'Answering '+from+'.':'Cut by Jamoja AI.'),st:[n+' plays','14 PTS · 5 AST'],l:0,c:0,v:1,me:1});
+        close();S.t='home';S.feed='fy';S.sport='all';render();toast('Posted'+(x.length?' and shared to '+x.join(', '):'')+'. Your tape is live.');
+      };
+    };
+  };
+  sh.querySelector('#sample').onclick=()=>run('sample-game.mp4');
+  sh.querySelector('#file').onchange=e=>{const f=e.target.files[0];if(f)run(f.name)};
+}
+function comments(p){
+  closeSheets();const sh=document.createElement('div');sh.className='sheet';
+  const L=[['Coach Rivera','Verified coach','That left hand is real. Check your messages.'],['Jay Park','','Bro went full ESPN on this one'],['Kemi Adebayo','','Answering this with my 200m start']];
+  sh.innerHTML=`<div role="dialog" aria-label="Comments"><div class="grab"></div><h3 style="margin-top:4px">${fmt(p.c)} comments</h3><div id="cl">${L.map(([n,r,t])=>`<div class="cm"><span class="av" style="background:var(--p2)">${ini(n)}</span><div><b>${n}</b>${r?` <span class="bdg o" style="padding:2px 7px">${r}</span>`:''}<div>${t}</div></div></div>`).join('')}</div>
+  <form id="cf" style="display:flex;gap:8px;margin-top:10px"><label class="search" style="flex:1"><input id="ci" placeholder="Add a comment" aria-label="Add a comment"></label><button class="btn">Send</button></form></div>`;
+  document.getElementById('app').append(sh);
+  sh.addEventListener('click',e=>{if(e.target===sh){sh.remove();if(S.t==='home'){const y=V.scrollTop;home();V.scrollTop=y}}});
+  sh.querySelector('#cf').onsubmit=e=>{e.preventDefault();const v=sh.querySelector('#ci').value.trim();if(!v)return;const d=document.createElement('div');d.className='cm';d.innerHTML=`<span class="av" style="background:#2a1408;color:var(--o)">AT</span><div><b>You</b><div></div></div>`;d.querySelector('div div').textContent=v;sh.querySelector('#cl').append(d);sh.querySelector('#ci').value='';p.c++};
+}
+function club(){V.className='';
+  V.innerHTML=`<div class="pg"><button class="back" data-back>‹ Back</button><div class="ch"><div class="thumb">${scene(CLUB.sp)}</div></div>
+  <h2>${CLUB.n}</h2><div class="mu">${SP[CLUB.sp][0]} club · ${CLUB.pl} · ${CLUB.mem.toLocaleString()} members</div>
+  <div class="badges"><span class="bdg o">Verified club</span><span class="bdg">22 games this season</span><span class="bdg">310 player tapes made</span></div>
+  <h3>Upcoming games</h3>${CLUB.games.map(x=>`<div class="game"><b class="v">vs ${x.vs}</b><div class="mu">${x.when}<br>${x.where} · ${x.go+(S.rsvp[x.id]?1:0)} going</div><div class="acts"><button class="btn" data-rsvp="${x.id}" aria-pressed="${!!S.rsvp[x.id]}">${S.rsvp[x.id]?'Going':'RSVP'}</button><button class="btn g" data-prom="${x.id}">${S.boost[x.id]?'Promoted':'Promote game'}</button></div></div>`).join('')}
+  <h3>Last match: won 3-2 vs Westside Ballers</h3><p class="mu" style="margin-top:0">The club uploaded the full match once. Jamoja cut a tape for each of the 14 tagged players, and every player who reposts sends fans back to this page.</p>
+  <div class="tiles">${[7,10,4].map(n=>`<div class="tile">${scene(CLUB.sp)}<span>#${n} tape</span></div>`).join('')}</div>
+  <h3>How the club earns</h3>
+  <div class="conn"><span>Game-day sponsor slot</span><span class="mu">$150 a game</span><span></span></div>
+  <div class="conn"><span>Livestream with fan tips</span><span class="mu">Next build</span><span></span></div>
+  <div class="conn"><span>Extra boosts (1 free a month)</span><span class="mu">$10 for 3 days</span><span></span></div>
+  <p class="mu">Sample club, games and pricing.</p></div>`}
+const DEALS=[['Anaheim Sneaker Lab','Post 2 clips in our hoop socks','$150'],['Coastline Smoothies','Game-day story with our cup','$75'],['North OC Skills Academy','Film one 30-second drill for us','$200']];
+function earn(){V.className='';const parts=[['Fan club',152.69],['Training packs',96],['Tips',88],['Brand deals',75]],tot=parts.reduce((a,b)=>a+b[1],0),mx=parts[0][1];
+  V.innerHTML=`<div class="pg"><h2>Your earnings</h2>
+  <div class="panel"><div class="mu">November so far</div><div style="font:600 40px/1.1 Oswald,sans-serif">$${tot.toFixed(2)}</div><div class="mu">After Jamoja's 10% fee. Paid out every Friday. Brand deals and payouts start at 18, so players under 18 use the social and recruiting side only.</div>
+  ${parts.map(([n,v])=>`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${n}</span><b>$${v.toFixed(2)}</b></div><div class="pbar"><b style="width:${v/mx*100}%"></b></div></div>`).join('')}</div>
+  <h3>Brand deals near you</h3>${DEALS.map(([b,t,p],i)=>`<div class="game"><div style="display:flex;justify-content:space-between;gap:10px"><b>${b}</b><b style="font-family:Oswald,sans-serif;color:var(--o)">${p}</b></div><div class="mu">${t}</div><button class="btn ${S.applied[i]?'g':''} w" style="margin-top:10px" data-apply="${i}">${S.applied[i]?'Applied. Waiting on parent approval':'Apply'}</button></div>`).join('')}
+  <h3>Ways fans pay you</h3>
+  <div class="conn"><span>Fan club · $4.99 a month<br><span class="mu">38 members get bonus clips</span></span><span></span><button class="tg" data-ern="club" aria-pressed="${S.earn.club}" aria-label="Fan club"></button></div>
+  <div class="conn"><span>Tips on your clips</span><span></span><button class="tg" data-ern="tips" aria-pressed="${S.earn.tips}" aria-label="Tips"></button></div>
+  <div class="conn"><span>Ball-handling pack · $12<br><span class="mu">8 sold this month</span></span><span></span><button class="btn g" data-sell style="min-height:36px;font-size:13px;padding:0 10px">Add pack</button></div>
+  <h3>Jamoja Pro</h3><div class="panel"><div style="display:flex;justify-content:space-between;gap:8px"><b>Pro · $9.99 a month</b><span class="bdg o">${S.min} free min left</span></div><p class="mu" style="margin:6px 0 0">10 recording hours a month, full stats and analytics, every tape style, and which coaches watched. Free plan: 60 recording minutes a month, plus unlimited posting and watching. Crews and leagues can share one plan.</p></div>
+  <p class="mu">Sample earnings, deals and pricing. High school NIL rules differ by state, so every deal is checked against your state first.</p></div>`}
+function rcard(){closeSheets();closeSheets();const sh=document.createElement('div');sh.className='sheet';
+  sh.innerHTML=`<div role="dialog" aria-label="Recruiting card"><div class="grab"></div><h3 style="margin-top:4px">Your player card</h3><div class="rc"><div><b style="font:30px/1 'Bebas Neue',Impact,sans-serif">Anis Taylor</b><div class="mu">Guard · Anaheim, CA<br>Pro: ABA and APBL · D1</div><div class="mu" style="margin:10px 0">6 highlights · 1 game</div><span class="bdg o">Jamoja founder</span></div><div class="tile" style="background:url(t1.jpg) center/cover"><span>Tape</span></div></div>
+  <p class="mu">Put this link in your bio and your emails. People see your tape, games and career on one page, and you see every view.</p><div class="lnk"><code>jamoja.io/anis.taylor</code><button class="btn" id="cp">Copy</button></div><button class="btn g w" style="margin-top:10px" id="cls">Done</button></div>`;
+  APP.append(sh);
+  sh.onclick=e=>{if(e.target===sh||e.target.id==='cls')sh.remove();else if(e.target.id==='cp'){try{navigator.clipboard.writeText('jamoja.io/anis.taylor').then(()=>toast('Link copied.'),()=>toast('Copy is blocked here. Press and hold the link instead.'))}catch(x){toast('Copy is blocked here.')}}}}
+const O={s:0,role:'',sport:'bball',lvl:'High school',pos:'',club:''};
+const ROLES=[['ath','user','Athlete','Post clips, get AI tapes, get seen by coaches'],['coach','clip','Coach or scout','Find verified athletes by what they do'],['fan','heart','Fan','Follow players, crews and game days'],['club','team','Club or league','Promote games and get a tape for every player']];
+function onb(){let el=APP.querySelector('.onb');
+  if(!el){el=document.createElement('div');el.className='onb';el.setAttribute('role','dialog');el.setAttribute('aria-label','Welcome to Jamoja');APP.append(el);el.addEventListener('click',onbClick);el.addEventListener('input',e=>{if(e.target.id&&e.target.id.startsWith('o_'))O[e.target.id.slice(2)]=e.target.value})}
+  const dots=`<div class="dots">${[1,2,3].map(i=>`<i class="${i<=O.s?'on':''}"></i>`).join('')}</div>`;
+  const chips=`<div class="chips" style="padding:0 0 12px;flex-wrap:wrap;overflow:visible">${Object.entries(SP).map(([k,[n,c]])=>`<button class="chip" data-osp="${k}" aria-pressed="${O.sport===k}"><b style="background:${c}"></b>${n}</button>`).join('')}</div>`;
+  const r=O.role;let h='';
+  if(O.s===0)h=`<div class="logo" style="font-size:40px">JAM<i></i>JA</div><div class="big">Your game.<br>Your tape.<br>Get seen.</div><p class="mu" style="font-size:16px">Upload a game, get a highlight tape in minutes, and get in front of verified coaches. Every sport, everywhere.</p><div class="foot">${['Google','Apple','TikTok'].map(k=>`<button class="btn g w" data-onext>Continue with ${k}</button>`).join('')}<button class="btn w" data-onext>Sign up with email</button></div>`;
+  else if(O.s===1)h=dots+`<h2>Who are you here as?</h2><div class="roles">${ROLES.map(([k,ic,t,d])=>`<button class="role" data-orole="${k}" aria-pressed="${r===k}"><svg class="i"><use href="#${ic}"/></svg><span><b>${t}</b><br><span class="mu">${d}</span></span></button>`).join('')}</div><div class="foot"><button class="btn w" data-onext ${r?'':'disabled style="opacity:.4"'}>Next</button><button class="back" data-oback>‹ Back</button></div>`;
+  else if(O.s===2)h=dots+`<h2>${{fan:'What do you watch?',club:'Set up your club',coach:'What do you recruit?',ath:'What do you play?'}[r]}</h2>`+(r==='club'?`<input class="tx" id="o_club" placeholder="Club or league name" aria-label="Club or league name" value="${esc(O.club)}">`:'')+`<p class="mu" style="margin:0 0 8px">Sport</p>${chips}`+(r==='ath'?`<select id="o_lvl" aria-label="Level" style="margin-bottom:10px">${['High school','College','Pro','Recreation'].map(x=>`<option ${O.lvl===x?'selected':''}>${x}</option>`).join('')}</select><input class="tx" id="o_pos" placeholder="Position, like point guard" aria-label="Position" value="${esc(O.pos)}"><p class="mu">Under 18? A parent or guardian approves your account before coaches can contact you.</p>`:'')+(r==='coach'?`<input class="tx" placeholder="School or club" aria-label="School or club"><p class="mu">We verify every coach before they can contact athletes.</p>`:'')+`<div class="foot"><button class="btn w" data-onext>Next</button><button class="back" data-oback>‹ Back</button></div>`;
+  else{const m={ath:["You're in",'Scroll the feed, post your plays, or film your next game and get everyone their highlights.','Go to my feed'],coach:['Your scout board is ready','Search by sport, level and verified stats.','Start scouting'],fan:['Your feed is ready',`We'll start you with the best ${SP[O.sport][0].toLowerCase()} plays.`,'Go to my feed'],club:['Your club page is live','Post your next game. Every player who gets tagged gets an AI tape after.','Open my club']}[r];
+    h=dots+`<div class="big" style="font-size:48px">${m[0]}</div><p class="mu" style="font-size:16px">${m[1]}</p><div class="foot"><button class="btn w" data-ofin>${m[2]}</button>${r==='ath'?'<button class="btn g w" data-oskip>Film a Run</button>':''}</div>`}
+  el.innerHTML=h;el.scrollTop=0}
+function onbClick(e){const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if('onext' in d){if(O.s===1&&!O.role)return;O.s++;onb()}
+  else if('oback' in d){O.s--;onb()}
+  else if(d.orole){O.role=d.orole;onb()}
+  else if(d.osp){O.sport=d.osp;onb()}
+  else if('ofin' in d||'oskip' in d){APP.querySelector('.onb').remove();try{localStorage.setItem('jmj-onb','1')}catch(x){}
+    const r=O.role;
+    if(r==='coach'){S.t='disc';render();document.getElementById('fs').value=O.sport;search();document.getElementById('res').scrollIntoView()}
+    else if(r==='club'){if(O.club.trim())CLUB.n=esc(O.club.trim());CLUB.sp=O.sport;S.t='club';render()}
+    else{S.t='home';S.feed='fy';S.sport=r==='fan'?O.sport:'all';render();if('oskip' in d&&r==='ath')newRun()}}}
+const FMTS=[['fc21','Full Court 21','bball','Every player for themselves, first to 21',6,'pts'],['5v5','5 on 5 pickup','bball','Full court, team scores',10,'pts'],['3v3','3 on 3','bball','Half court to 21',6,'pts'],['ss','Small-sided soccer','soccer','5 or 7 a side',10,'goals'],['flag7','7 on 7 flag','flag','Flag football scrimmage',14,'TDs'],['vb','Beach 2s','vball','Volleyball doubles',4,'kills']];
+const UNITS={pts:[21,17,12,9,8,6,5,4,2,2],goals:[3,2,1,1,1,1,0,0,0,0],TDs:[3,2,2,1,1,1,0,0,0,0,0,0,0,0],kills:[11,9,7,5]};
+const PLAYN={bball:['Deep 3','And-1','Steal','Game winner','Crossover','Block'],soccer:['Top bins','Nutmeg','Through ball','Header','Save','Volley'],flag:['TD catch','One-hand grab','Flag pull','Deep ball','Pick six','Juke'],vball:['Kill','Dig','Ace','Block','Set','Pancake']};
+const SHIRTS=['black shirt','white shirt','red shorts','grey hoodie','blue shirt','no shirt','green shirt','yellow shirt','orange shorts','headband','black hat','striped shirt','purple shirt','white shoes'];
+const COURTS=[['La Palma Park','Anaheim · hoops run at 6 PM',9],['Pier Park','Long Beach · small-sided soccer',14],['Pearson Park','Anaheim · 7 on 7 flag',6]];
+let RUN=null;S.chk={};S.min=42;S.pro=false;
+function newRun(){closeSheets();const sh=document.createElement('div');sh.className='sheet';APP.append(sh);
+  const st={s:'fmt',f:'fc21',court:'La Palma Park, Anaheim',names:[]};let tmr;const fixN=()=>{const n=F()[4];st.names=Array.from({length:n},(_,i)=>i===0?'You (Anis)':(st.names[i]||''))};
+  const F=()=>FMTS.find(x=>x[0]===st.f);
+  const draw=()=>{const f=F();fixN();let h='';
+    if(st.s==='fmt'&&S.min<=0&&!S.pro)h=`<h2>You're out of free minutes</h2><p class="mu" style="margin-top:0">Your 60 free recording minutes reset on the 1st. Pro gives you 10 hours a month, full stats and every tape style.</p><div class="panel"><b>Pro · $9.99 a month</b><div class="mu">or $79.99 a year · cancel any time</div></div><button class="btn w" data-rpro style="margin-top:12px">Start 7-day free trial</button><button class="btn g w" data-rx style="margin-top:8px">Maybe later</button>`;
+    else if(st.s==='fmt')h=`<h2>New Run</h2><p class="mu" style="margin-top:0">Film your game. We cut everyone's plays. You send one link.</p><div class="panel"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${S.pro?'Pro recording time':'Free recording minutes'}</span><b>${S.pro?Math.floor(S.min/60)+'h '+S.min%60+'m left':S.min+' of 60 left'}</b></div><div class="pbar"><b style="width:${Math.min(100,S.min/(S.pro?600:60)*100)}%"></b></div>${!S.pro&&S.min<15?'<p class="mu" style="margin:6px 0 0">Running low. Pro gives you 10 hours a month for $9.99.</p>':''}</div><h3>Format</h3><div class="roles">${FMTS.map(([k,n,sp,d])=>`<button class="role" data-rf="${k}" aria-pressed="${st.f===k}"><span class="av" style="width:38px;height:38px;border:0;background:${SP[sp][1]}33;color:${SP[sp][1]};font-size:15px">${k.toUpperCase().slice(0,4)}</span><span><b>${n}</b><br><span class="mu">${d}</span></span></button>`).join('')}</div><h3>Where</h3><input class="tx" id="rcourt" value="${esc(st.court)}" aria-label="Court or field"><div class="grid2"><button class="btn" data-rgo="cam">Film now</button><button class="btn g" data-rgo="up">Upload video</button></div><button class="btn g w" data-rx style="margin-top:10px">Cancel</button>`;
+    else if(st.s==='cam')h=`<div class="vf2">${scene(f[2])}<div class="rec"><i></i>REC <span id="tm">0:00</span></div><div class="vtip">Phone on the fence, whole court in frame. Just play. We'll handle the rest.</div></div><div class="grid2" style="margin-top:12px"><button class="btn" data-rgo="stop">End Run</button><button class="btn g" data-rx>Cancel</button></div>`;
+    else if(st.s==='up')h=`<h2>Upload your Run</h2><div class="drop"><svg class="i"><use href="#up"/></svg><b>Choose the game video</b><span class="mu">Any length. Two friends filmed? Add both angles.</span><label class="btn">Choose video<input type="file" accept="video/*" id="rfile" hidden></label><button class="btn g" data-rgo="proc">Use sample game</button></div><button class="btn g w" data-rx style="margin-top:10px">Cancel</button>`;
+    else if(st.s==='proc')h=`<h2>Cutting your Run</h2><div class="pbar"><b id="pb"></b></div>`+['Saving your Run','Finding each player by shirt and face','Following the ball',`Scoring the ${f[1]} game`,'Cutting plays for every player'].map((s,i)=>`<div class="step" id="s${i}"><i></i>${s}</div>`).join('');
+    else h=`<h2>Tag your crew</h2><p class="mu" style="margin-top:0">We found ${st.names.length} players. Names are optional. Anyone untagged can claim themselves from the link, and nobody's name shows until they approve it.</p>${st.names.map((n,i)=>`<div class="mom"><div class="tile">${scene(f[2])}</div><div><b style="font:600 15px Oswald,sans-serif">Player ${i+1} · ${SHIRTS[i]}</b>${i===0?'<div class="mu">You, tagged automatically</div>':`<input class="tx" style="margin:6px 0 0;height:40px" data-ni="${i}" placeholder="Friend's name" value="${esc(n)}" aria-label="Name for player ${i+1}">`}</div><span></span></div>`).join('')}<button class="btn w" data-rgo="make" style="margin-top:12px">Create the Run page</button>`;
+    sh.innerHTML=`<div role="dialog" aria-label="New Run"><div class="grab"></div>${h}</div>`;
+    if(st.s==='cam'){let t=0;tmr=setInterval(()=>{t+=17;const e=sh.querySelector('#tm');if(e)e.textContent=Math.floor(t/60)+':'+String(t%60).padStart(2,'0')},250)}
+    if(st.s==='proc'){let k=0;const tick=()=>{if(!sh.isConnected)return;if(k>0)sh.querySelector('#s'+(k-1)).className='step ok';if(k<5){sh.querySelector('#s'+k).className='step on';sh.querySelector('#pb').style.width=(k+1)*20+'%';k++;setTimeout(tick,650)}else{st.s='tag';draw()}};tick()}};
+  sh.addEventListener('input',e=>{if(e.target.id==='rcourt')st.court=e.target.value;if(e.target.dataset.ni)st.names[e.target.dataset.ni]=e.target.value});
+  sh.addEventListener('change',e=>{if(e.target.id==='rfile'&&e.target.files[0]){st.s='proc';draw()}});
+  sh.addEventListener('click',e=>{if(e.target===sh){clearInterval(tmr);sh.remove();return}const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if('rx' in d){clearInterval(tmr);sh.remove()}
+    else if(d.rf){st.f=d.rf;draw()}
+    else if('rpro' in d){S.pro=true;S.min=600;draw();toast('Pro trial started. 10 hours of recording this month.')}
+    else if(d.rgo==='make'){const f=F();RUN={f,court:esc(st.court.trim()||'the park'),names:st.names.map(n=>esc(n.trim())),pts:UNITS[f[5]].slice(0,f[4]),plays:[8,6,5,6,3,2,4,3,2,1,2,1,1,1].slice(0,f[4]),claimed:{}};
+      posts.unshift({id:Date.now(),n:'Marcus Bell',h:'marcus.buckets',sp:f[2],lv:'Run · '+f[1],pl:RUN.court,cap:'Saturday run. Tagged the crew, go claim your plays.',st:[f[1],(f[0]==='fc21'?'Won · ':'Led with ')+RUN.pts[0]+' '+f[5]],l:0,c:0,v:0,me:1});
+      const used=Math.min(S.min,38);S.min-=used;sh.remove();S.t='run';render();toast('Your Run page is live. That used '+used+(S.pro?' Pro minutes.':' of your free minutes.'))}
+    else if(d.rgo){clearInterval(tmr);st.s=d.rgo==='stop'?'proc':d.rgo;draw()}});
+  draw()}
+function run(){if(!RUN){S.t='home';return home()}const f=RUN.f;V.className='';
+  V.innerHTML=`<div class="pg"><button class="back" data-feed2>‹ Feed</button><div class="ch"><div class="thumb">${scene(f[2])}<span class="chip tag" style="background:${SP[f[2]][1]};color:#0a0a0b">${f[1]}</span></div></div>
+  <h2>Saturday Run</h2><div class="mu">${RUN.court} · 38 min · ${RUN.names.length} players · ${RUN.f[5]}</div>
+  <div class="panel" style="margin-top:12px"><b>Send it to the group chat</b><p class="mu" style="margin:4px 0 0">Anyone can watch. To save their plays and get their own tape, they make a free account.</p><div class="lnk"><code>jamoja.io/run/sat-la-palma</code><button class="btn" id="rcp">Copy</button></div><button class="btn g w" data-friend style="margin-top:10px">Preview what a friend sees</button></div>
+  <h3>${RUN.f[0]==='fc21'?'Final standings':'Player leaders'}</h3>${RUN.names.map((n,i)=>`<div class="lb"><span class="n">${i+1}</span><div><b>${n||'Player '+(i+1)}</b><div class="mu">${RUN.plays[i]} plays found · ${i===0||RUN.claimed[i]?'Claimed':'Not claimed yet'}</div></div><span class="s">${RUN.pts[i]} ${RUN.f[5]}</span></div>`).join('')}
+  <h3>Your ${RUN.plays[0]} plays</h3><div class="tiles">${[0,1,2,3,4,5].map(i=>`<div class="tile">${scene(f[2])}<span>${PLAYN[f[2]][i]}</span></div>`).join('')}</div>
+  <p class="mu" style="margin-top:12px">Sample Run. Points and plays are made up for the demo.</p></div>`}
+function friend(){const n=RUN.names[1]||'Player 2',el=document.createElement('div');el.className='onb';APP.append(el);let s=0;
+  const tiles=`<div class="tiles" style="margin:12px 0 0">${[0,1,2].map(()=>`<div class="tile">${scene(RUN.f[2])}</div>`).join('')}</div>`;
+  const draw=()=>{if(s===0)el.innerHTML=`<p class="mu" style="margin:0">This is what ${n} sees after tapping your link</p><div class="logo" style="font-size:32px;margin-top:12px">JAM<i></i>JA</div><div class="ch" style="margin-top:14px"><div class="thumb" style="height:190px">${scene(RUN.f[2])}</div></div><h2>Anis tagged you in a Run</h2><div class="mu">${RUN.f[1]} · ${RUN.court}</div><div class="nums"><div><b>${RUN.pts[1]}</b><span class="mu">${RUN.f[5]}</span></div><div><b>${RUN.plays[1]}</b><span class="mu">Plays</span></div><div><b>2nd</b><span class="mu">Finish</span></div></div><label class="ck"><input type="checkbox" checked> Show my name on this Run</label><div class="foot"><button class="btn w" data-c="1">Claim my plays</button><button class="btn g w" data-c="x">That's not me</button><button class="back" data-c="close">Close preview</button></div>`;
+    else if(s===1)el.innerHTML=`<h2>Save your ${RUN.plays[1]} plays</h2><p class="mu">Free account. Takes 10 seconds.</p>${tiles}<div class="foot">${['Google','Apple','TikTok'].map(k=>`<button class="btn g w" data-c="2">Continue with ${k}</button>`).join('')}<button class="btn w" data-c="2">Sign up with email</button></div>`;
+    else el.innerHTML=`<div class="big" style="font-size:48px">Your plays are on your profile</div><p class="mu" style="font-size:16px">Your tape is cut and ready to post anywhere. This Run counts on your record. Film the next one and your crew gets theirs.</p>${tiles}<div class="foot"><button class="btn w" data-c="done">Back to your view</button></div>`;el.scrollTop=0};
+  el.onclick=e=>{const b=e.target.closest('[data-c]');if(!b)return;const c=b.dataset.c;
+    if(c==='close'||c==='done'||c==='x'){el.remove();if(c==='done'){RUN.claimed[1]=1;if(!RUN.names[1])RUN.names[1]='Jay'}run();if(c==='done')toast(RUN.names[1]+' claimed their plays. That Run just brought in a new member.');if(c==='x')toast('Got it. That tag is removed.')}
+    else{s=+c;draw()}};
+  draw()}
+function createMenu(){closeSheets();const sh=document.createElement('div');sh.className='sheet';APP.append(sh);
+  sh.innerHTML=`<div role="dialog" aria-label="Create"><div class="grab"></div><h2>Create</h2><div class="roles">${[['post','share','Post a clip or photo','Share to your feed like any social app'],['run','cal','Film a Run','Record your game. Everyone gets their plays and stats'],['game','up','Upload a full game','AI cuts your highlight tape and stat cards'],['live','bell','Go live','Stream with a free scoreboard. Highlights when it ends'],['yt','share','Share a YouTube game','Paste a link. Everyone clips their own plays']].map(([k,ic,t,d])=>`<button class="role" data-mk="${k}"><svg class="i"><use href="#${ic}"/></svg><span><b>${t}</b><br><span class="mu">${d}</span></span></button>`).join('')}</div><button class="btn g w" data-mx style="margin-top:12px">Cancel</button></div>`;
+  sh.onclick=e=>{if(e.target===sh)return sh.remove();const b=e.target.closest('button');if(!b)return;const k=b.dataset.mk;sh.remove();if(k==='run')newRun();else if(k==='game')upload();else if(k==='post')newPost();else if(k==='yt')newGame();else if(k==='live')goLive()}}
+function newPost(){closeSheets();const sh=document.createElement('div');sh.className='sheet';APP.append(sh);let sp='bball';
+  const draw=()=>{sh.innerHTML=`<div role="dialog" aria-label="New post"><div class="grab"></div><h2>New post</h2><div class="drop"><svg class="i"><use href="#up"/></svg><b>Add a clip or photo</b><label class="btn">Choose from phone<input type="file" accept="video/*,image/*" hidden></label></div><h3>Caption</h3><input class="tx" id="pcap" placeholder="What happened?" aria-label="Caption"><h3>Sport</h3><div class="chips" style="padding:0 0 12px;flex-wrap:wrap;overflow:visible">${Object.entries(SP).map(([k,[n,c]])=>`<button class="chip" data-psp="${k}" aria-pressed="${sp===k}"><b style="background:${c}"></b>${n}</button>`).join('')}</div><button class="btn w" data-pgo>Post</button><button class="btn g w" data-px style="margin-top:8px">Cancel</button></div>`};
+  sh.onclick=e=>{if(e.target===sh)return sh.remove();const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if(d.psp){const c=sh.querySelector('#pcap').value;sp=d.psp;draw();sh.querySelector('#pcap').value=c}
+    else if('px' in d)sh.remove();
+    else if('pgo' in d){const c=sh.querySelector('#pcap').value.trim()||'Just got this one.';posts.unshift({id:Date.now(),n:'Anis Taylor',h:'anis.taylor',sp,lv:'Former pro · Guard',pl:'Anaheim, CA',cap:esc(c),st:['New','Just posted'],l:0,c:0,v:1,me:1});sh.remove();S.t='home';S.feed='fy';S.sport='all';render();toast('Posted to your feed.')}};
+  draw()}
+const GAME={t:'Salem vs Sussex',ch:'HigherThan7TV',date:'Nov 14, 2026',dur:5400,
+  plays:[[312,'#2 Green','Pull-up three',14],[905,'#10 Green','And-1 finish',11],[1460,'#3 White','Steal and dunk',19],[2230,'#2 Green','Step-back jumper',9],[3010,'#1 White','No-look assist',7],[3890,'#16 Green','Block on the break',12],[4620,'#2 Green','Go-ahead three',22],[5180,'#3 White','Buzzer floater',16]],
+  box:[['#2 Green',18,'7-12','3-5',4,3],['#10 Green',12,'5-9','0-1',8,1],['#16 Green',6,'3-4','0-0',5,0],['#3 White',14,'5-11','2-6',3,4],['#1 White',11,'4-10','1-4',2,6],['#23 White',9,'4-7','1-2',6,1]]};
+const G={tab:'plays',time:0,on:false,mine:[],who:'#2 Green'};let GT;
+const hms=t=>{t=Math.floor(t);const h=Math.floor(t/3600),m=Math.floor(t%3600/60),x=t%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+function newGame(){closeSheets();const sh=document.createElement('div');sh.className='sheet';APP.append(sh);
+  sh.innerHTML=`<div role="dialog" aria-label="Share a YouTube game"><div class="grab"></div><h2>Share a YouTube game</h2><p class="mu" style="margin-top:0">Paste the link. Jamoja makes a game page where everyone clips their own plays.</p><input class="tx" id="ytl" value="https://www.youtube.com/live/cBsYKpeUWvU" aria-label="YouTube link"><div class="panel" style="margin-bottom:12px"><b>Found: Salem vs Sussex</b><div class="mu">HigherThan7TV · Streamed Nov 14, 2026 · 1:30:00</div></div><button class="btn w" data-gok>Create the game page</button><button class="btn g w" data-gx style="margin-top:8px">Cancel</button></div>`;
+  sh.onclick=e=>{if(e.target===sh||e.target.closest('[data-gx]'))return sh.remove();if(e.target.closest('[data-gok]')){sh.remove();S.t='game';render();toast('Game page is live. It is on your profile and in the basketball feed.')}}}
+function game(){V.className='';const g=GAME,mx=Math.max(...g.plays.map(p=>p[3]));
+  V.innerHTML=`<div class="pg"><button class="back" data-feed2>‹ Feed</button>
+  <div class="gp" id="gp">${scene('bball')}<button class="pl ${G.on?'on':''}" id="gpl" aria-label="Play or pause"><span></span></button><span class="yt">Playing from YouTube</span><span class="tm" id="gtm">${hms(G.time)} / ${hms(g.dur)}</span></div>
+  <div class="scrub" id="gsc" aria-label="Timeline">${g.plays.map(p=>`<i style="left:${p[0]/g.dur*100}%;height:${8+p[3]/mx*18}px"></i>`).join('')}<div class="tr"></div><div class="pr" id="gpr" style="width:${G.time/g.dur*100}%"></div></div>
+  <div class="mu" style="font-size:12px">Orange marks show the most-clipped moments</div>
+  <button class="clipb" data-gclip>Clip it</button><div class="mu" style="text-align:center">Saves the 10 seconds before you tap</div>
+  <h2 style="margin-top:16px">${g.t}</h2><a class="btn g" style="min-height:36px;font-size:13px;margin:4px 0 6px" href="https://www.youtube.com/live/cBsYKpeUWvU" target="_blank" rel="noopener">Watch the full stream on YouTube</a><div class="mu">${g.ch} · ${g.date} · ${110+G.mine.length} clips from players and fans</div>
+  <div class="seg" style="margin-top:12px">${[['plays','Top plays'],['mine','My plays'],['tape','Game tape'],['stats','Stats']].map(([k,n])=>`<button data-gt="${k}" aria-pressed="${G.tab===k}">${n}${k==='mine'&&G.mine.length?' ('+G.mine.length+')':''}</button>`).join('')}</div>
+  <div id="gtab">${gtab()}</div>
+  <div class="panel" style="margin-top:16px"><b>Own this video?</b><p class="mu" style="margin:4px 0 10px">Upload the original file from YouTube Studio and the AI finds every play, builds a tape for every player and fills in the full stats.</p><button class="btn g w" data-gown>Upload the original</button></div>
+  <p class="mu">Sample plays and stats for the demo. The real game page would fill in from clips and the uploaded file.</p></div>`;
+  const sc=document.getElementById('gsc');sc.onpointerdown=e=>{const r=sc.getBoundingClientRect();G.time=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*g.dur;tick(0)}}
+function gtab(){const g=GAME;
+  if(G.tab==='plays')return g.plays.slice().sort((a,b)=>b[3]-a[3]).map(p=>`<button class="pr2" data-gseek="${p[0]}"><span class="t">${hms(p[0])}</span><span><b>${p[2]}</b><br><span class="mu">${p[1]}</span></span><span class="mu">${p[3]} clips</span></button>`).join('');
+  if(G.tab==='mine')return G.mine.length?G.mine.map((m,i)=>`<button class="pr2" data-gseek="${m}"><span class="t">${hms(m)}</span><span><b>My play ${i+1}</b><br><span class="mu">${hms(m)} to ${hms(m+10)} · on your profile</span></span><span class="mu">Play</span></button>`).join('')+`<button class="btn w" style="margin-top:12px" data-gtape>Make my tape from these</button>`:`<p class="mu">Press play, then tap Clip it every time you make a play. Each one lands on your profile as its own highlight.</p>`;
+  if(G.tab==='tape'){const res=['Made 2','Missed 3','Assist','Made 3','Turnover','Foul drawn','Rebound','Made 2'];const pos=Array.from({length:18},(_,i)=>[150+i*290+(i*37%90),res[i%res.length]]);
+    return `<p class="mu" style="margin:0 0 8px">Every possession, not just the makes. This is what coaches want.</p><div class="seg">${g.box.map(b=>`<button data-gwho="${b[0]}" aria-pressed="${G.who===b[0]}">${b[0]}</button>`).join('')}</div>
+    <div class="panel" style="margin:8px 0"><b>${G.who}: condensed tape</b><div class="mu">18 possessions · 6:40 long · built by AI from the original file</div></div>${pos.map((p,i)=>`<button class="pr2" data-gseek="${p[0]}"><span class="t">${hms(p[0])}</span><span><b>Possession ${i+1}</b><br><span class="mu">${p[0]<2700?'1st half':'2nd half'}</span></span><span class="mu">${p[1]}</span></button>`).join('')}`}
+  const pts=[[150,60,1],[90,95,1],[210,95,0],[150,150,1],[40,40,0],[262,40,1],[150,210,0],[120,70,1],[190,120,1],[60,160,0],[245,150,1],[150,30,0]];
+  return `<table class="bx"><thead><tr><th>Player</th><th>PTS</th><th>FG</th><th>3PT</th><th>REB</th><th>AST</th></tr></thead><tbody>${g.box.map(b=>`<tr><td>${b[0]}</td>${b.slice(1).map(x=>`<td>${x}</td>`).join('')}</tr>`).join('')}</tbody></table>
+  <h3>Shot chart: ${G.who}</h3><svg class="shot" viewBox="0 0 300 260" role="img" aria-label="Shot chart"><rect x="1" y="1" width="298" height="258" rx="8" fill="#151517" stroke="#2a2a2e"/><path d="M20 1 V60 A130 130 0 0 0 280 60 V1" fill="none" stroke="#3a3a40" stroke-width="2"/><rect x="100" y="1" width="100" height="120" fill="none" stroke="#3a3a40" stroke-width="2"/><circle cx="150" cy="121" r="30" fill="none" stroke="#3a3a40" stroke-width="2"/><circle cx="150" cy="22" r="8" fill="none" stroke="#ff5a1f" stroke-width="2"/>${pts.map(([x,y,m])=>m?`<circle cx="${x}" cy="${y}" r="7" fill="#ff5a1f"/>`:`<path d="M${x-6} ${y-6}l12 12M${x+6} ${y-6}l-12 12" stroke="#a1a1aa" stroke-width="2.5"/>`).join('')}</svg>
+  <p class="mu" style="text-align:center;margin-top:0">Dots are makes, crosses are misses</p>
+  <div class="nums"><div><b>58%</b><span class="mu">FG</span></div><div><b>+11</b><span class="mu">Plus-minus</span></div><div><b>1.24</b><span class="mu">Pts a shot</span></div></div>
+  <p class="mu">Pro adds play types like pick and roll, shot zones over a whole season, and side-by-side comparisons.</p>`}
+function tick(dt){G.time=Math.min(GAME.dur,G.time+dt);const a=document.getElementById('gtm'),b=document.getElementById('gpr');if(a)a.textContent=hms(G.time)+' / '+hms(GAME.dur);if(b)b.style.width=G.time/GAME.dur*100+'%';if(G.time>=GAME.dur){G.on=false;clearInterval(GT)}}
+const LV={on:false,t:0,sc:{h:0,a:0},team:'h',who:'#2',log:[],view:23,name:'Salem vs Sussex',yt:true,sp:'bball'};
+const TEAMS={h:['Green',['#2','#10','#16','#4','#13']],a:['White',['#3','#1','#23','#11','#5']]};let LT;
+const PADS={bball:[['+1',1,'Free throw'],['+2',2,'Bucket'],['+3',3,'Three'],['Miss',0,'Miss'],['REB',0,'Rebound'],['AST',0,'Assist'],['STL',0,'Steal',1],['BLK',0,'Block',1]],
+ soccer:[['Goal',1,'Goal'],['Shot',0,'Shot'],['Save',0,'Save',1],['Assist',0,'Assist'],['Tackle',0,'Tackle'],['Foul',0,'Foul'],['Corner',0,'Corner'],['Card',0,'Card']],
+ flag:[['TD +6',6,'Touchdown'],['XP +1',1,'Extra point'],['XP +2',2,'Two-point try'],['Safety',2,'Safety'],['Catch',0,'Catch'],['Flag pull',0,'Flag pull'],['INT',0,'Interception',1],['Sack',0,'Sack',1]],
+ vball:[['Kill',1,'Kill'],['Ace',1,'Ace'],['Block',1,'Block'],['Opp error',1,'Opponent error'],['Dig',0,'Dig',1],['Set',0,'Set'],['Serve err',0,'Serve error'],['Hit err',0,'Attack error']]};
+const UNIT={bball:'PTS',soccer:'Goals',flag:'PTS',vball:'PTS'};
+const lscene=()=>scene(LV.sp);
+function goLive(){if(LV.on){S.t='live';return render()}closeSheets();const sh=document.createElement('div');sh.className='sheet';APP.append(sh);
+  const draw=()=>{sh.innerHTML=`<div role="dialog" aria-label="Go live"><div class="grab"></div><h2>Go live</h2><p class="mu" style="margin-top:0">Stream the game with a free scoreboard. Highlights and stats are ready when it ends.</p><input class="tx" id="lvn" value="${esc(LV.name)}" aria-label="Game name">
+  <p class="mu" style="margin:0 0 8px">Sport</p><div class="chips" style="padding:0 0 12px;flex-wrap:wrap;overflow:visible">${['bball','soccer','flag','vball'].map(k=>`<button class="chip" data-lsp="${k}" aria-pressed="${LV.sp===k}"><b style="background:${SP[k][1]}"></b>${SP[k][0]}</button>`).join('')}</div>
+  <div class="conn"><span>Also stream to YouTube<br><span class="mu">HigherThan7TV · keeps your YouTube audience</span></span><span></span><button class="tg" data-lyt aria-pressed="${LV.yt}" aria-label="Also stream to YouTube"></button></div>
+  <div class="conn"><span>Scorekeeper<br><span class="mu">You, on this phone. Or send a friend the scorer link.</span></span><span></span><span class="bdg o">Me</span></div>
+  <div class="conn"><span>Who can watch<br><span class="mu">Everyone, and it shows on Discover</span></span><span></span><span class="bdg">Public</span></div>
+  <button class="btn w" data-lgo style="margin-top:14px">Start stream</button><button class="btn g w" data-lx style="margin-top:8px">Cancel</button></div>`};
+  draw();
+  sh.onclick=e=>{if(e.target===sh||e.target.closest('[data-lx]'))return sh.remove();const n=sh.querySelector('#lvn');if(n)LV.name=n.value;
+    const k=e.target.closest('[data-lsp]');if(k){LV.sp=k.dataset.lsp;draw();return}
+    const y=e.target.closest('[data-lyt]');if(y){LV.yt=!LV.yt;y.setAttribute('aria-pressed',LV.yt)}
+    if(e.target.closest('[data-lgo]')){LV.name=LV.name.trim()||"Tonight's game";Object.assign(LV,{on:true,t:0,sc:{h:0,a:0},log:[],view:23,team:'h',who:'#2'});sh.remove();S.t='live';render();clearInterval(LT);LT=setInterval(ltick,1000);toast('You are live'+(LV.yt?' on Jamoja and YouTube.':' on Jamoja.'))}}}
+function ltick(){if(!LV.on)return;LV.t+=7;LV.view+=Math.round(Math.random()*3);const a=document.getElementById('lclk'),b=document.getElementById('lvw');if(a)a.textContent=lclock();if(b)b.textContent=LV.view+' watching'}
+const lclock=()=>{const r=Math.max(0,1080-LV.t%1080);return (LV.t<1080?'1st ':'2nd ')+Math.floor(r/60)+':'+String(r%60).padStart(2,'0')};
+function live(){V.className='';
+  if(!LV.on){if(LV.log.length)return lsum();V.innerHTML=`<div class="pg"><h2>No game live</h2><p class="mu">Start a stream to keep score and make highlights.</p><button class="btn" data-lagain>Go live</button></div>`;return}
+  const tm=TEAMS[LV.team];
+  V.innerHTML=`<div class="pg"><div class="cam">${lscene()}<div class="livep"><b>LIVE</b><span id="lvw">${LV.view} watching</span>${LV.yt?'<span>+ YouTube</span>':''}</div>
+  <div class="sbo"><span>GREEN</span><span class="sc" id="lh">${LV.sc.h}</span><span style="text-align:right">WHITE</span><span class="sc" id="la">${LV.sc.a}</span></div></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px"><b>${esc(LV.name)} · ${SP[LV.sp][0]}</b><span class="bdg" id="lclk">${lclock()}</span></div>
+  <h3 style="margin-top:14px">Scorekeeper</h3>
+  <div class="seg">${['h','a'].map(k=>`<button data-lteam="${k}" aria-pressed="${LV.team===k}">${TEAMS[k][0]}</button>`).join('')}</div>
+  <div class="seg">${tm[1].map(n=>`<button data-lwho="${n}" aria-pressed="${LV.who===n}">${n}</button>`).join('')}</div>
+  <div class="pad">${PADS[LV.sp].map((p,i)=>`<button class="${p[1]?'pt':''}" data-lk="${i}">${p[0]}</button>`).join('')}</div>
+  <h3>Play by play</h3><div class="log" id="llog">${llog()}</div>
+  <button class="btn g w" data-lend style="margin-top:14px">End game</button>
+  <p class="mu">You can leave this screen. The stream keeps going until you tap End game.</p></div>`}
+const llog=()=>LV.log.length?LV.log.slice().reverse().map(l=>`<div class="pr2"><span class="t">${l.c}</span><span><b>${l.who} ${TEAMS[l.tm][0]}</b><br><span class="mu">${l.ev}</span></span><span class="mu">${l.hl?'Highlight saved':''}</span></div>`).join(''):'<p class="mu">Tap a player, then what happened. The scoreboard updates for everyone watching.</p>';
+function lsum(){const by={};LV.log.forEach(l=>{const k=l.who+' '+TEAMS[l.tm][0];by[k]=by[k]||{p:0,n:0};by[k].p+=l.pts;by[k].n++});const hl=LV.log.filter(l=>l.hl);
+  V.innerHTML=`<div class="pg"><h2>Final: Green ${LV.sc.h}, White ${LV.sc.a}</h2><div class="mu">${esc(LV.name)} · ${SP[LV.sp][0]} · ${LV.view} people watched${LV.yt?' plus YouTube':''}</div>
+  <div class="nums" style="margin-top:12px"><div><b>${hl.length}</b><span class="mu">Highlights</span></div><div><b>${Object.keys(by).length}</b><span class="mu">Players</span></div><div><b>${LV.log.length}</b><span class="mu">Plays logged</span></div></div>
+  <h3>Box score from your taps</h3>${Object.keys(by).length?`<table class="bx"><thead><tr><th>Player</th><th>${UNIT[LV.sp]}</th><th>Plays</th></tr></thead><tbody>${Object.entries(by).sort((a,b)=>b[1].p-a[1].p).map(([k,v])=>`<tr><td>${k}</td><td>${v.p}</td><td>${v.n}</td></tr>`).join('')}</tbody></table>`:'<p class="mu">No plays logged.</p>'}
+  <h3>Highlights, cut automatically</h3>${hl.map(l=>`<div class="pr2"><span class="t">${l.c}</span><span><b>${l.who} ${TEAMS[l.tm][0]}: ${l.ev}</b><br><span class="mu">Sent to the player's profile to claim</span></span><span></span></div>`).join('')||'<p class="mu">Scoring plays and big defensive plays show up here.</p>'}
+  <div class="grid2" style="margin-top:14px"><button class="btn" data-lpost>Post the game</button><button class="btn g" data-lscout>Send to scouts</button></div>
+  <button class="btn g w" style="margin-top:8px" data-lagain>Go live again</button>
+  <p class="mu">The full replay stays on the game page and on Discover under ${SP[LV.sp][0]}.</p></div>`}
+const R={home,disc,ch,me,club,earn,run,game,live};
+function render(){clearInterval(GT);G.on=false;closeSheets();liveBtn();document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.t===S.t));V.scrollTop=0;R[S.t]()}
+document.getElementById('nav').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.t==='up')return createMenu();S.t=b.dataset.t;render()};
+document.getElementById('bell').onclick=()=>{toast('Coach Rivera (verified) watched your Salem vs Sussex tape twice.');document.querySelector('.dot')?.remove()};
+const byId=id=>posts.find(p=>p.id==id);
+let lastTap=0;
+V.addEventListener('click',e=>{
+  const b=e.target.closest('button,[data-id]');if(!b)return;const d=b.dataset;
+  if(d.feed){S.feed=d.feed;home()}
+  else if(d.sp){S.sport=d.sp;home()}
+  else if(d.like){S.like[d.like]=!S.like[d.like];home();V.scrollTop=[...V.querySelectorAll('.card')].findIndex(c=>c.dataset.id==d.like)*V.clientHeight}
+  else if(d.fol){if(byId(d.fol).me)return;S.fol[d.fol]=!S.fol[d.fol];const y=V.scrollTop;home();V.scrollTop=y;toast(S.fol[d.fol]?'Following '+byId(d.fol).n:'Unfollowed')}
+  else if(d.cm)comments(byId(d.cm));
+  else if(d.ans)upload("@"+byId(d.ans).h+"'s clip");
+  else if(d.sh)toast('Link copied. Shares carry a Jamoja tag back to the clip.');
+  else if(d.go){S.t='home';S.sport=d.go;render()}
+  else if(b.id==='go')search();
+  else if(d.req)toast(byId(d.req).lv.startsWith('HS')?'Request sent to '+byId(d.req).n+"'s parent or guardian first.":'Contact request sent to '+byId(d.req).n+'.');
+  else if(d.enter)upload(CH.find(c=>c[0]===d.enter)[1]);
+  else if(d.rsvp){S.rsvp[d.rsvp]=!S.rsvp[d.rsvp];const y=V.scrollTop;R[S.t]();V.scrollTop=y;if(S.rsvp[d.rsvp])toast("You're going. We'll remind you on game day.")}
+  else if(d.club){S.t='club';render()}
+  else if('back' in d){S.t='disc';render()}
+  else if(d.prom){S.boost[d.prom]=true;const y=V.scrollTop;club();V.scrollTop=y;toast('Promoted to '+SP[CLUB.sp][0].toLowerCase()+' fans near '+CLUB.pl.split(',')[0]+' for 3 days. That used your free boost this month.')}
+  else if(d.tip){const p=byId(d.tip);toast(p.me?'This is where fans tip you.':'Sent a $2 tip to '+p.n+'. They keep $1.80.')}
+  else if('card' in d)rcard();
+  else if('earn' in d){S.t='earn';render()}
+  else if(d.apply){S.applied[d.apply]=1;const y=V.scrollTop;earn();V.scrollTop=y;toast('Applied. Your parent or guardian approves before anything is signed.')}
+  else if(d.ern){S.earn[d.ern]=!S.earn[d.ern];const y=V.scrollTop;earn();V.scrollTop=y}
+  else if('sell' in d)toast('Uploading training packs comes in the next build.');
+  else if('replay' in d){O.s=0;O.role='';onb()}
+  else if('feed2' in d){S.t='home';render()}
+  else if(d.pf){S.pf=d.pf;me()}
+  else if(d.pv!==undefined)pv(+d.pv);
+  else if('opengame' in d){S.t='game';render()}
+  else if('mkopen' in d)createMenu();
+  else if(d.ctry){const code={Brazil:'BR',USA:', CA|, HI|, TX',Nigeria:'NG',Philippines:'PH',Spain:'ES',Japan:'JP'}[d.ctry];const re=new RegExp(code);const r=posts.filter(p=>re.test(p.pl));document.getElementById('sres').innerHTML=`<div class="panel"><b>${d.ctry}</b>${r.length?r.map(p=>`<div class="res"><span class="av" style="background:${SP[p.sp][1]}33">${ini(p.n)}</span><div><b>${p.n}</b><div class="mu">${SP[p.sp][0]} · ${p.pl}</div></div><button class="btn g" data-go="${p.sp}">View</button></div>`).join(''):`<p class="mu" style="margin:6px 0 0">No clips from ${d.ctry} yet. Share the app with players there and they show up here.</p>`}</div>`;document.getElementById('q').scrollIntoView({block:'start'})}
+  else if(d.lteam){LV.team=d.lteam;LV.who=TEAMS[d.lteam][1][0];live()}
+  else if(d.lwho){LV.who=d.lwho;V.querySelectorAll('[data-lwho]').forEach(x=>x.setAttribute('aria-pressed',x===b))}
+  else if(d.lk){const p=PADS[LV.sp][+d.lk],pts=p[1];if(pts)LV.sc[LV.team]+=pts;LV.log.push({c:lclock(),who:LV.who,tm:LV.team,pts,ev:p[2],hl:!!(pts||p[3])});document.getElementById('lh').textContent=LV.sc.h;document.getElementById('la').textContent=LV.sc.a;document.getElementById('llog').innerHTML=llog()}
+  else if('lend' in d){LV.on=false;clearInterval(LT);lsum();V.scrollTop=0;liveBtn()}
+  else if('lpost' in d){posts.unshift({id:Date.now(),n:'Anis Taylor',h:'anis.taylor',sp:LV.sp,lv:'Live game',pl:esc(LV.name),cap:'Final: Green '+LV.sc.h+', White '+LV.sc.a+'. Full replay and every player\'s highlights are up.',st:['Final',LV.sc.h+'-'+LV.sc.a],l:0,c:0,v:1,me:1});S.t='home';render();toast('Game posted. Each player got a notice to claim their highlights.')}
+  else if('lscout' in d)toast('Sent to scouts following basketball in your area. Under-18 players need a parent OK first.');
+  else if('lagain' in d)goLive();
+  else if(b.id==='gpl'){G.on=!G.on;b.classList.toggle('on',G.on);clearInterval(GT);if(G.on)GT=setInterval(()=>tick(6),250)}
+  else if('gclip' in d){if(G.time<1&&!G.on){toast('Press play first, then tap Clip it when you make a play.');return}const t=Math.max(0,G.time-10);G.mine.push(t);if(G.tab==='mine'||G.mine.length===1){G.tab='mine'}document.getElementById('gtab').innerHTML=gtab();V.querySelectorAll('[data-gt]').forEach(x=>{x.setAttribute('aria-pressed',x.dataset.gt===G.tab);if(x.dataset.gt==='mine')x.textContent='My plays ('+G.mine.length+')'});toast('Clipped '+hms(t)+' to '+hms(t+10)+'. It is on your profile.')}
+  else if(d.gt){G.tab=d.gt;document.getElementById('gtab').innerHTML=gtab();V.querySelectorAll('[data-gt]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.gt===G.tab))}
+  else if(d.gseek){G.time=+d.gseek;tick(0);document.getElementById('gp').scrollIntoView({behavior:'smooth',block:'center'})}
+  else if(d.gwho){G.who=d.gwho;document.getElementById('gtab').innerHTML=gtab()}
+  else if('gtape' in d)toast('Your '+G.mine.length+' clips are being cut into one tape with stat cards.');
+  else if('gown' in d)toast('Owner upload starts the AI. Every player gets a tape and full stats in about an hour.');
+  else if('friend' in d)friend();
+  else if('lastrun' in d){S.t='run';render()}
+  else if(b.id==='rcp'){try{navigator.clipboard.writeText('jamoja.io/run/sat-la-palma').then(()=>toast('Link copied. Drop it in the group chat.'),()=>toast('Copy is blocked here. Press and hold the link instead.'))}catch(x){toast('Copy is blocked here.')}}
+  else if(d.chk){S.chk[d.chk]=!S.chk[d.chk];const y=V.scrollTop;disc();V.scrollTop=y;if(S.chk[d.chk])toast("Checked in. Your crew sees you're at "+COURTS[d.chk][0]+'.')}
+  else if(d.lb){S.lbs=d.lb;ch()}
+  else if(d.st){S.status=d.st;me();toast('Status set: open to '+d.st+'.')}
+  else if(d.cn){S.conn[d.cn]=!S.conn[d.cn];const y=V.scrollTop;me();V.scrollTop=y}
+  else if(d.id&&!e.target.closest('.rail')){const now=Date.now();if(now-lastTap<300){S.like[d.id]=true;const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('class','burst');s.setAttribute('viewBox','0 0 24 24');s.innerHTML='<use href="#hf"/>';b.append(s);setTimeout(()=>s.remove(),750);const btn=b.querySelector('[data-like]');btn.classList.add('on')}lastTap=now}
+});
+function liveBtn(){const b=document.getElementById('golive');if(b)b.textContent=LV.on?'● LIVE':'GO LIVE'}
+V.addEventListener('input',e=>{if(e.target.id!=='q')return;const q=e.target.value.trim().toLowerCase(),out=document.getElementById('sres');if(!q){out.innerHTML='';return}
+  const ps=posts.filter(p=>(p.n+' '+p.h+' '+p.pl+' '+SP[p.sp][0]+' '+p.lv).toLowerCase().includes(q)),cs=Object.entries(SP).filter(([k,v])=>v[0].toLowerCase().includes(q)),cl=CLUB.n.toLowerCase().includes(q)||'club league fc21'.includes(q);
+  out.innerHTML=`<div class="panel">${cs.map(([k,v])=>`<div class="res"><span class="av" style="background:${v[1]}33">${v[0][0]}</span><div><b>${v[0]}</b><div class="mu">Channel</div></div><button class="btn g" data-go="${k}">Open</button></div>`).join('')}${cl?`<div class="res"><span class="av" style="background:#22c55e33">FC</span><div><b>${CLUB.n}</b><div class="mu">Club</div></div><button class="btn g" data-club="1">Open</button></div>`:''}${ps.map(p=>`<div class="res"><span class="av" style="background:${SP[p.sp][1]}33">${ini(p.n)}</span><div><b>${p.n}</b><div class="mu">@${p.h} · ${p.pl}</div></div><button class="btn g" data-go="${p.sp}">View</button></div>`).join('')}${!ps.length&&!cs.length&&!cl?'<p class="mu" style="margin:0">No matches yet. Try a name, a sport or a city.</p>':''}</div>`});
+document.getElementById('golive').onclick=()=>goLive();
+document.getElementById('wal').onclick=()=>{S.t='earn';render()};
+render();
+if(location.hash==='#live'){try{localStorage.setItem('jmj-onb','1')}catch(x){}goLive()}else{try{if(!localStorage.getItem('jmj-onb'))onb()}catch(x){onb()}}
+}
+</script>
+</body>
+</html>
