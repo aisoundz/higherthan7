@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261125e';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261125f';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -136,9 +136,33 @@ export const highlights = {
     if (sb) return chk(await sb.from('highlights').select('*, game:games(id,title)').in('player_id', ids).order('created_at', { ascending: false }));
     return Object.values(M.highlights).filter(h => ids.includes(h.player_id)).map(h => ({ ...h, game: M.games[h.game_id] }));
   },
+  // The public feed: newest highlights from every game, optionally one sport.
+  async feed(sport, limit = 30) {
+    if (sb) {
+      let q = sb.from('highlights').select('id,label,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles(name,handle)), player:players(label, user:profiles(name,handle)), fires(count)').order('created_at', { ascending: false }).limit(limit);
+      if (sport) q = q.eq('game.sport', sport);
+      return chk(await q).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
+    }
+    return Object.values(M.highlights).map(h => {
+      const g = M.games[h.game_id] || {}; const o = M.profiles[g.owner_id]; const p = M.players[h.player_id];
+      return { ...h, game: { ...g, owner: o ? { name: o.name, handle: o.handle } : null }, player: p ? { label: p.label, user: p.user_id ? M.profiles[p.user_id] : null } : null, fire: Object.values(M.fires || {}).filter(f => f.highlight_id === h.id).length };
+    }).filter(h => !sport || h.game.sport === sport).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
+  },
   async add(h) { if (sb) return chk(await sb.from('highlights').insert(h).select().single()); const r = { id: uid(), created_at: now(), player_id: null, ...h }; M.highlights[r.id] = r; await save(); return r; },
   async update(id, patch) { if (sb) { chk(await sb.from('highlights').update(patch).eq('id', id)); return; } Object.assign(M.highlights[id], patch); await save(); },
   async remove(id) { if (sb) { chk(await sb.from('highlights').delete().eq('id', id)); return; } delete M.highlights[id]; await save(); },
+};
+
+export const fires = {
+  async mine(userId, ids) {
+    if (!userId || !ids.length) return new Set();
+    if (sb) return new Set(chk(await sb.from('fires').select('highlight_id').eq('user_id', userId).in('highlight_id', ids)).map(r => r.highlight_id));
+    return new Set(Object.values(M.fires || {}).filter(f => f.user_id === userId).map(f => f.highlight_id));
+  },
+  async toggle(hid, userId, on) {
+    if (sb) { if (on) chk(await sb.from('fires').insert({ highlight_id: hid })); else chk(await sb.from('fires').delete().eq('highlight_id', hid).eq('user_id', userId)); return; }
+    M.fires = M.fires || {}; const k = hid + ':' + userId; if (on) M.fires[k] = { highlight_id: hid, user_id: userId }; else delete M.fires[k]; await save();
+  },
 };
 
 export const storage = {

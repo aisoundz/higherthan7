@@ -1,10 +1,11 @@
-import * as E from './engine.js?v=20261125e';
-import * as R from './rec.js?v=20261125e';
-import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js?v=20261125e';
+import * as E from './engine.js?v=20261125f';
+import * as R from './rec.js?v=20261125f';
+import { auth, profiles, games, players, highlights, fires, storage, mode, ready } from './db.js?v=20261125f';
 
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
 let ME = null, MYP = null;
+const POS = { Basketball: 'Point guard', Soccer: 'Striker', 'Flag football': 'Wide receiver', Volleyball: 'Outside hitter', Football: 'Linebacker', Baseball: 'Shortstop', Softball: 'Pitcher', Track: '100m and 200m', Tennis: 'Singles', Other: '' };
 const SPORTS = ['Basketball', 'Soccer', 'Flag football', 'Volleyball', 'Football', 'Baseball', 'Softball', 'Track', 'Tennis', 'Other'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mmss = t => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
@@ -20,9 +21,13 @@ window.addEventListener('beforeunload', e => { if (busy) { e.preventDefault(); e
 
 async function refreshMe() { ME = await auth.user(); MYP = ME ? await profiles.byId(ME.id) : null; }
 function topbar() {
-  TR.innerHTML = ME && MYP
-    ? `<a class="btn s" href="#/new">+ New game</a><a href="#/u/${esc(MYP.handle)}" class="av" style="width:38px;height:38px;font-size:17px;text-decoration:none" aria-label="My profile">${esc(ini(MYP.name))}</a>`
+  TR.innerHTML = ME
+    ? (MYP ? `<a class="btn s" href="#/new">+ New game</a><a href="#/u/${esc(MYP.handle)}" class="av" style="width:38px;height:38px;font-size:17px;text-decoration:none" aria-label="My profile">${esc(ini(MYP.name))}</a>` : '')
     : LOCAL ? '' : `<a class="btn s g" href="#/login">Sign in</a>`;
+  const nav = document.getElementById('nav'); if (!nav) return;
+  const h = location.hash || '#/';
+  nav.hidden = !(ME && MYP) || /^#\/(login|setup)/.test(h);
+  if (!nav.hidden) nav.innerHTML = `<a href="#/" class="${h === '#/' || h === '#' ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Feed</a><a href="#/new" class="film"><span>+</span>Film</a><a href="#/u/${esc(MYP.handle)}" class="${h.startsWith('#/u/') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Me</a>`;
 }
 function needLogin(next) { go(LOCAL ? '#/setup?next=' + encodeURIComponent(next || '#/') : '#/login?next=' + encodeURIComponent(next || location.hash)); }
 
@@ -53,23 +58,55 @@ auth.onChange(() => { refreshMe().then(topbar); });
 
 const gameList = list => `<div class="list">${list.map(g => `<a href="#/g/${g.id}"><span><b>${esc(g.title)}</b><br><span class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}</span></span><span class="mu">${esc(g.played_on || '')}</span></a>`).join('')}</div>`;
 
-// ---------------- Home
+// ---------------- Home: the social feed
+let FEED_SPORT = '';
 async function home() {
-  if (!ME) {
-    const rec = await games.recent().catch(() => []);
-    V.innerHTML = `<section class="hero"><h1>Your game. Your tape. Get seen.</h1><p>Film your run. Jamoja finds the big plays, cuts the highlights and gives every player their own tape.</p>
-      <ol class="steps"><li><span><b>Film in Jamoja or upload clips</b><br><span class="mu">Tap BUCKET after big plays while you film.</span></span></li><li><span><b>Get highlights automatically</b><br><span class="mu">Your taps and the crowd noise pick the moments.</span></span></li><li><span><b>Tag your crew and send one link</b><br><span class="mu">Friends claim their plays with a free account.</span></span></li></ol>
-      <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>
-      ${rec.length ? `<h2>Recent games</h2>${gameList(rec)}` : ''}<p class="foot">Jamoja beta. 18 and older during testing.</p>`;
-    return;
-  }
-  const [mine, tagged, parts] = await Promise.all([games.mine(ME.id), players.mine(ME.id), R.savedParts()]);
-  V.innerHTML = `<h1>What's up, ${esc((MYP.name || '').split(' ')[0])}</h1>
-    ${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
-    <a class="card" href="#/new" style="display:block;text-decoration:none"><b style="font:26px/1 var(--hd)">+ New game</b><br><span class="mu">Film in Jamoja or upload clips from your phone.</span></a>
-    <h2>Your games</h2>${mine.length ? gameList(mine) : `<p class="mu">No games yet. Film your next run.</p>`}
-    ${LOCAL ? '' : `<h2>Games you're in</h2>${tagged.length ? `<div class="list">${tagged.filter(t => t.game).map(t => `<a href="#/g/${t.game.id}"><span><b>${esc(t.game.title)}</b><br><span class="mu">You: ${esc(t.label)}</span></span><span class="mu">${esc(t.game.played_on || '')}</span></a>`).join('')}</div>` : `<p class="mu">When a friend tags you and you claim your plays, those games show up here.</p>`}`}
-    <p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}</p>`;
+  const parts = ME ? await R.savedParts() : [];
+  const top = !ME
+    ? `<section class="hero"><h1>Every game. Seen.</h1><p>Film your run. Jamoja finds the big plays, cuts the highlights and puts them on every player's profile.</p>
+      <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
+    : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
+      <a class="card film-cta" href="#/new"><span class="dot">●</span><span><b>Film a game</b><br><span class="mu">Tap BUCKET after big plays. Highlights are cut for you.</span></span></a>`;
+  V.innerHTML = `${top}<div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div id="feed"><p class="mu">Loading highlights…</p></div>
+    ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
+  document.getElementById('sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
+  await drawFeed();
+  if (ME && !LOCAL) drawMine();
+}
+async function drawFeed() {
+  const box = document.getElementById('feed');
+  let list = [];
+  try { list = await highlights.feed(FEED_SPORT); } catch (e) { console.error(e); box.innerHTML = `<div class="err">Could not load the feed. Pull down to refresh.</div>`; return; }
+  await storage.prep(list.flatMap(h => [h.path, h.poster]));
+  const lit = await fires.mine(ME && ME.id, list.map(h => h.id)).catch(() => new Set());
+  const who = h => h.player ? (h.player.user ? `<a href="#/u/${esc(h.player.user.handle)}">@${esc(h.player.user.handle)}</a>` : esc(h.player.label)) : '';
+  const pinned = list.length < 3 && !FEED_SPORT ? `<article class="post"><div class="pin">Pinned · Welcome to Jamoja</div><video src="../reel.mp4" poster="../poster.jpg" playsinline muted loop preload="metadata"></video><div class="meta"><b>Anis Taylor</b><span class="mu">Founder · Basketball · Anaheim. Built by an athlete, for athletes.</span><a class="mu" href="../profile/">See a full player profile</a></div></article>` : '';
+  box.innerHTML = pinned + (list.length ? list.map(h => `<article class="post" data-id="${h.id}"><video src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
+    <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-share="${h.game_id}" aria-label="Share"><span>↗</span><b>Share</b></button></div>
+    <div class="meta"><b>${who(h) || esc(h.label)}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · ' + esc(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`).join('')
+    : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' highlights yet.' : 'The feed fills up as games get filmed.'}</b><p class="mu" style="margin:4px 0 10px">Film your next run and your plays show up here for everyone.</p>${ME ? `<a class="btn s" href="#/new">Film a game</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`);
+  // Autoplay the clip that is on screen, muted. Tap a clip for sound.
+  const io = new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 });
+  box.querySelectorAll('video').forEach(v => { io.observe(v); v.onclick = () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); toast(v.muted ? 'Sound off' : 'Sound on'); }; });
+  box.onclick = async e => {
+    const f = e.target.closest('[data-fire]'), sh = e.target.closest('[data-share]');
+    if (f) {
+      if (!ME) return needLogin('#/');
+      const on = !f.classList.contains('on'), n = f.querySelector('b');
+      f.classList.toggle('on', on); n.textContent = (+n.textContent || 0) + (on ? 1 : -1);
+      try { await fires.toggle(f.dataset.fire, ME.id, on); } catch (err) { f.classList.toggle('on', !on); n.textContent = (+n.textContent || 0) + (on ? -1 : 1); toast(err.message); }
+    } else if (sh) {
+      const url = shareBase() + '#/g/' + sh.dataset.share;
+      if (navigator.share) navigator.share({ title: 'Jamoja highlight', text: 'Check this play on Jamoja.', url }).catch(() => {});
+      else { try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch (err) { toast(url); } }
+    }
+  };
+}
+async function drawMine() {
+  const [mine, tagged] = await Promise.all([games.mine(ME.id), players.mine(ME.id)]).catch(() => [[], []]);
+  const el = document.getElementById('mine'); if (!el) return;
+  el.innerHTML = `${mine.length ? `<h2>Your games</h2>${gameList(mine)}` : ''}${tagged.filter(t => t.game).length ? `<h2>Games you're in</h2><div class="list">${tagged.filter(t => t.game).map(t => `<a href="#/g/${t.game.id}"><span><b>${esc(t.game.title)}</b><br><span class="mu">You: ${esc(t.label)}</span></span><span class="mu">${esc(t.game.played_on || '')}</span></a>`).join('')}</div>` : ''}`;
 }
 
 // ---------------- Sign in / create account (live mode)
@@ -127,16 +164,22 @@ function setup() {
   const p = MYP || {};
   V.innerHTML = `<h1>${MYP ? 'Edit your profile' : 'Set up your profile'}</h1><p class="mu">${LOCAL ? 'Takes 20 seconds. Saved on this phone.' : 'This is what coaches, scouts and friends see.'}</p>
     <form id="pf"><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
-    <label class="f" for="hd">Handle</label><input class="t" id="hd" value="${esc(p.handle || '')}" placeholder="yourname" autocapitalize="off" required>
+    <label class="f" for="hd">Handle</label><input class="t" id="hd" value="${esc(p.handle || '')}" placeholder="yourname" autocapitalize="off" autocorrect="off" spellcheck="false" required><p class="mu" id="hp" style="margin:4px 0 0"></p>
     <label class="f" for="sp">Main sport</label><select class="t" id="sp">${SPORTS.map(s => `<option ${p.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
-    <label class="f" for="ps">Position (optional)</label><input class="t" id="ps" value="${esc(p.position || '')}" placeholder="Point guard">
+    <label class="f" for="ps">Position (optional)</label><input class="t" id="ps" value="${esc(p.position || '')}" placeholder="${esc(POS[p.sport || 'Basketball'] || '')}">
     <label class="f" for="ct">City</label><input class="t" id="ct" value="${esc(p.city || '')}" placeholder="Anaheim, CA">
     <div id="pe"></div><button class="btn w" style="margin-top:16px">Save profile</button></form>`;
   const nm = document.getElementById('nm'), hd = document.getElementById('hd');
-  nm.oninput = () => { if (!MYP) hd.value = nm.value.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '').slice(0, 24); };
+  const hp = document.getElementById('hp'), sp = document.getElementById('sp'), ps = document.getElementById('ps');
+  const clean = v => v.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9._]/g, '').slice(0, 24);
+  const showH = () => { hp.innerHTML = hd.value ? `Your profile: <b>@${esc(hd.value)}</b>. Letters, numbers, dots and underscores.` : 'Letters, numbers, dots and underscores.'; };
+  nm.oninput = () => { if (!MYP) { hd.value = clean(nm.value).replace(/^[._]+|[._]+$/g, ''); showH(); } };
+  hd.oninput = () => { const c = clean(hd.value); if (c !== hd.value) hd.value = c; showH(); };
+  sp.onchange = () => { ps.placeholder = POS[sp.value] || ''; };
+  showH();
   document.getElementById('pf').onsubmit = async e => {
     e.preventDefault();
-    const handle = hd.value.toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 24);
+    const handle = clean(hd.value).replace(/^[._]+|[._]+$/g, '');
     if (!nm.value.trim() || handle.length < 3) { document.getElementById('pe').innerHTML = `<div class="err">Add your name and a handle of at least 3 letters or numbers.</div>`; return; }
     try {
       MYP = await profiles.save({ id: ME.id, name: nm.value.trim(), handle, sport: document.getElementById('sp').value, position: document.getElementById('ps').value.trim(), city: document.getElementById('ct').value.trim() });
