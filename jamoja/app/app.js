@@ -1,6 +1,6 @@
-import * as E from './engine.js';
-import * as R from './rec.js';
-import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js';
+import * as E from './engine.js?v=20261125c';
+import * as R from './rec.js?v=20261125c';
+import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js?v=20261125c';
 
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
