@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261125g';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261125h';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -139,16 +139,20 @@ export const highlights = {
     return Object.values(M.highlights).filter(h => ids.includes(h.player_id)).map(h => ({ ...h, game: M.games[h.game_id] }));
   },
   // The public feed: newest highlights from every game, optionally one sport.
-  async feed(sport, limit = 30) {
+  async feed(sport, limit = 30, ids = null) {
+    if (ids && !ids.length) return [];
     if (sb) {
-      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles(name,handle)), player:players(label, user:profiles(name,handle)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
+      let pids = null;
+      if (ids) pids = chk(await sb.from('players').select('id').in('user_id', ids)).map(r => r.id);
+      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
       if (sport) q = q.eq('game.sport', sport);
+      if (ids) q = q.or(`created_by.in.(${ids.join(',')})` + (pids.length ? `,player_id.in.(${pids.join(',')})` : ''));
       return chk(await q).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
     }
     return Object.values(M.highlights).map(h => {
       const g = M.games[h.game_id] || {}; const o = M.profiles[g.owner_id]; const p = M.players[h.player_id];
       return { ...h, game: { ...g, owner: o ? { name: o.name, handle: o.handle } : null }, player: p ? { label: p.label, user: p.user_id ? M.profiles[p.user_id] : null } : null, fire: Object.values(M.fires || {}).filter(f => f.highlight_id === h.id).length };
-    }).filter(h => !h.hidden && (!sport || h.game.sport === sport)).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
+    }).filter(h => !h.hidden && (!sport || h.game.sport === sport) && (!ids || ids.includes(h.created_by) || (h.player_id && M.players[h.player_id] && ids.includes(M.players[h.player_id].user_id)))).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
   },
   async add(h) { if (sb) return chk(await sb.from('highlights').insert(h).select().single()); const r = { id: uid(), created_at: now(), player_id: null, ...h }; M.highlights[r.id] = r; await save(); return r; },
   async view(id) { if (sb) { await sb.rpc('add_view', { p_highlight: id }); return; } if (M.highlights[id]) { M.highlights[id].views = (M.highlights[id].views || 0) + 1; await save(); } },
@@ -159,6 +163,73 @@ export const highlights = {
   },
   async update(id, patch) { if (sb) { chk(await sb.from('highlights').update(patch).eq('id', id)); return; } Object.assign(M.highlights[id], patch); await save(); },
   async remove(id) { if (sb) { chk(await sb.from('highlights').delete().eq('id', id)); return; } delete M.highlights[id]; await save(); },
+};
+
+const PROF = 'id,name,handle,avatar,level,sport';
+export const posts = {
+  async create(p) { if (sb) return chk(await sb.from('posts').insert(p).select().single()); const r = { id: uid(), created_at: now(), hidden: false, user_id: M.session.id, ...p }; M.posts = M.posts || {}; M.posts[r.id] = r; await save(); return r; },
+  async feed(sport, limit = 30, ids = null) {
+    if (ids && !ids.length) return [];
+    if (sb) {
+      let q = sb.from('posts').select(`*, user:profiles(${PROF}), post_fires(count)`).eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
+      if (sport) q = q.eq('sport', sport);
+      if (ids) q = q.in('user_id', ids);
+      return chk(await q).map(x => ({ ...x, fire: (x.post_fires && x.post_fires[0] && x.post_fires[0].count) || 0 }));
+    }
+    return Object.values(M.posts || {}).filter(x => !x.hidden && (!sport || x.sport === sport) && (!ids || ids.includes(x.user_id)))
+      .map(x => ({ ...x, user: M.profiles[x.user_id], fire: Object.values(M.pfires || {}).filter(f => f.post_id === x.id).length })).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
+  },
+  async get(id) { if (sb) { const r = chk(await sb.from('posts').select(`*, user:profiles(${PROF}), post_fires(count)`).eq('id', id).maybeSingle()); return r && { ...r, fire: (r.post_fires && r.post_fires[0] && r.post_fires[0].count) || 0 }; } const x = (M.posts || {})[id]; return x ? { ...x, user: M.profiles[x.user_id], fire: 0 } : null; },
+  async byUser(userId) { return posts.feed('', 50, [userId]); },
+  async remove(id) { if (sb) { chk(await sb.from('posts').delete().eq('id', id)); return; } delete M.posts[id]; await save(); },
+  async report(id, reason) {
+    if (sb) { const r = await sb.from('reports').insert({ post_id: id, reason }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); return; }
+    M.preports = M.preports || {}; M.preports[id + ':' + M.session.id] = reason; if (Object.keys(M.preports).filter(k => k.startsWith(id + ':')).length >= 2) M.posts[id].hidden = true; await save();
+  },
+};
+export const postFires = {
+  async mine(userId, ids) {
+    if (!userId || !ids.length) return new Set();
+    if (sb) return new Set(chk(await sb.from('post_fires').select('post_id').eq('user_id', userId).in('post_id', ids)).map(r => r.post_id));
+    return new Set(Object.values(M.pfires || {}).filter(f => f.user_id === userId).map(f => f.post_id));
+  },
+  async toggle(pid, userId, on) {
+    if (sb) { if (on) chk(await sb.from('post_fires').insert({ post_id: pid })); else chk(await sb.from('post_fires').delete().eq('post_id', pid).eq('user_id', userId)); return; }
+    M.pfires = M.pfires || {}; const k = pid + ':' + userId; if (on) M.pfires[k] = { post_id: pid, user_id: userId }; else delete M.pfires[k]; await save();
+  },
+};
+export const follows = {
+  async ids(userId) { if (!userId) return []; if (sb) return chk(await sb.from('follows').select('followee_id').eq('follower_id', userId)).map(r => r.followee_id); return Object.values(M.follows || {}).filter(f => f.follower_id === userId).map(f => f.followee_id); },
+  async counts(userId) {
+    if (sb) { const [a, b] = await Promise.all([sb.from('follows').select('*', { count: 'exact', head: true }).eq('followee_id', userId), sb.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId)]); return { followers: a.count || 0, following: b.count || 0 }; }
+    const all = Object.values(M.follows || {}); return { followers: all.filter(f => f.followee_id === userId).length, following: all.filter(f => f.follower_id === userId).length };
+  },
+  async toggle(me, them, on) {
+    if (sb) { if (on) { const r = await sb.from('follows').insert({ followee_id: them }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); } else chk(await sb.from('follows').delete().eq('follower_id', me).eq('followee_id', them)); return; }
+    M.follows = M.follows || {}; const k = me + ':' + them; if (on) M.follows[k] = { follower_id: me, followee_id: them }; else delete M.follows[k]; await save();
+  },
+  async suggested(me, limit = 8) {
+    if (sb) { const r = chk(await sb.from('profiles').select(PROF).neq('id', me || '00000000-0000-0000-0000-000000000000').order('created_at', { ascending: false }).limit(limit + 20)); return r; }
+    return Object.values(M.profiles).filter(p => p.id !== me);
+  },
+};
+export const comments = {
+  async counts(kind, ids) {
+    const m = {}; if (!ids.length) return m; const col = kind === 'post' ? 'post_id' : 'highlight_id';
+    const rows = sb ? chk(await sb.from('comments').select(col).in(col, ids)) : Object.values(M.comments || {}).filter(c => ids.includes(c[col]));
+    for (const r of rows) m[r[col]] = (m[r[col]] || 0) + 1; return m;
+  },
+  async list(kind, id) {
+    const col = kind === 'post' ? 'post_id' : 'highlight_id';
+    if (sb) return chk(await sb.from('comments').select(`id,body,created_at,user_id, user:profiles(${PROF})`).eq(col, id).order('created_at').limit(100));
+    return Object.values(M.comments || {}).filter(c => c[col] === id).sort((a, b) => a.created_at < b.created_at ? -1 : 1).map(c => ({ ...c, user: M.profiles[c.user_id] }));
+  },
+  async add(kind, id, body) {
+    const row = { [kind === 'post' ? 'post_id' : 'highlight_id']: id, body };
+    if (sb) return chk(await sb.from('comments').insert(row).select().single());
+    M.comments = M.comments || {}; const r = { id: uid(), user_id: M.session.id, created_at: now(), post_id: null, highlight_id: null, ...row }; M.comments[r.id] = r; await save(); return r;
+  },
+  async remove(id) { if (sb) { chk(await sb.from('comments').delete().eq('id', id)); return; } delete M.comments[id]; await save(); },
 };
 
 export const fires = {

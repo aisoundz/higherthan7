@@ -100,6 +100,7 @@ input[type=date].t::-webkit-date-and-time-value{text-align:left}
 .fire span{font-size:28px;line-height:1;filter:grayscale(1) brightness(1.6)}.fire.on span{filter:none}.fire b{font:600 13px var(--num)}
 .pin{position:absolute;top:10px;left:10px;z-index:2;background:#000b;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600}
 nav.bn{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;align-items:center;background:#0a0a0bf2;border-top:1px solid var(--ln);padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+nav.bn[hidden]{display:none}
 nav.bn a{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--mu);text-decoration:none;min-width:64px}
 nav.bn a.on{color:var(--ink)}nav.bn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2}
 nav.bn .film span{display:grid;place-items:center;width:46px;height:34px;border-radius:12px;background:var(--o);color:#0a0a0b;font:700 24px/1 Inter}
@@ -107,13 +108,30 @@ nav.bn:not([hidden])~main,body:has(nav.bn:not([hidden])) main{padding-bottom:cal
 .post .cap{align-self:flex-start;background:var(--o);color:#0a0a0b;font:22px/1 var(--hd);letter-spacing:.5px;padding:5px 10px 3px;border-radius:8px;margin-bottom:4px}
 .rep{margin-top:-8px}
 .stats{gap:0;margin:16px 0 0;background:var(--p);border:1px solid var(--ln);border-radius:16px;flex-wrap:nowrap}.stats>div{flex:1;text-align:center;padding:12px 4px;display:flex;flex-direction:column}.stats>div+div{border-left:1px solid var(--ln)}.stats b{font:600 26px/1 var(--num)}.stats span{font-size:12px;color:var(--mu);margin-top:4px}
+.avi{border-radius:50%;object-fit:cover;flex:none;background:#2a1408;color:var(--o);display:inline-grid;place-items:center;font-family:var(--hd)}
+.lv{display:inline-block;font:600 11px/1 var(--num);letter-spacing:.5px;padding:3px 6px 2px;border-radius:6px;background:#ff5a1f22;color:var(--o);border:1px solid #ff5a1f66;vertical-align:2px}
+.tabs{display:flex;gap:4px;margin:2px 0 8px;border-bottom:1px solid var(--ln)}.tabs button{flex:1;background:none;border:0;padding:10px 0;font-weight:700;color:var(--mu);border-bottom:3px solid transparent}.tabs button.on{color:var(--ink);border-color:var(--o)}
+.compose{display:flex;gap:12px;align-items:center;text-decoration:none}.compose .mu{flex:1}.compose .ic{font-size:22px}
+.pst{padding:12px 12px 6px}.ph{display:flex;gap:10px;align-items:center;justify-content:space-between}.pu{display:flex;gap:10px;align-items:center;text-decoration:none;flex:1}.pu b{font-weight:700}
+.pb{margin:10px 2px 8px;white-space:normal;overflow-wrap:anywhere}
+.pm{display:block;width:100%;border-radius:12px;background:#000;max-height:70vh;object-fit:cover;margin:8px 0}
+.yt{position:relative;display:block;width:100%;padding:0;border:0;background:#000;border-radius:12px;overflow:hidden;margin:8px 0}.yt img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}.yt span{position:absolute;inset:0;margin:auto;width:68px;height:48px;border-radius:12px;background:#ff0000e6;color:#fff;display:grid;place-items:center;font-size:22px}
+.ytf{aspect-ratio:16/9;height:auto;border:0}
+.acts{display:flex;justify-content:space-around;border-top:1px solid var(--ln);margin-top:6px;padding-top:4px}.acts .fire{flex-direction:row;gap:6px;text-shadow:none;color:var(--ink)}.acts .fire span{font-size:20px}.acts .fire b{font-size:14px}
+.cmt{margin-top:-8px}.cm1{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--ln);font-size:14px;overflow-wrap:anywhere}.cm1 a{text-decoration:none}
+.cf{display:flex;gap:8px;margin-top:10px}.cf input{flex:1;height:42px}
+.lnkb{background:none;border:0;color:var(--mu);text-decoration:underline;font-size:13px;padding:4px}
+.people{display:flex;gap:10px;overflow-x:auto;padding:10px 2px 2px;scrollbar-width:none}.people::-webkit-scrollbar{display:none}
+.person{flex:none;width:104px;background:var(--p2);border:1px solid var(--ln);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}.person a{display:flex;flex-direction:column;align-items:center;text-decoration:none;gap:2px}.person .btn{width:100%}
+.fb{flex:none}
+textarea.ta{width:100%;height:auto;min-height:90px;padding:10px 12px;line-height:1.4;resize:vertical;border-radius:12px;background:var(--p2);border:1px solid var(--ln);font:inherit}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261125g"></script>
-<script type="module" src="app.js?v=20261125g"></script>
+<script src="vendor/supabase.js?v=20261125h"></script>
+<script type="module" src="app.js?v=20261125h"></script>
 </body>
 </html>

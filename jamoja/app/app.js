@@ -1,6 +1,22 @@
-import * as E from './engine.js?v=20261125g';
-import * as R from './rec.js?v=20261125g';
-import { auth, profiles, games, players, highlights, fires, storage, mode, ready } from './db.js?v=20261125g';
+import * as E from './engine.js?v=20261125h';
+import * as R from './rec.js?v=20261125h';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125h';
+const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
+const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
+const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
+const avUrl = p => p && p.avatar ? storage.url(p.avatar) : '';
+const avatar = (p, px = 40) => avUrl(p) ? `<img class="avi" src="${esc(avUrl(p))}" alt="" style="width:${px}px;height:${px}px">` : `<span class="avi" style="width:${px}px;height:${px}px;font-size:${Math.round(px * 0.42)}px">${esc(ini(p && p.name))}</span>`;
+const ago = t => { const s2 = (Date.now() - new Date(t)) / 1000; return s2 < 60 ? 'now' : s2 < 3600 ? Math.floor(s2 / 60) + 'm' : s2 < 86400 ? Math.floor(s2 / 3600) + 'h' : s2 < 604800 ? Math.floor(s2 / 86400) + 'd' : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
+const ytId = u => { const m = /(?:youtu\.be\/|[?&]v=|\/(?:live|shorts|embed)\/)([A-Za-z0-9_-]{11})/.exec(u || ''); return m ? m[1] : null; };
+const nl = t => esc(t).replace(/\n/g, '<br>');
+// Shrink a photo to a JPEG (max side px) before upload.
+async function toJpeg(file, max = 1440) {
+  let img;
+  try { img = await createImageBitmap(file); } catch (e) { img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not read that photo. Try another one.')); i.src = URL.createObjectURL(file); }); }
+  const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
+}
 const PLAYS = {
   Basketball: ['Bucket', 'Three', 'And-one', 'Dunk', 'Dime', 'Block', 'Steal', 'Ankle breaker', 'Game winner'],
   Soccer: ['Goal', 'Assist', 'Skill move', 'Nutmeg', 'Save', 'Tackle'],
@@ -86,12 +102,12 @@ window.addEventListener('beforeunload', e => { if (busy) { e.preventDefault(); e
 async function refreshMe() { ME = await auth.user(); MYP = ME ? await profiles.byId(ME.id) : null; }
 function topbar() {
   TR.innerHTML = ME
-    ? (MYP ? `<a class="btn s" href="#/new">+ New game</a><a href="#/u/${esc(MYP.handle)}" class="av" style="width:38px;height:38px;font-size:17px;text-decoration:none" aria-label="My profile">${esc(ini(MYP.name))}</a>` : '')
+    ? (MYP ? `<a class="btn s" href="#/post">+ Post</a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
     : LOCAL ? '' : `<a class="btn s g" href="#/login">Sign in</a>`;
   const nav = document.getElementById('nav'); if (!nav) return;
   const h = location.hash || '#/';
   nav.hidden = !(ME && MYP) || /^#\/(login|setup)/.test(h);
-  if (!nav.hidden) nav.innerHTML = `<a href="#/" class="${h === '#/' || h === '#' ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Feed</a><a href="#/new" class="film"><span>+</span>Film</a><a href="#/u/${esc(MYP.handle)}" class="${h.startsWith('#/u/') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Me</a>`;
+  if (!nav.hidden) nav.innerHTML = `<a href="#/" class="${h === '#/' || h === '#' ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Feed</a><a href="#/post" class="film"><span>+</span>Post</a><a href="#/u/${esc(MYP.handle)}" class="${h.startsWith('#/u/') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Me</a>`;
 }
 function needLogin(next) { go(LOCAL ? '#/setup?next=' + encodeURIComponent(next || '#/') : '#/login?next=' + encodeURIComponent(next || location.hash)); }
 
@@ -113,6 +129,8 @@ async function route() {
     if (parts[0] === 'setup') return setup();
     if (parts[0] === 'reset') return resetPage();
     if (parts[0] === 'new') return await newGame();
+    if (parts[0] === 'post') return await composer();
+    if (parts[0] === 'p' && parts[1]) return await postPage(parts[1]);
     if (parts[0] === 'g' && parts[1]) return await gamePage(parts[1]);
     if (parts[0] === 'u' && parts[1]) return await profilePage(decodeURIComponent(parts[1]));
     V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`;
@@ -127,60 +145,196 @@ auth.onChange(ev => { if (ev === 'PASSWORD_RECOVERY') { RECOVERY = false; go('#/
 const gameList = list => `<div class="list">${list.map(g => `<a href="#/g/${g.id}"><span><b>${esc(g.title)}</b><br><span class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}</span></span><span class="mu">${esc(g.played_on || '')}</span></a>`).join('')}</div>`;
 
 // ---------------- Home: the social feed
-let FEED_SPORT = '';
+let FEED_SPORT = '', FEED_TAB = 'all';
 async function home() {
   const parts = ME ? await R.savedParts() : [];
   const top = !ME
-    ? `${inAppCard()}<section class="hero"><h1>Every game. Seen.</h1><p>Film your run. Jamoja finds the big plays, cuts the highlights and puts them on every player's profile.</p>
+    ? `${inAppCard()}<section class="hero"><h1>Every game. Seen.</h1><p>The social network for athletes. Post your work, film your runs, and Jamoja cuts the highlights and puts them on your profile.</p>
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
-      <a class="card film-cta" href="#/new"><span class="dot">●</span><span><b>Film a game</b><br><span class="mu">Tap BUCKET after big plays. Highlights are cut for you.</span></span></a>`;
-  V.innerHTML = `${top}<div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
-    <div id="feed"><p class="mu">Loading highlights…</p></div>
+      <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
+  V.innerHTML = `${top}${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
+    <div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
-  document.getElementById('sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
+  V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
+  const tabs = V.querySelector('.tabs'); if (tabs) tabs.onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; FEED_TAB = b.dataset.tab; home(); };
   await drawFeed();
   if (ME && !LOCAL) drawMine();
 }
 async function drawFeed() {
   const box = document.getElementById('feed');
-  let list = [];
-  try { list = await highlights.feed(FEED_SPORT); } catch (e) { console.error(e); box.innerHTML = `<div class="err">Could not load the feed. Pull down to refresh.</div>`; return; }
-  await storage.prep(list.flatMap(h => [h.path, h.poster]));
-  const lit = await fires.mine(ME && ME.id, list.map(h => h.id)).catch(() => new Set());
+  let fol = [];
+  try { fol = ME ? await follows.ids(ME.id) : []; } catch (e) { fol = []; }
+  const ids = ME && FEED_TAB === 'following' ? [...fol, ME.id] : null;
+  let hl = [], ps = [];
+  try { [hl, ps] = await Promise.all([highlights.feed(FEED_SPORT, 30, ids), posts.feed(FEED_SPORT, 30, ids)]); }
+  catch (e) { console.error(e); box.innerHTML = `<div class="err">Could not load the feed. Pull down to refresh.</div>`; return; }
+  const items = [...hl.map(h => ({ t: 'h', at: h.created_at, h })), ...ps.map(x => ({ t: 'p', at: x.created_at, x }))].sort((a, b) => a.at < b.at ? 1 : -1).slice(0, 40);
+  const pinned = !FEED_SPORT && FEED_TAB === 'all' && items.length < 3 ? `<article class="post"><div class="pin">Pinned · Welcome to Jamoja</div><video src="../reel.mp4" poster="../poster.jpg" playsinline muted loop preload="metadata"></video><div class="meta"><b>Anis Taylor</b><span class="mu">Founder · Basketball · Anaheim. Built by an athlete, for athletes.</span><a class="mu" href="../profile/">See a full player profile</a></div></article>` : '';
+  const empty = FEED_TAB === 'following' && !fol.length;
+  let sugg = '';
+  if (ME && (empty || fol.length < 3)) {
+    const people = (await follows.suggested(ME.id).catch(() => [])).filter(p => !fol.includes(p.id)).slice(0, 8);
+    if (people.length) sugg = `<div class="card"><b>People to follow</b><div class="people">${people.map(p => `<div class="person"><a href="#/u/${esc(p.handle)}">${avatar(p, 56)}<b>${esc((p.name || '').split(' ')[0])}</b><span class="mu">${esc(p.sport || '')}</span></a><button class="btn s" data-follow="${p.id}">Follow</button></div>`).join('')}</div></div>`;
+  }
+  box.innerHTML = (empty ? `<div class="card"><b>Follow athletes to fill this tab.</b><p class="mu" style="margin:4px 0 0">Their posts and plays show up here.</p></div>` : '') + sugg;
+  const list = document.createElement('div'); box.append(list);
+  await renderItems(list, items, { empty: empty ? '' : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' posts yet.' : 'Nothing here yet.'}</b><p class="mu" style="margin:4px 0 10px">Post something or film your next run.</p>${ME ? `<a class="btn s" href="#/post">Post</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`, fol });
+  if (pinned) box.insertAdjacentHTML('beforeend', pinned);
+  box.querySelectorAll('.pin ~ video').forEach(v => playWhenSeen(v));
+  bindFollow(box, fol);
+}
+const IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 }) : null;
+function playWhenSeen(v) { if (IO) IO.observe(v); v.onclick = () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); toast(v.muted ? 'Sound off' : 'Sound on'); }; }
+function bindFollow(root, fol) {
+  if (root._fh) root.removeEventListener('click', root._fh);
+  root.addEventListener('click', root._fh = async e => {
+    const b = e.target.closest('[data-follow]'); if (!b) return;
+    if (!ME) return needLogin(location.hash || '#/');
+    const id = b.dataset.follow, on = !fol.includes(id);
+    try {
+      await follows.toggle(ME.id, id, on);
+      if (on) fol.push(id); else fol.splice(fol.indexOf(id), 1);
+      document.querySelectorAll(`[data-follow="${id}"]`).forEach(x => { x.textContent = on ? 'Following' : 'Follow'; x.classList.toggle('g', on); });
+      toast(on ? 'Following. Their posts show up in your Following tab.' : 'Unfollowed.');
+    } catch (err) { toast(err.message); }
+  });
+}
+// Draw a mixed list of posts ({t:'p', x}) and highlights ({t:'h', h}).
+async function renderItems(box, items, opt = {}) {
+  const hs = items.filter(i => i.t === 'h').map(i => i.h), ps = items.filter(i => i.t === 'p').map(i => i.x);
+  await storage.prep([...hs.flatMap(h => [h.path, h.poster]), ...ps.flatMap(x => [x.media, x.poster, x.user && x.user.avatar])].filter(Boolean));
+  const [lit, plit, cch, ccp] = await Promise.all([
+    fires.mine(ME && ME.id, hs.map(h => h.id)).catch(() => new Set()), postFires.mine(ME && ME.id, ps.map(x => x.id)).catch(() => new Set()),
+    comments.counts('highlight', hs.map(h => h.id)).catch(() => ({})), comments.counts('post', ps.map(x => x.id)).catch(() => ({}))]);
+  const fol = opt.fol || [];
+  const folBtn = u => ME && u && u.id !== ME.id && !opt.noFollow ? `<button class="btn s ${fol.includes(u.id) ? 'g' : ''} fb" data-follow="${u.id}">${fol.includes(u.id) ? 'Following' : 'Follow'}</button>` : '';
   const who = h => h.player ? (h.player.user ? `<a href="#/u/${esc(h.player.user.handle)}">@${esc(h.player.user.handle)}</a>` : esc(h.player.label)) : '';
-  const pinned = list.length < 3 && !FEED_SPORT ? `<article class="post"><div class="pin">Pinned · Welcome to Jamoja</div><video src="../reel.mp4" poster="../poster.jpg" playsinline muted loop preload="metadata"></video><div class="meta"><b>Anis Taylor</b><span class="mu">Founder · Basketball · Anaheim. Built by an athlete, for athletes.</span><a class="mu" href="../profile/">See a full player profile</a></div></article>` : '';
   const whoName = h => h.player ? (h.player.user ? '@' + h.player.user.handle : h.player.label) : '';
-  box.innerHTML = (list.length ? list.map(h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
-    <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-share="${h.id}" aria-label="Share"><span>↗</span><b>Share</b></button><button class="fire" data-more="${h.id}" aria-label="More"><span>⋯</span><b></b></button></div>
-    <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · ' + esc(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`).join('')
-    : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' highlights yet.' : 'The feed fills up as games get filmed.'}</b><p class="mu" style="margin:4px 0 10px">Film your next run and your plays show up here for everyone.</p>${ME ? `<a class="btn s" href="#/new">Film a game</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`) + pinned;
+  const hCard = h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
+    <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-cm="h:${h.id}" aria-label="Comments"><span>💬</span><b>${cch[h.id] || 0}</b></button><button class="fire" data-share="${h.id}" aria-label="Share"><span>↗</span><b>Share</b></button><button class="fire" data-more="h:${h.id}" aria-label="More"><span>⋯</span><b></b></button></div>
+    <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · ' + esc(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`;
+  const media = x => x.kind === 'photo' ? `<img class="pm" src="${esc(storage.url(x.media))}" alt="" loading="lazy">`
+    : x.kind === 'video' ? `<video class="pm" data-pv="1" src="${esc(storage.url(x.media))}" poster="${esc(storage.url(x.poster))}" playsinline muted loop preload="none"></video>`
+    : x.kind === 'youtube' ? `<button class="yt" data-yt="${esc(x.youtube_id)}" aria-label="Play YouTube video"><img src="https://i.ytimg.com/vi/${esc(x.youtube_id)}/hqdefault.jpg" alt="" loading="lazy"><span>▶</span></button>` : '';
+  const pCard = x => `<article class="card pst" data-pid="${x.id}"><div class="ph"><a href="#/u/${esc(x.user ? x.user.handle : '')}" class="pu">${avatar(x.user, 40)}<span><b>${esc(x.user ? x.user.name : '')}</b> ${lvBadge(x.user)}<br><span class="mu">@${esc(x.user ? x.user.handle : '')} · ${ago(x.created_at)}${x.sport ? ' · ' + esc(x.sport) : ''}</span></span></a>${folBtn(x.user)}</div>
+    ${x.body ? `<p class="pb">${nl(x.body)}</p>` : ''}${media(x)}
+    <div class="acts"><button class="fire ${plit.has(x.id) ? 'on' : ''}" data-pfire="${x.id}"><span>🔥</span><b>${x.fire || 0}</b></button><button class="fire" data-cm="p:${x.id}"><span>💬</span><b>${ccp[x.id] || 0}</b></button><button class="fire" data-pshare="${x.id}"><span>↗</span><b>Share</b></button><button class="fire" data-more="p:${x.id}"><span>⋯</span><b></b></button></div></article>`;
+  box.innerHTML = items.length ? items.map(i => i.t === 'h' ? hCard(i.h) : pCard(i.x)).join('') : (opt.empty || '');
+  box.querySelectorAll('.post video, video[data-pv]').forEach(playWhenSeen);
   countViews(box);
-  // Autoplay the clip that is on screen, muted. Tap a clip for sound.
-  const io = new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 });
-  box.querySelectorAll('video').forEach(v => { io.observe(v); v.onclick = () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); toast(v.muted ? 'Sound off' : 'Sound on'); }; });
   box.onclick = async e => {
-    const f = e.target.closest('[data-fire]'), sh = e.target.closest('[data-share]'), mo = e.target.closest('[data-more]'), rp = e.target.closest('[data-rep]');
-    if (mo) {
-      const art = mo.closest('.post'); const open = art.nextElementSibling && art.nextElementSibling.classList.contains('rep');
-      box.querySelectorAll('.rep').forEach(x => x.remove()); if (open) return;
-      art.insertAdjacentHTML('afterend', `<div class="card rep"><b>Report this clip</b><p class="mu" style="margin:4px 0 10px">Two reports take a clip off the feed until we review it.</p><div class="row">${["I'm in it and want it removed", 'Inappropriate', 'Not a real play', 'Spam'].map(r => `<button class="btn s g" data-rep="${mo.dataset.more}" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`);
+    const q = sel => e.target.closest(sel);
+    const f = q('[data-fire]'), pf = q('[data-pfire]'), sh = q('[data-share]'), psh = q('[data-pshare]'), mo = q('[data-more]'), rp = q('[data-rep]'), cm = q('[data-cm]'), yt = q('[data-yt]'), del = q('[data-pdel]');
+    if (yt) { yt.outerHTML = `<iframe class="pm ytf" src="https://www.youtube-nocookie.com/embed/${esc(yt.dataset.yt)}?autoplay=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="YouTube video"></iframe>`; return; }
+    if (f || pf) {
+      if (!ME) return needLogin('#/');
+      const el = f || pf, on = !el.classList.contains('on'), n = el.querySelector('b');
+      el.classList.toggle('on', on); n.textContent = (+n.textContent || 0) + (on ? 1 : -1);
+      try { if (f) await fires.toggle(f.dataset.fire, ME.id, on); else await postFires.toggle(pf.dataset.pfire, ME.id, on); }
+      catch (err) { el.classList.toggle('on', !on); n.textContent = (+n.textContent || 0) + (on ? -1 : 1); toast(err.message); }
       return;
     }
+    if (sh) { const h = hs.find(x => x.id === sh.dataset.share); shareClip(h, whoName(h), shareBase() + '#/g/' + h.game_id).catch(err => toast(err.message)); return; }
+    if (psh) { const url = shareBase() + '#/p/' + psh.dataset.pshare; if (navigator.share) navigator.share({ title: 'Jamoja', text: 'Check this on Jamoja.', url }).catch(() => {}); else { navigator.clipboard.writeText(url).then(() => toast('Link copied.'), () => toast(url)); } return; }
+    if (mo) {
+      const art = mo.closest('article'); const open = art.nextElementSibling && art.nextElementSibling.classList.contains('rep');
+      box.querySelectorAll('.rep').forEach(x => x.remove()); if (open) return;
+      const [kind, id] = mo.dataset.more.split(':');
+      const mine = kind === 'p' && ME && (ps.find(x => x.id === id) || {}).user_id === ME.id;
+      art.insertAdjacentHTML('afterend', mine ? `<div class="card rep"><button class="btn s g" data-pdel="${id}">Delete this post</button></div>`
+        : `<div class="card rep"><b>Report this</b><p class="mu" style="margin:4px 0 10px">Two reports take it off the feed until we review it.</p><div class="row">${["I'm in it and want it removed", 'Inappropriate', 'Not real', 'Spam'].map(r => `<button class="btn s g" data-rep="${kind}:${id}" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`);
+      return;
+    }
+    if (del) { if (!confirmIn(del)) return; try { const x = ps.find(y => y.id === del.dataset.pdel); await posts.remove(x.id); if (x.media) await storage.remove([x.media, x.poster].filter(Boolean)); del.closest('.rep').previousElementSibling.remove(); del.closest('.rep').remove(); toast('Post deleted.'); } catch (err) { toast(err.message); } return; }
     if (rp) {
       if (!ME) return needLogin('#/');
-      try { await highlights.report(rp.dataset.rep, rp.dataset.r); rp.closest('.rep').innerHTML = `<b>Thanks. We got your report.</b>`; } catch (err) { toast(err.message); }
+      const [kind, id] = rp.dataset.rep.split(':');
+      try { if (kind === 'h') await highlights.report(id, rp.dataset.r); else await posts.report(id, rp.dataset.r); rp.closest('.rep').innerHTML = `<b>Thanks. We got your report.</b>`; } catch (err) { toast(err.message); }
       return;
     }
-    if (f) {
-      if (!ME) return needLogin('#/');
-      const on = !f.classList.contains('on'), n = f.querySelector('b');
-      f.classList.toggle('on', on); n.textContent = (+n.textContent || 0) + (on ? 1 : -1);
-      try { await fires.toggle(f.dataset.fire, ME.id, on); } catch (err) { f.classList.toggle('on', !on); n.textContent = (+n.textContent || 0) + (on ? -1 : 1); toast(err.message); }
-    } else if (sh) {
-      const h = list.find(x => x.id === sh.dataset.share);
-      shareClip(h, whoName(h), shareBase() + '#/g/' + h.game_id).catch(err => toast(err.message));
-    }
+    if (cm) { const art = cm.closest('article'); const [kind, id] = cm.dataset.cm.split(':'); openComments(art, kind === 'p' ? 'post' : 'highlight', id, cm.querySelector('b')); }
+  };
+}
+async function openComments(art, kind, id, countEl) {
+  const nx = art.nextElementSibling;
+  if (nx && nx.classList.contains('cmt')) { nx.remove(); return; }
+  art.insertAdjacentHTML('afterend', `<div class="card cmt"><div class="cl"><p class="mu">Loading…</p></div>${ME ? `<form class="cf"><input class="t" maxlength="500" placeholder="Add a comment" aria-label="Comment"><button class="btn s">Send</button></form>` : `<a class="btn s g" href="#/login">Sign in to comment</a>`}</div>`);
+  const panel = art.nextElementSibling, cl = panel.querySelector('.cl');
+  const draw = async () => {
+    const list = await comments.list(kind, id).catch(() => []);
+    await storage.prep(list.map(c => c.user && c.user.avatar).filter(Boolean));
+    cl.innerHTML = list.length ? list.map(c => `<div class="cm1">${avatar(c.user, 30)}<div><a href="#/u/${esc(c.user ? c.user.handle : '')}"><b>${esc(c.user ? c.user.name : '')}</b></a> <span class="mu">${ago(c.created_at)}</span>${ME && c.user_id === ME.id ? ` <button class="lnkb" data-cdel="${c.id}">Delete</button>` : ''}<br>${nl(c.body)}</div></div>`).join('') : `<p class="mu">No comments yet. Say something.</p>`;
+    if (countEl) countEl.textContent = list.length;
+  };
+  await draw();
+  const cf = panel.querySelector('.cf');
+  if (cf) cf.onsubmit = async e => { e.preventDefault(); const inp = cf.querySelector('input'); const v = inp.value.trim(); if (!v) return; inp.value = ''; try { await comments.add(kind, id, v); await draw(); } catch (err) { toast(err.message); } };
+  panel.onclick = async e => { const d = e.target.closest('[data-cdel]'); if (!d) return; try { await comments.remove(d.dataset.cdel); await draw(); } catch (err) { toast(err.message); } };
+}
+async function postPage(id) {
+  const x = await posts.get(id);
+  if (!x) { V.innerHTML = `<h1>Post not found</h1><p class="mu">It may have been deleted.</p><a class="btn g" href="#/">Go home</a>`; return; }
+  const fol = ME ? await follows.ids(ME.id).catch(() => []) : [];
+  V.innerHTML = `<div id="one"></div>${ME ? '' : `<div class="card"><b>Athletes post here every day.</b><p class="mu" style="margin:4px 0 10px">Make a free account to follow, comment and post your own plays.</p><a class="btn s" href="#/login?mode=up">Create free account</a></div>`}`;
+  const one = V.querySelector('#one');
+  await renderItems(one, [{ t: 'p', x }], { fol }); bindFollow(V, fol);
+  openComments(one.querySelector('article'), 'post', id, one.querySelector('[data-cm] b'));
+}
+
+// ---------------- Post composer: text, photo, video, YouTube link
+async function composer() {
+  if (!ME) return needLogin('#/post');
+  let att = null; // {kind, file?, yt?}
+  V.innerHTML = `<h1>New post</h1>
+    <div class="card"><div class="row" style="flex-wrap:nowrap;align-items:flex-start;gap:10px">${avatar(MYP, 40)}<textarea id="pt" class="t ta" maxlength="1000" rows="4" placeholder="What's up? A workout, a big win, a run you're putting together…"></textarea></div>
+      <div id="att"></div>
+      <div class="row" style="margin-top:10px"><label class="btn s g" for="ph">📷 Photo</label><input id="ph" type="file" accept="image/*" hidden>
+        <label class="btn s g" for="vd">🎥 Video</label><input id="vd" type="file" accept="video/*" hidden>
+        <button class="btn s g" id="ytb" type="button">▶ YouTube link</button></div>
+      <label class="f" for="ps">Sport</label><select class="t" id="ps">${SPORTS.map(x => `<option ${MYP.sport === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+      <div id="pe"></div><button class="btn w" id="go" style="margin-top:14px;min-height:52px">Post</button><div id="prog" hidden><div class="bar"><b id="pb"></b></div><p class="mu" id="pm"></p></div></div>
+    <a class="card film-cta" href="#/new"><span class="dot">●</span><span><b>Film a game instead</b><br><span class="mu">Record or upload a full game. Jamoja cuts the highlights and tags your crew.</span></span></a>`;
+  const attEl = V.querySelector('#att'), err = m => { V.querySelector('#pe').innerHTML = m ? `<div class="err">${esc(m)}</div>` : ''; };
+  const showAtt = () => {
+    if (!att) { attEl.innerHTML = ''; return; }
+    const x = `<button class="lnkb" id="rm" type="button">Remove</button>`;
+    if (att.kind === 'photo') attEl.innerHTML = `<img class="pm" src="${att.url}" alt="">${x}`;
+    else if (att.kind === 'video') attEl.innerHTML = `<video class="pm" src="${att.url}" controls playsinline></video><p class="mu">Videos are trimmed to the first 60 seconds.</p>${x}`;
+    else attEl.innerHTML = `<img class="pm" src="https://i.ytimg.com/vi/${att.yt}/hqdefault.jpg" alt="">${x}`;
+    V.querySelector('#rm').onclick = () => { att = null; showAtt(); };
+  };
+  V.querySelector('#ph').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) { att = { kind: 'photo', file: f, url: URL.createObjectURL(f) }; showAtt(); } };
+  V.querySelector('#vd').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) { att = { kind: 'video', file: f, url: URL.createObjectURL(f) }; showAtt(); } };
+  V.querySelector('#ytb').onclick = () => {
+    attEl.innerHTML = `<div class="lnk"><input id="yu" class="t" inputmode="url" placeholder="Paste a YouTube link" autocapitalize="off"><button class="btn s" id="yo" type="button">Add</button></div>`;
+    V.querySelector('#yo').onclick = () => { const id2 = ytId(V.querySelector('#yu').value); if (!id2) return err('That does not look like a YouTube link.'); err(''); att = { kind: 'youtube', yt: id2 }; showAtt(); };
+  };
+  V.querySelector('#go').onclick = async () => {
+    const body = V.querySelector('#pt').value.trim(), sport = V.querySelector('#ps').value;
+    if (!body && !att) return err('Write something or add a photo, video or YouTube link.');
+    err(''); const go2 = V.querySelector('#go'); go2.disabled = true; go2.hidden = true;
+    const prog = V.querySelector('#prog'), pb = V.querySelector('#pb'), pm = V.querySelector('#pm'); prog.hidden = false;
+    try {
+      const row = { kind: att ? att.kind : 'text', body: body || null, sport };
+      const key = `${ME.id}/posts/${Date.now()}`;
+      if (att && att.kind === 'photo') { pm.textContent = 'Preparing your photo…'; const j = await toJpeg(att.file); pm.textContent = 'Uploading…'; await storage.upload(key + '.jpg', j, 'image/jpeg'); row.media = key + '.jpg'; }
+      if (att && att.kind === 'video') {
+        busy = true; R.keepAwake(true);
+        pm.textContent = 'Getting your video ready. Keep this screen open.';
+        const src = await E.analyze(att.file);
+        const c = await E.cut(src, 0, Math.min(src.dur || 60, 60), p => { pb.style.width = (p * 90) + '%'; });
+        await E.close(src);
+        pm.textContent = 'Uploading…';
+        await storage.upload(key + '.mp4', c.video, 'video/mp4'); await storage.upload(key + '-p.jpg', c.poster, 'image/jpeg');
+        row.media = key + '.mp4'; row.poster = key + '-p.jpg';
+      }
+      if (att && att.kind === 'youtube') row.youtube_id = att.yt;
+      await posts.create(row);
+      busy = false; R.keepAwake(false);
+      pb.style.width = '100%'; toast('Posted.'); FEED_TAB = 'all'; FEED_SPORT = ''; go('#/');
+    } catch (e) { console.error(e); busy = false; R.keepAwake(false); prog.hidden = true; go2.hidden = false; go2.disabled = false; err(e.message || 'Could not post. Try again.'); }
   };
 }
 async function drawMine() {
@@ -268,11 +422,13 @@ function setup() {
   const next = qs().get('next') || '#/';
   const p = MYP || {};
   V.innerHTML = `<h1>${MYP ? 'Edit your profile' : 'Set up your profile'}</h1><p class="mu">${LOCAL ? 'Takes 20 seconds. Saved on this phone.' : 'This is what coaches, scouts and friends see.'}</p>
-    <form id="pf"><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
+    <form id="pf"><div class="row" style="gap:14px;margin:8px 0 4px"><span id="avp">${avatar(p, 72)}</span><label class="btn s g" for="avf">${p.avatar ? 'Change photo' : 'Add a photo'}</label><input id="avf" type="file" accept="image/*" hidden></div><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
     <label class="f" for="hd">Handle</label><input class="t" id="hd" value="${esc(p.handle || '')}" placeholder="yourname" autocapitalize="off" autocorrect="off" spellcheck="false" required><p class="mu" id="hp" style="margin:4px 0 0"></p>
     <label class="f" for="sp">Main sport</label><select class="t" id="sp">${SPORTS.map(s => `<option ${p.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
     <label class="f" for="ps">Position (optional)</label><input class="t" id="ps" value="${esc(p.position || '')}" placeholder="${esc(POS[p.sport || 'Basketball'] || '')}">
+    <label class="f" for="lv">Level (optional)</label><select class="t" id="lv"><option value="">Pick one</option>${LEVELS.map(l => `<option ${p.level === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
     <label class="f" for="ct">City</label><input class="t" id="ct" value="${esc(p.city || '')}" placeholder="Anaheim, CA">
+    <label class="f" for="bi">Bio (optional)</label><textarea class="t ta" id="bi" maxlength="300" rows="3" placeholder="Hoops since day one. PG. Looking for runs in OC.">${esc(p.bio || '')}</textarea>
     <div id="pe"></div><button class="btn w" style="margin-top:16px">Save profile</button></form>`;
   const nm = document.getElementById('nm'), hd = document.getElementById('hd');
   const hp = document.getElementById('hp'), sp = document.getElementById('sp'), ps = document.getElementById('ps');
@@ -282,14 +438,19 @@ function setup() {
   hd.oninput = () => { const c = clean(hd.value); if (c !== hd.value) hd.value = c; showH(); };
   sp.onchange = () => { ps.placeholder = POS[sp.value] || ''; };
   showH();
+  let avFile = null;
+  document.getElementById('avf').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; avFile = f; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(f)}" alt="" style="width:72px;height:72px">`; };
   document.getElementById('pf').onsubmit = async e => {
     e.preventDefault();
     const handle = clean(hd.value).replace(/^[._]+|[._]+$/g, '');
     if (!nm.value.trim() || handle.length < 3) { document.getElementById('pe').innerHTML = `<div class="err">Add your name and a handle of at least 3 letters or numbers.</div>`; return; }
     try {
-      MYP = await profiles.save({ id: ME.id, name: nm.value.trim(), handle, sport: document.getElementById('sp').value, position: document.getElementById('ps').value.trim(), city: document.getElementById('ct').value.trim() });
+      const sv = e.target.querySelector('button.w'); sv.disabled = true; sv.textContent = 'Saving…';
+      let av = p.avatar || null;
+      if (avFile) { const k = `${ME.id}/avatar-${Date.now()}.jpg`; await storage.upload(k, await toJpeg(avFile, 400), 'image/jpeg'); if (p.avatar) storage.remove([p.avatar]).catch(() => {}); av = k; }
+      MYP = await profiles.save({ id: ME.id, name: nm.value.trim(), handle, sport: document.getElementById('sp').value, position: document.getElementById('ps').value.trim(), city: document.getElementById('ct').value.trim(), level: document.getElementById('lv').value || null, bio: document.getElementById('bi').value.trim() || null, avatar: av });
       toast('Profile saved.'); go(next);
-    } catch (err) { document.getElementById('pe').innerHTML = `<div class="err">${esc(/duplicate|unique/i.test(err.message) ? 'That handle is taken. Try another.' : err.message)}</div>`; }
+    } catch (err) { const sv = e.target.querySelector('button.w'); sv.disabled = false; sv.textContent = 'Save profile'; document.getElementById('pe').innerHTML = `<div class="err">${esc(/duplicate|unique/i.test(err.message) ? 'That handle is taken. Try another.' : err.message)}</div>`; }
   };
 }
 
@@ -504,18 +665,22 @@ async function profilePage(handle) {
   const p = await profiles.byHandle(handle);
   if (!p) { V.innerHTML = `<h1>Player not found</h1><a class="btn g" href="#/">Go home</a>`; return; }
   const me = ME && ME.id === p.id;
-  const [tags, made] = await Promise.all([players.mine(p.id), games.mine(p.id)]);
+  const [tags, made, cnt, fol, mine] = await Promise.all([players.mine(p.id), games.mine(p.id), follows.counts(p.id).catch(() => ({ followers: 0, following: 0 })), ME ? follows.ids(ME.id).catch(() => []) : [], posts.byUser(p.id).catch(() => [])]);
   const hs = await highlights.forPlayers(tags.map(t => t.id));
-  await storage.prep(hs.flatMap(h => [h.path, h.poster]));
+  await storage.prep([...hs.flatMap(h => [h.path, h.poster]), p.avatar].filter(Boolean));
   const link = shareBase() + '#/u/' + encodeURIComponent(p.handle);
-  V.innerHTML = `<div class="row" style="gap:14px"><div class="av">${esc(ini(p.name))}</div><div><h1 style="margin:0">${esc(p.name)}</h1><p class="mu" style="margin:0">@${esc(p.handle)} · ${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}</p></div></div>
-    <div class="row" style="margin-top:14px">${LOCAL ? '' : `<button class="btn s" id="cp">Copy profile link</button>`}${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>${LOCAL ? '' : `<button class="btn s g" id="so">Sign out</button>`}` : ''}</div>
-    ${hs.length ? `<div class="row stats"><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div><div><b>${made.length}</b><span>Games filmed</span></div></div>` : ''}
-    <h2>${me ? 'Your plays' : 'Plays'}</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'In a game, tap "I\'m …" on your name and your plays show up here.' : 'No highlights yet.'}</p>`}
+  const following = fol.includes(p.id);
+  V.innerHTML = `<div class="row" style="gap:14px;flex-wrap:nowrap">${avatar(p, 84)}<div><h1 style="margin:0">${esc(p.name)}</h1><p class="mu" style="margin:0">@${esc(p.handle)} ${lvBadge(p)}<br>${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}</p></div></div>
+    ${p.bio ? `<p style="margin:12px 0 0">${nl(p.bio)}</p>` : me ? `<p class="mu" style="margin:12px 0 0"><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Add a bio and photo</a> so people know who you are.</p>` : ''}
+    <div class="row stats"><div><b>${cnt.followers}</b><span>Followers</span></div><div><b>${cnt.following}</b><span>Following</span></div><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div></div>
+    <div class="row" style="margin-top:14px">${!me && !LOCAL ? `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button>` : ''}${LOCAL ? '' : `<button class="btn s g" id="cp">Copy profile link</button>`}${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>${LOCAL ? '' : `<button class="btn s g" id="so">Sign out</button>`}` : ''}</div>
+    <h2>Plays</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'In a game, tap "I\'m …" on your name and your plays show up here.' : 'No plays yet.'}</p>`}
+    <h2>Posts</h2><div id="pp"></div>
     <h2>Games filmed</h2>${made.length ? gameList(made) : `<p class="mu">None yet.</p>`}
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;
+  await renderItems(V.querySelector('#pp'), mine.map(x => ({ t: 'p', at: x.created_at, x })), { fol, noFollow: true, empty: `<p class="mu">${me ? 'Nothing posted yet. <a href="#/post">Make your first post</a>.' : 'No posts yet.'}</p>` });
+  countViews(V); bindFollow(V, fol);
   const cp = document.getElementById('cp'); if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(link); toast('Profile link copied.'); } catch (e) { toast(link); } };
-  countViews(V);
   const so = document.getElementById('so'); if (so) so.onclick = async () => { await auth.signOut(); toast('Signed out.'); go('#/'); };
 }
 
