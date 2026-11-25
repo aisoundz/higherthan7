@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125k';
-import * as R from './rec.js?v=20261125k';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125k';
+import * as E from './engine.js?v=20261125l';
+import * as R from './rec.js?v=20261125l';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125l';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -86,7 +86,7 @@ const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
 let ME = null, MYP = null;
 const POS = { Basketball: 'Point guard', Soccer: 'Striker', 'Flag football': 'Wide receiver', Volleyball: 'Outside hitter', Football: 'Linebacker', Baseball: 'Shortstop', Softball: 'Pitcher', Track: '100m and 200m', Tennis: 'Singles', Other: '' };
-const SPORTS = ['Basketball', 'Soccer', 'Flag football', 'Volleyball', 'Football', 'Baseball', 'Softball', 'Track', 'Tennis', 'Other'];
+const SPORTS = ['Basketball', 'Football', 'Soccer', 'Baseball', 'Softball', 'Volleyball', 'Flag football', 'Track', 'Tennis', 'Other'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mmss = t => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
 const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
