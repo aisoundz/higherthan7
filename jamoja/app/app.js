@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125d';
-import * as R from './rec.js?v=20261125d';
-import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js?v=20261125d';
+import * as E from './engine.js?v=20261125e';
+import * as R from './rec.js?v=20261125e';
+import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js?v=20261125e';
 
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
@@ -37,7 +37,7 @@ async function route() {
     if (ME && !MYP && parts[0] !== 'setup' && parts[0] !== 'login') return go('#/setup?next=' + encodeURIComponent(location.hash || '#/'));
     topbar();
     if (!parts.length) return await home();
-    if (parts[0] === 'login') { TR.innerHTML = ''; return LOCAL ? go('#/') : login(); }
+    if (parts[0] === 'login') { TR.innerHTML = ''; return LOCAL ? go('#/') : await login(); }
     if (parts[0] === 'setup') return setup();
     if (parts[0] === 'new') return await newGame();
     if (parts[0] === 'g' && parts[1]) return await gamePage(parts[1]);
@@ -73,11 +73,26 @@ async function home() {
 }
 
 // ---------------- Sign in / create account (live mode)
-function login() {
-  const q = qs(); let up = q.get('mode') === 'up'; const next = q.get('next') || '#/';
+async function login() {
+  const q = qs(); const next = q.get('next') || '#/';
+  const gm = /^#\/g\/([0-9a-f-]{36})(?:\?claim=([0-9a-f-]{36}))?/.exec(next);
+  let up = q.get('mode') === 'up' || (!!gm && q.get('mode') !== 'in');
+  let invite = '';
+  if (gm) {
+    try {
+      const [g, ps, hs] = await Promise.all([games.get(gm[1]), players.list(gm[1]), highlights.list(gm[1])]);
+      if (g) {
+        const who = gm[2] && ps.find(p => p.id === gm[2]);
+        const mine = who ? hs.filter(h => h.player_id === who.id).length : 0;
+        const pic = hs.find(h => h.poster);
+        if (pic) await storage.prep([pic.poster]);
+        invite = `<div class="card row" style="flex-wrap:nowrap;gap:12px;border-color:var(--o)">${pic ? `<img src="${esc(storage.url(pic.poster))}" alt="" style="width:64px;height:84px;object-fit:cover;border-radius:10px;flex:none">` : ''}<div><b>${who ? `Claim ${esc(who.label)}'s plays` : 'Join this game on Jamoja'}</b><br><span class="mu">${esc(g.title)}${g.owner ? ' · filmed by ' + esc(g.owner.name) : ''}${who ? ` · ${mine || hs.length} highlight${(mine || hs.length) === 1 ? '' : 's'}` : ` · ${hs.length} highlight${hs.length === 1 ? '' : 's'}`}</span></div></div>`;
+      }
+    } catch (e) { invite = ''; }
+  }
   const draw = (msg = '') => {
-    V.innerHTML = `<h1>${up ? 'Create your account' : 'Welcome back'}</h1>
-      <p class="mu" style="margin-top:-4px">${up ? 'Free. Takes 20 seconds.' : 'Sign in to see your games and plays.'}</p>
+    V.innerHTML = `${invite}<h1>${up ? (gm ? 'Claim your plays' : 'Create your account') : 'Welcome back'}</h1>
+      <p class="mu" style="margin-top:-4px">${up ? (gm ? 'Make a free account and these plays go on your profile. Takes 20 seconds.' : 'Free. Takes 20 seconds.') : 'Sign in to see your games and plays.'}</p>
       <form id="lf" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@email.com" required>
       <label class="f" for="pw">Password</label><div class="pwb"><input class="t" id="pw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="6" placeholder="${up ? 'At least 6 characters' : 'Your password'}" required><button type="button" id="eye" class="eye" aria-pressed="false" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="sl" d="M4 4l16 16"/></svg></button></div>
       ${up ? `<label class="ck"><input type="checkbox" id="age"> <span>I am 18 or older. The Jamoja beta is adults only for now.</span></label>` : ''}
@@ -260,6 +275,12 @@ async function newGame() {
 async function gamePage(id) {
   const g = await games.get(id);
   if (!g) { V.innerHTML = `<h1>Game not found</h1><p class="mu">${LOCAL ? 'It may have been deleted from this phone.' : 'The link may be wrong, or the game was deleted.'}</p><a class="btn g" href="#/">Go home</a>`; return; }
+  const want = qs().get('claim');
+  if (want && ME && MYP) {
+    let okc = false; try { okc = await players.claim(want); } catch (e) { okc = false; }
+    toast(okc ? 'Your plays are claimed. They are on your profile now.' : 'That name was already claimed, or you already claimed one in this game.');
+    history.replaceState(null, '', location.pathname + location.search + '#/g/' + id);
+  }
   const [ps, hs] = await Promise.all([players.list(id), highlights.list(id)]);
   await storage.prep(hs.flatMap(h => [h.path, h.poster]));
   const own = ME && g.owner_id === ME.id;
@@ -308,7 +329,7 @@ async function gamePage(id) {
       if (b.dataset.rm) { await players.remove(b.dataset.rm); gamePage(id); }
       else if (b.dataset.s1) { await sendFiles([hs.find(x => x.id === b.dataset.s1)]); }
       else if (b.dataset.claim) {
-        if (!ME) return needLogin('#/g/' + id);
+        if (!ME) return needLogin('#/g/' + id + '?claim=' + b.dataset.claim);
         const okc = await players.claim(b.dataset.claim);
         toast(okc ? 'These plays are now on your profile.' : 'Someone already claimed that one.'); gamePage(id);
       }
