@@ -78,12 +78,14 @@ function login() {
   const draw = (msg = '') => {
     V.innerHTML = `<h1>${up ? 'Create your account' : 'Welcome back'}</h1>
       <form id="lf" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" autocomplete="email" required>
-      <label class="f" for="pw">Password</label><input class="t" id="pw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" minlength="6" required>
+      <label class="f" for="pw">Password</label><div class="row" style="flex-wrap:nowrap"><input class="t" id="pw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" minlength="6" required style="flex:1"><button type="button" class="btn g" id="eye" aria-pressed="false" aria-label="Show password" style="min-height:48px">Show</button></div>
       ${up ? `<label class="ck"><input type="checkbox" id="age"> <span>I am 18 or older. The Jamoja beta is adults only for now.</span></label>` : ''}
       ${msg ? `<div class="err">${esc(msg)}</div>` : ''}
       <button class="btn w" style="margin-top:14px">${up ? 'Create account' : 'Sign in'}</button></form>
       <p style="margin-top:16px" class="mu">${up ? 'Already have an account?' : 'New to Jamoja?'} <a href="#" id="sw">${up ? 'Sign in' : 'Create one'}</a></p>`;
     document.getElementById('sw').onclick = e => { e.preventDefault(); up = !up; draw(); };
+    const eye = document.getElementById('eye'), pwi = document.getElementById('pw');
+    eye.onclick = () => { const show = pwi.type === 'password'; pwi.type = show ? 'text' : 'password'; eye.textContent = show ? 'Hide' : 'Show'; eye.setAttribute('aria-pressed', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); pwi.focus(); };
     document.getElementById('lf').onsubmit = async e => {
       e.preventDefault();
       const em = document.getElementById('em').value.trim(), pw = document.getElementById('pw').value;
