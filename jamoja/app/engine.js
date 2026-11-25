@@ -101,3 +101,21 @@ export async function cut(src, start, end, onProgress) {
 export async function close(src) {
   try { await (await ensure()).unmount(src.dir); await ff.deleteDir(src.dir); } catch (e) { /* already closed */ }
 }
+
+// Stamp a watermark image (PNG bytes) onto a clip so every repost carries the brand.
+export async function brand(videoBlob, png, onProgress) {
+  const f = await ensure();
+  const id = ++seq, inp = `/b${id}.mp4`, wm = `/w${id}.png`, out = `/o${id}.mp4`;
+  await f.writeFile(inp, new Uint8Array(await videoBlob.arrayBuffer()));
+  await f.writeFile(wm, png);
+  const prog = ({ progress }) => onProgress && onProgress(Math.max(0, Math.min(1, progress)));
+  f.on('progress', prog);
+  try {
+    await f.exec(['-i', inp, '-i', wm, '-filter_complex',
+      "[0:v]scale='if(gt(iw,ih),-2,540)':'if(gt(iw,ih),540,-2)'[v];[v][1:v]overlay=16:main_h-overlay_h-24",
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out]);
+  } finally { f.off('progress', prog); }
+  const data = await f.readFile(out);
+  for (const p of [inp, wm, out]) { try { await f.deleteFile(p); } catch (e) { /* gone */ } }
+  return new Blob([data], { type: 'video/mp4' });
+}

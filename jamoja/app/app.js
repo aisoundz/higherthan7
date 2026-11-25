@@ -1,6 +1,70 @@
-import * as E from './engine.js?v=20261125f';
-import * as R from './rec.js?v=20261125f';
-import { auth, profiles, games, players, highlights, fires, storage, mode, ready } from './db.js?v=20261125f';
+import * as E from './engine.js?v=20261125g';
+import * as R from './rec.js?v=20261125g';
+import { auth, profiles, games, players, highlights, fires, storage, mode, ready } from './db.js?v=20261125g';
+const PLAYS = {
+  Basketball: ['Bucket', 'Three', 'And-one', 'Dunk', 'Dime', 'Block', 'Steal', 'Ankle breaker', 'Game winner'],
+  Soccer: ['Goal', 'Assist', 'Skill move', 'Nutmeg', 'Save', 'Tackle'],
+  'Flag football': ['Touchdown', 'Catch', 'Pick', 'Big run', 'Flag pull'],
+  Football: ['Touchdown', 'Catch', 'Pick', 'Big run', 'Sack', 'Big hit'],
+  Volleyball: ['Kill', 'Ace', 'Block', 'Dig', 'Set'],
+  Baseball: ['Home run', 'Hit', 'Strikeout', 'Diving catch', 'Double play'],
+  Softball: ['Home run', 'Hit', 'Strikeout', 'Diving catch', 'Double play'],
+  Track: ['Finish', 'Start', 'PR'],
+  Tennis: ['Ace', 'Winner', 'Rally'],
+  Other: ['Big play'],
+};
+const playsFor = sp => [...(PLAYS[sp] || []), 'Big play'].filter((v, i, a) => a.indexOf(v) === i);
+// Links opened inside Instagram, Facebook, TikTok, Snapchat or LinkedIn run in their own browser,
+// where the camera, uploads and staying signed in often fail.
+const UA = navigator.userAgent || '';
+const IN_APP = /Instagram|FBAN|FBAV|FB_IAB|TikTok|musical_ly|Bytedance|Snapchat|LinkedInApp|Line\//i.test(UA);
+const ANDROID = /Android/i.test(UA);
+function inAppCard() {
+  if (!IN_APP) return '';
+  const url = location.href;
+  const open = ANDROID ? `<a class="btn s" href="intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end">Open in Chrome</a>` : '';
+  return `<div class="card" style="border-color:var(--o)"><b>Open Jamoja in your browser</b><p class="mu" style="margin:4px 0 10px">You opened this inside another app, where filming, uploads and staying signed in can fail. ${ANDROID ? 'Tap below.' : 'Tap the ••• or share button at the top or bottom, then Open in Safari.'}</p><div class="row">${open}<button class="btn s g" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href).then(()=>this.textContent='Link copied')">Copy link</button></div></div>`;
+}
+// Password reset links come back with tokens in the address.
+let RECOVERY = /type=recovery/.test(location.hash);
+const LINK_ERR = /error_description=([^&]+)/.exec(location.hash);
+// Count a view once per clip per visit, after 2 seconds of play.
+function countViews(root) {
+  root.querySelectorAll('video[data-hid]').forEach(v => {
+    let t = null;
+    v.addEventListener('play', () => { const id = v.dataset.hid; if (sessionStorage.getItem('jm.v.' + id)) return; t = setTimeout(() => { try { sessionStorage.setItem('jm.v.' + id, '1'); } catch (e) { /* private mode */ } highlights.view(id).catch(() => {}); }, 2000); });
+    v.addEventListener('pause', () => clearTimeout(t));
+  });
+}
+const views = n => n ? `${n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K' : n} view${n === 1 ? '' : 's'}` : '';
+// Branded clip for sharing: JAMOJA tag plus the player's handle and the play.
+function watermark(who, play) {
+  const c = document.createElement('canvas'); const W = 360, H = 64; c.width = W; c.height = H; const x = c.getContext('2d');
+  x.fillStyle = 'rgba(0,0,0,0.62)'; x.beginPath(); (x.roundRect ? x.roundRect(0, 0, W, H, 14) : x.rect(0, 0, W, H)); x.fill();
+  x.fillStyle = '#ff5a1f'; x.font = 'bold 24px Impact, Arial Black, sans-serif'; x.textBaseline = 'middle'; x.fillText('JAMOJA', 14, 22);
+  x.fillStyle = '#fff'; x.font = '600 17px Inter, Arial, sans-serif';
+  let line = [who, play].filter(Boolean).join(' · ').toUpperCase(); while (x.measureText(line).width > W - 28 && line.length > 4) line = line.slice(0, -2) + '…';
+  x.fillText(line || 'EVERY GAME. SEEN.', 14, 46);
+  return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/png'));
+}
+let sharing = false;
+async function shareClip(h, who, link) {
+  if (sharing) return; sharing = true;
+  try {
+    const canFiles = navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x.mp4', { type: 'video/mp4' })] });
+    if (!canFiles) {
+      if (navigator.share) await navigator.share({ title: 'Jamoja', text: (who ? who + ' on Jamoja. ' : '') + 'Watch the play:', url: link }).catch(() => {});
+      else { await navigator.clipboard.writeText(link).catch(() => {}); toast('Link copied.'); }
+      return;
+    }
+    toast('Making your clip with the Jamoja tag… the first time takes a moment.');
+    const raw = await storage.blob(h.path);
+    let out = raw;
+    try { out = await E.brand(raw, await watermark(who, h.play_type)); } catch (e) { console.warn('brand failed, sharing original', e); }
+    const file = new File([out], `jamoja-${(who || 'play').replace(/[^\w]+/g, '-')}.mp4`, { type: 'video/mp4' });
+    await navigator.share({ files: [file], text: `${who ? who + ' ' : ''}on Jamoja. ${link}` }).catch(() => {});
+  } finally { sharing = false; }
+}
 
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
@@ -39,11 +103,15 @@ async function route() {
   try {
     await ready;
     await refreshMe();
-    if (ME && !MYP && parts[0] !== 'setup' && parts[0] !== 'login') return go('#/setup?next=' + encodeURIComponent(location.hash || '#/'));
+    if (LINK_ERR && !route.linkErr) { route.linkErr = 1; history.replaceState(null, '', location.pathname + location.search + '#/login?expired=1'); return route(); }
+    if (RECOVERY) { RECOVERY = false; history.replaceState(null, '', location.pathname + location.search + '#/reset'); return route(); }
+    if (/access_token=/.test(location.hash)) { history.replaceState(null, '', location.pathname + location.search + '#/'); return route(); }
+    if (ME && !MYP && parts[0] !== 'setup' && parts[0] !== 'login' && parts[0] !== 'reset') return go('#/setup?next=' + encodeURIComponent(location.hash || '#/'));
     topbar();
     if (!parts.length) return await home();
     if (parts[0] === 'login') { TR.innerHTML = ''; return LOCAL ? go('#/') : await login(); }
     if (parts[0] === 'setup') return setup();
+    if (parts[0] === 'reset') return resetPage();
     if (parts[0] === 'new') return await newGame();
     if (parts[0] === 'g' && parts[1]) return await gamePage(parts[1]);
     if (parts[0] === 'u' && parts[1]) return await profilePage(decodeURIComponent(parts[1]));
@@ -54,7 +122,7 @@ async function route() {
   }
 }
 window.addEventListener('hashchange', route);
-auth.onChange(() => { refreshMe().then(topbar); });
+auth.onChange(ev => { if (ev === 'PASSWORD_RECOVERY') { RECOVERY = false; go('#/reset'); return; } refreshMe().then(topbar); });
 
 const gameList = list => `<div class="list">${list.map(g => `<a href="#/g/${g.id}"><span><b>${esc(g.title)}</b><br><span class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}</span></span><span class="mu">${esc(g.played_on || '')}</span></a>`).join('')}</div>`;
 
@@ -63,7 +131,7 @@ let FEED_SPORT = '';
 async function home() {
   const parts = ME ? await R.savedParts() : [];
   const top = !ME
-    ? `<section class="hero"><h1>Every game. Seen.</h1><p>Film your run. Jamoja finds the big plays, cuts the highlights and puts them on every player's profile.</p>
+    ? `${inAppCard()}<section class="hero"><h1>Every game. Seen.</h1><p>Film your run. Jamoja finds the big plays, cuts the highlights and puts them on every player's profile.</p>
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
       <a class="card film-cta" href="#/new"><span class="dot">●</span><span><b>Film a game</b><br><span class="mu">Tap BUCKET after big plays. Highlights are cut for you.</span></span></a>`;
@@ -82,24 +150,36 @@ async function drawFeed() {
   const lit = await fires.mine(ME && ME.id, list.map(h => h.id)).catch(() => new Set());
   const who = h => h.player ? (h.player.user ? `<a href="#/u/${esc(h.player.user.handle)}">@${esc(h.player.user.handle)}</a>` : esc(h.player.label)) : '';
   const pinned = list.length < 3 && !FEED_SPORT ? `<article class="post"><div class="pin">Pinned · Welcome to Jamoja</div><video src="../reel.mp4" poster="../poster.jpg" playsinline muted loop preload="metadata"></video><div class="meta"><b>Anis Taylor</b><span class="mu">Founder · Basketball · Anaheim. Built by an athlete, for athletes.</span><a class="mu" href="../profile/">See a full player profile</a></div></article>` : '';
-  box.innerHTML = pinned + (list.length ? list.map(h => `<article class="post" data-id="${h.id}"><video src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
-    <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-share="${h.game_id}" aria-label="Share"><span>↗</span><b>Share</b></button></div>
-    <div class="meta"><b>${who(h) || esc(h.label)}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · ' + esc(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`).join('')
-    : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' highlights yet.' : 'The feed fills up as games get filmed.'}</b><p class="mu" style="margin:4px 0 10px">Film your next run and your plays show up here for everyone.</p>${ME ? `<a class="btn s" href="#/new">Film a game</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`);
+  const whoName = h => h.player ? (h.player.user ? '@' + h.player.user.handle : h.player.label) : '';
+  box.innerHTML = (list.length ? list.map(h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
+    <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-share="${h.id}" aria-label="Share"><span>↗</span><b>Share</b></button><button class="fire" data-more="${h.id}" aria-label="More"><span>⋯</span><b></b></button></div>
+    <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · ' + esc(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`).join('')
+    : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' highlights yet.' : 'The feed fills up as games get filmed.'}</b><p class="mu" style="margin:4px 0 10px">Film your next run and your plays show up here for everyone.</p>${ME ? `<a class="btn s" href="#/new">Film a game</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`) + pinned;
+  countViews(box);
   // Autoplay the clip that is on screen, muted. Tap a clip for sound.
   const io = new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 });
   box.querySelectorAll('video').forEach(v => { io.observe(v); v.onclick = () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); toast(v.muted ? 'Sound off' : 'Sound on'); }; });
   box.onclick = async e => {
-    const f = e.target.closest('[data-fire]'), sh = e.target.closest('[data-share]');
+    const f = e.target.closest('[data-fire]'), sh = e.target.closest('[data-share]'), mo = e.target.closest('[data-more]'), rp = e.target.closest('[data-rep]');
+    if (mo) {
+      const art = mo.closest('.post'); const open = art.nextElementSibling && art.nextElementSibling.classList.contains('rep');
+      box.querySelectorAll('.rep').forEach(x => x.remove()); if (open) return;
+      art.insertAdjacentHTML('afterend', `<div class="card rep"><b>Report this clip</b><p class="mu" style="margin:4px 0 10px">Two reports take a clip off the feed until we review it.</p><div class="row">${["I'm in it and want it removed", 'Inappropriate', 'Not a real play', 'Spam'].map(r => `<button class="btn s g" data-rep="${mo.dataset.more}" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`);
+      return;
+    }
+    if (rp) {
+      if (!ME) return needLogin('#/');
+      try { await highlights.report(rp.dataset.rep, rp.dataset.r); rp.closest('.rep').innerHTML = `<b>Thanks. We got your report.</b>`; } catch (err) { toast(err.message); }
+      return;
+    }
     if (f) {
       if (!ME) return needLogin('#/');
       const on = !f.classList.contains('on'), n = f.querySelector('b');
       f.classList.toggle('on', on); n.textContent = (+n.textContent || 0) + (on ? 1 : -1);
       try { await fires.toggle(f.dataset.fire, ME.id, on); } catch (err) { f.classList.toggle('on', !on); n.textContent = (+n.textContent || 0) + (on ? -1 : 1); toast(err.message); }
     } else if (sh) {
-      const url = shareBase() + '#/g/' + sh.dataset.share;
-      if (navigator.share) navigator.share({ title: 'Jamoja highlight', text: 'Check this play on Jamoja.', url }).catch(() => {});
-      else { try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch (err) { toast(url); } }
+      const h = list.find(x => x.id === sh.dataset.share);
+      shareClip(h, whoName(h), shareBase() + '#/g/' + h.game_id).catch(err => toast(err.message));
     }
   };
 }
@@ -112,6 +192,7 @@ async function drawMine() {
 // ---------------- Sign in / create account (live mode)
 async function login() {
   const q = qs(); const next = q.get('next') || '#/';
+  if (q.get('mode') === 'forgot') return forgot();
   const gm = /^#\/g\/([0-9a-f-]{36})(?:\?claim=([0-9a-f-]{36}))?/.exec(next);
   let up = q.get('mode') === 'up' || (!!gm && q.get('mode') !== 'in');
   let invite = '';
@@ -128,14 +209,14 @@ async function login() {
     } catch (e) { invite = ''; }
   }
   const draw = (msg = '') => {
-    V.innerHTML = `${invite}<h1>${up ? (gm ? 'Claim your plays' : 'Create your account') : 'Welcome back'}</h1>
+    V.innerHTML = `${inAppCard()}${q.get('expired') ? `<div class="err">That link expired or was already used. Ask for a new one below.</div>` : ''}${invite}<h1>${up ? (gm ? 'Claim your plays' : 'Create your account') : 'Welcome back'}</h1>
       <p class="mu" style="margin-top:-4px">${up ? (gm ? 'Make a free account and these plays go on your profile. Takes 20 seconds.' : 'Free. Takes 20 seconds.') : 'Sign in to see your games and plays.'}</p>
       <form id="lf" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@email.com" required>
       <label class="f" for="pw">Password</label><div class="pwb"><input class="t" id="pw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="6" placeholder="${up ? 'At least 6 characters' : 'Your password'}" required><button type="button" id="eye" class="eye" aria-pressed="false" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="sl" d="M4 4l16 16"/></svg></button></div>
       ${up ? `<label class="ck"><input type="checkbox" id="age"> <span>I am 18 or older. The Jamoja beta is adults only for now.</span></label>` : ''}
       ${msg ? `<div class="err">${esc(msg)}</div>` : ''}
       <button class="btn w" style="margin-top:14px">${up ? 'Create account' : 'Sign in'}</button></form>
-      <p style="margin-top:16px" class="mu">${up ? 'Already have an account?' : 'New to Jamoja?'} <a href="#" id="sw">${up ? 'Sign in' : 'Create one'}</a></p>`;
+      <p style="margin-top:16px" class="mu">${up ? 'Already have an account?' : 'New to Jamoja?'} <a href="#" id="sw">${up ? 'Sign in' : 'Create one'}</a>${up ? '' : ` · <a href="#/login?mode=forgot">Forgot password?</a>`}</p>`;
     document.getElementById('sw').onclick = e => { e.preventDefault(); up = !up; draw(); };
     const eye = document.getElementById('eye'), pwi = document.getElementById('pw');
     eye.onclick = () => { const show = pwi.type === 'password'; pwi.type = show ? 'text' : 'password'; eye.classList.toggle('on', show); eye.setAttribute('aria-pressed', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); pwi.focus(); };
@@ -155,6 +236,30 @@ async function login() {
     };
   };
   draw();
+}
+
+function forgot() {
+  V.innerHTML = `<h1>Reset your password</h1><p class="mu">Enter your email and we will send you a link to set a new one.</p>
+    <form id="ff" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@email.com"><div id="fe"></div>
+    <button class="btn w" style="margin-top:14px">Send reset link</button></form><p class="mu" style="margin-top:16px"><a href="#/login">Back to sign in</a></p>`;
+  document.getElementById('ff').onsubmit = async e => {
+    e.preventDefault(); const em = document.getElementById('em').value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(em)) { document.getElementById('fe').innerHTML = `<div class="err">Enter a valid email.</div>`; return; }
+    const b = e.target.querySelector('button'); b.disabled = true; b.textContent = 'Sending…';
+    try { await auth.resetEmail(em, location.origin + location.pathname); V.innerHTML = `<h1>Check your email</h1><p>If <b>${esc(em)}</b> has a Jamoja account, a reset link is on the way. It can take a few minutes, and it may land in spam.</p><a class="btn g" href="#/login">Back to sign in</a>`; }
+    catch (err) { b.disabled = false; b.textContent = 'Send reset link'; document.getElementById('fe').innerHTML = `<div class="err">${esc(/rate|seconds/i.test(err.message) ? 'Too many tries. Wait a minute and try again.' : err.message)}</div>`; }
+  };
+}
+function resetPage() {
+  if (!ME) { V.innerHTML = `<h1>Link expired</h1><p class="mu">Ask for a new reset link.</p><a class="btn" href="#/login?mode=forgot">Send a new link</a>`; return; }
+  TR.innerHTML = '';
+  V.innerHTML = `<h1>Set a new password</h1><form id="rf" novalidate><label class="f" for="pw">New password</label><div class="pwb"><input class="t" id="pw" type="text" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="At least 6 characters"></div><div id="re"></div><button class="btn w" style="margin-top:14px">Save password</button></form>`;
+  document.getElementById('rf').onsubmit = async e => {
+    e.preventDefault(); const pw = document.getElementById('pw').value;
+    if (pw.length < 6) { document.getElementById('re').innerHTML = `<div class="err">Use at least 6 characters.</div>`; return; }
+    try { await auth.setPassword(pw); toast('Password saved. You are signed in.'); go(MYP ? '#/' : '#/setup'); }
+    catch (err) { document.getElementById('re').innerHTML = `<div class="err">${esc(err.message)}</div>`; }
+  };
 }
 
 // ---------------- Profile setup
@@ -197,7 +302,7 @@ async function newGame() {
   const srcs = [];
   const recParts = new Set();
   const saved = await R.savedParts();
-  V.innerHTML = `<h1>${existing ? 'Add clips' : 'New game'}</h1>
+  V.innerHTML = `${inAppCard()}<h1>${existing ? 'Add clips' : 'New game'}</h1>
     ${existing ? `<p class="mu">Adding to <b>${esc(existing.title)}</b></p>` : `<div class="card"><label class="f" for="gt" style="margin-top:0">Game name</label><input class="t" id="gt" value="Saturday Run">
       <label class="f" for="gs">Sport</label><select class="t" id="gs">${SPORTS.map(s => `<option ${MYP.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       <label class="f" for="gp">Where</label><input class="t" id="gp" value="${esc(MYP.city || '')}" placeholder="Court or field, city">
@@ -337,7 +442,7 @@ async function gamePage(id) {
     : `<div class="card"><b>Share this game</b><div class="lnk"><input readonly value="${esc(link)}" aria-label="Game link" id="lk"><button class="btn s" id="cp">Copy</button></div>
       ${navigator.share ? `<button class="btn g w" id="sh" style="margin-top:8px">Send to the group chat</button>` : ''}</div>`;
   V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}${g.played_on ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>
-    ${own && qs().get('fresh') ? `<div class="card" style="border-color:var(--o)"><b>${LOCAL ? 'Next: tag your crew, then send the clips.' : 'Next: tag your crew, then send the link.'}</b><p class="mu" style="margin:4px 0 0">Add each player below and pick who is in each highlight.</p></div>` : ''}
+    ${own && qs().get('fresh') ? `<div class="card" style="border-color:var(--o)"><b>${LOCAL ? 'Next: tag your crew, then send the clips.' : 'Next: tag your crew, then send the link.'}</b><p class="mu" style="margin:4px 0 0">Add each player below, then pick who is in each highlight and what the play was. Tagged plays get shared way more.</p></div>` : ''}
     ${shareCard}
     <h2>Players</h2>
     <div class="row" id="pl">${ps.map(p => `<span class="chip ${p.user_id ? 'ok' : ''}">${esc(p.label)}${p.user && !LOCAL ? ` · <a href="#/u/${esc(p.user.handle)}">@${esc(p.user.handle)}</a>` : p.user_id ? ' · you' : ''}${own && !p.user_id ? `<button data-rm="${p.id}" aria-label="Remove ${esc(p.label)}">×</button>` : ''}</span>`).join('') || '<span class="mu">No players tagged yet.</span>'}</div>
@@ -345,8 +450,9 @@ async function gamePage(id) {
     ${!myClaim && ps.some(p => !p.user_id) ? `<div class="card" style="margin-top:12px"><b>${LOCAL ? 'Which one is you?' : 'Are you in this game?'}</b><p class="mu" style="margin:4px 0 10px">Tap your name to put these plays on your profile.</p><div class="row">${ps.filter(p => !p.user_id).map(p => `<button class="btn s" data-claim="${p.id}">I'm ${esc(p.label)}</button>`).join('')}</div></div>` : ''}
     ${myClaim ? `<p class="mu" style="margin-top:10px">You are <b>${esc(myClaim.label)}</b> in this game. <button class="btn s g" data-release="${myClaim.id}">Not me</button></p>` : ''}
     <h2>Highlights</h2>
-    ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}</span>
-      ${own ? `<select data-hp="${h.id}" aria-label="Player in ${esc(h.label)}"><option value="">No one tagged</option>${ps.map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>` : ''}
+    ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}${h.views ? ' · ' + views(h.views) : ''}</span>
+      ${own ? `<select data-hp="${h.id}" aria-label="Player in ${esc(h.label)}"><option value="">Who is this?</option>${ps.map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
+      <select data-pt="${h.id}" aria-label="Play type for ${esc(h.label)}"><option value="">What was the play?</option>${playsFor(g.sport).map(t => `<option ${h.play_type === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
       <div class="row" style="margin-top:6px">${LOCAL ? `<button class="btn s g" data-s1="${h.id}" style="flex:1">${canFiles ? 'Send' : 'Save'}</button>` : ''}${own ? `<button class="btn s g" data-hd="${h.id}" style="flex:1">Delete</button>` : ''}</div></div></div>`).join('')}</div>` : `<p class="mu">No highlights yet.</p>`}
     ${own ? `<div class="row" style="margin-top:16px"><a class="btn g" href="#/new?game=${id}">+ Add more clips</a><button class="btn g" id="dg">Delete game</button></div>` : ''}
     ${LOCAL ? '' : `<p class="foot">Want highlights from your games? <a href="#/login?mode=up">Create a free Jamoja account</a></p>`}`;
@@ -381,7 +487,14 @@ async function gamePage(id) {
       else if (b.id === 'dg') { if (!confirmIn(b)) return; await storage.remove(hs.flatMap(h => [h.path, h.poster])); await games.remove(id); toast('Game deleted.'); go('#/'); }
     } catch (err) { toast(err.message); }
   };
-  V.onchange = async ev => { const s = ev.target.closest('[data-hp]'); if (!s) return; await highlights.update(s.dataset.hp, { player_id: s.value || null }); toast('Tagged.'); gamePage(id); };
+  countViews(V);
+  V.onchange = async ev => {
+    const s = ev.target.closest('[data-hp]'), t = ev.target.closest('[data-pt]');
+    try {
+      if (s) { await highlights.update(s.dataset.hp, { player_id: s.value || null }); toast('Tagged.'); gamePage(id); }
+      else if (t) { await highlights.update(t.dataset.pt, { play_type: t.value || null }); toast('Saved.'); gamePage(id); }
+    } catch (err) { toast(err.message); }
+  };
 }
 // Two-tap confirm without browser dialogs.
 function confirmIn(b) { if (b.dataset.sure) return true; b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again to confirm'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 3000); return false; }
@@ -397,10 +510,12 @@ async function profilePage(handle) {
   const link = shareBase() + '#/u/' + encodeURIComponent(p.handle);
   V.innerHTML = `<div class="row" style="gap:14px"><div class="av">${esc(ini(p.name))}</div><div><h1 style="margin:0">${esc(p.name)}</h1><p class="mu" style="margin:0">@${esc(p.handle)} · ${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}</p></div></div>
     <div class="row" style="margin-top:14px">${LOCAL ? '' : `<button class="btn s" id="cp">Copy profile link</button>`}${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>${LOCAL ? '' : `<button class="btn s g" id="so">Sign out</button>`}` : ''}</div>
-    <h2>Your plays</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.label)}</b><a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'In a game, tap "I\'m …" on your name and your plays show up here.' : 'No highlights yet.'}</p>`}
+    ${hs.length ? `<div class="row stats"><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div><div><b>${made.length}</b><span>Games filmed</span></div></div>` : ''}
+    <h2>${me ? 'Your plays' : 'Plays'}</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'In a game, tap "I\'m …" on your name and your plays show up here.' : 'No highlights yet.'}</p>`}
     <h2>Games filmed</h2>${made.length ? gameList(made) : `<p class="mu">None yet.</p>`}
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;
   const cp = document.getElementById('cp'); if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(link); toast('Profile link copied.'); } catch (e) { toast(link); } };
+  countViews(V);
   const so = document.getElementById('so'); if (so) so.onclick = async () => { await auth.signOut(); toast('Signed out.'); go('#/'); };
 }
 

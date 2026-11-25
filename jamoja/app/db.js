@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261125f';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261125g';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -57,7 +57,9 @@ export const auth = {
     if (sb) { const { data } = await sb.auth.getSession(); return data.session ? data.session.user : null; }
     return M.session;
   },
-  onChange(fn) { if (sb) sb.auth.onAuthStateChange(() => fn()); else authListeners.push(fn); },
+  onChange(fn) { if (sb) sb.auth.onAuthStateChange(ev => fn(ev)); else authListeners.push(fn); },
+  async resetEmail(email, back) { if (sb) { chk(await sb.auth.resetPasswordForEmail(email, { redirectTo: back })); return; } },
+  async setPassword(password) { if (sb) { chk(await sb.auth.updateUser({ password })); return; } const u = Object.values(M.users).find(x => M.session && x.id === M.session.id); if (u) u.password = password; },
   async signUp(email, password) {
     if (sb) { const d = chk(await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } })); return { needsConfirm: !d.session }; }
     if (M.users[email]) throw new Error('That email already has an account. Sign in instead.');
@@ -139,16 +141,22 @@ export const highlights = {
   // The public feed: newest highlights from every game, optionally one sport.
   async feed(sport, limit = 30) {
     if (sb) {
-      let q = sb.from('highlights').select('id,label,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles(name,handle)), player:players(label, user:profiles(name,handle)), fires(count)').order('created_at', { ascending: false }).limit(limit);
+      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles(name,handle)), player:players(label, user:profiles(name,handle)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
       if (sport) q = q.eq('game.sport', sport);
       return chk(await q).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
     }
     return Object.values(M.highlights).map(h => {
       const g = M.games[h.game_id] || {}; const o = M.profiles[g.owner_id]; const p = M.players[h.player_id];
       return { ...h, game: { ...g, owner: o ? { name: o.name, handle: o.handle } : null }, player: p ? { label: p.label, user: p.user_id ? M.profiles[p.user_id] : null } : null, fire: Object.values(M.fires || {}).filter(f => f.highlight_id === h.id).length };
-    }).filter(h => !sport || h.game.sport === sport).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
+    }).filter(h => !h.hidden && (!sport || h.game.sport === sport)).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
   },
   async add(h) { if (sb) return chk(await sb.from('highlights').insert(h).select().single()); const r = { id: uid(), created_at: now(), player_id: null, ...h }; M.highlights[r.id] = r; await save(); return r; },
+  async view(id) { if (sb) { await sb.rpc('add_view', { p_highlight: id }); return; } if (M.highlights[id]) { M.highlights[id].views = (M.highlights[id].views || 0) + 1; await save(); } },
+  async report(id, reason) {
+    if (sb) { const r = await sb.from('reports').insert({ highlight_id: id, reason }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); return; }
+    M.reports = M.reports || {}; M.reports[id + ':' + (M.session && M.session.id)] = { id, reason };
+    if (Object.keys(M.reports).filter(k => k.startsWith(id + ':')).length >= 2 && M.highlights[id]) M.highlights[id].hidden = true; await save();
+  },
   async update(id, patch) { if (sb) { chk(await sb.from('highlights').update(patch).eq('id', id)); return; } Object.assign(M.highlights[id], patch); await save(); },
   async remove(id) { if (sb) { chk(await sb.from('highlights').delete().eq('id', id)); return; } delete M.highlights[id]; await save(); },
 };

@@ -104,13 +104,16 @@ nav.bn a{display:flex;flex-direction:column;align-items:center;gap:2px;font-size
 nav.bn a.on{color:var(--ink)}nav.bn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2}
 nav.bn .film span{display:grid;place-items:center;width:46px;height:34px;border-radius:12px;background:var(--o);color:#0a0a0b;font:700 24px/1 Inter}
 nav.bn:not([hidden])~main,body:has(nav.bn:not([hidden])) main{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+.post .cap{align-self:flex-start;background:var(--o);color:#0a0a0b;font:22px/1 var(--hd);letter-spacing:.5px;padding:5px 10px 3px;border-radius:8px;margin-bottom:4px}
+.rep{margin-top:-8px}
+.stats{gap:0;margin:16px 0 0;background:var(--p);border:1px solid var(--ln);border-radius:16px;flex-wrap:nowrap}.stats>div{flex:1;text-align:center;padding:12px 4px;display:flex;flex-direction:column}.stats>div+div{border-left:1px solid var(--ln)}.stats b{font:600 26px/1 var(--num)}.stats span{font-size:12px;color:var(--mu);margin-top:4px}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261125f"></script>
-<script type="module" src="app.js?v=20261125f"></script>
+<script src="vendor/supabase.js?v=20261125g"></script>
+<script type="module" src="app.js?v=20261125g"></script>
 </body>
 </html>
