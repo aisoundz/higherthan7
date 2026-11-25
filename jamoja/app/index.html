@@ -127,13 +127,18 @@ nav.bn:not([hidden])~main,body:has(nav.bn:not([hidden])) main{padding-bottom:cal
 textarea.ta{width:100%;height:auto;min-height:90px;padding:10px 12px;line-height:1.4;resize:vertical;border-radius:12px;background:var(--p2);border:1px solid var(--ln);font:inherit}
 [hidden]{display:none!important}
 .tr a,.pu,.person a{text-decoration:none}
+.crop{position:fixed;inset:0;z-index:200;background:#000d;display:grid;place-items:center;padding:16px}
+.cbox{background:var(--p);border:1px solid var(--ln);border-radius:18px;padding:16px;display:flex;flex-direction:column;align-items:center;max-width:100%}
+.cvw{position:relative;border-radius:12px;overflow:hidden;cursor:grab}.cvw canvas{display:block}
+.ring{position:absolute;inset:0;pointer-events:none;border-radius:50%;box-shadow:0 0 0 999px #000a;outline:2px solid #fff8;outline-offset:-2px}
+.zm{width:100%;margin-top:12px;accent-color:var(--o)}.cbox .row{width:100%}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261125i"></script>
-<script type="module" src="app.js?v=20261125i"></script>
+<script src="vendor/supabase.js?v=20261125j"></script>
+<script type="module" src="app.js?v=20261125j"></script>
 </body>
 </html>

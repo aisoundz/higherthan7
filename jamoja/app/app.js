@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125i';
-import * as R from './rec.js?v=20261125i';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125i';
+import * as E from './engine.js?v=20261125j';
+import * as R from './rec.js?v=20261125j';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125j';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -420,13 +420,51 @@ function resetPage() {
   };
 }
 
+// Photo adjuster: drag to move, slider or pinch to zoom. Returns a 400x400 JPEG, or null if cancelled.
+function cropPhoto(src) {
+  return new Promise(async resolve => {
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    try { await new Promise((ok, bad) => { img.onload = ok; img.onerror = () => bad(new Error('Could not open that photo.')); img.src = typeof src === 'string' ? src : URL.createObjectURL(src); }); }
+    catch (e) { toast(e.message); resolve(null); return; }
+    const S = Math.min(300, window.innerWidth - 48);
+    const ov = document.createElement('div'); ov.className = 'crop';
+    ov.innerHTML = `<div class="cbox"><b style="font:28px var(--hd)">Adjust your photo</b><p class="mu" style="margin:0 0 10px">Drag to move. Zoom with the slider.</p>
+      <div class="cvw" style="width:${S}px;height:${S}px"><canvas width="${S * 2}" height="${S * 2}" style="width:${S}px;height:${S}px"></canvas><div class="ring"></div></div>
+      <input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom" class="zm">
+      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn g s" data-x>Cancel</button><button class="btn s" data-ok>Use photo</button></div></div>`;
+    document.body.append(ov);
+    const cv = ov.querySelector('canvas'), cx = cv.getContext('2d'), zm = ov.querySelector('.zm');
+    const base = Math.max(S / img.width, S / img.height); let z = 1, ox = 0, oy = 0;
+    const clamp = () => { const w = img.width * base * z, h = img.height * base * z; ox = Math.min((w - S) / 2, Math.max(-(w - S) / 2, ox)); oy = Math.min((h - S) / 2, Math.max(-(h - S) / 2, oy)); };
+    const draw = (ctx, size) => { const k = size / S, w = img.width * base * z * k, h = img.height * base * z * k; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, size, size); ctx.drawImage(img, (size - w) / 2 + ox * k, (size - h) / 2 + oy * k, w, h); };
+    const paint = () => { clamp(); draw(cx, S * 2); };
+    paint();
+    zm.oninput = () => { z = +zm.value; paint(); };
+    const pts = new Map(); let last = null, pinch = 0;
+    cv.style.touchAction = 'none';
+    cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); last = [e.clientX, e.clientY]; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
+    cv.onpointermove = e => {
+      if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) { z = Math.min(4, Math.max(1, z * d / pinch)); zm.value = z; } pinch = d; }
+      else if (last) { ox += e.clientX - last[0]; oy += e.clientY - last[1]; last = [e.clientX, e.clientY]; }
+      paint();
+    };
+    cv.onpointerup = cv.onpointercancel = e => { pts.delete(e.pointerId); pinch = 0; last = pts.size ? [...pts.values()][0] : null; };
+    ov.querySelector('[data-x]').onclick = () => { ov.remove(); resolve(null); };
+    ov.querySelector('[data-ok]').onclick = () => {
+      const out = document.createElement('canvas'); out.width = out.height = 400; draw(out.getContext('2d'), 400);
+      out.toBlob(b => { ov.remove(); if (!b) { toast('Could not use that photo. Try another one.'); resolve(null); return; } b.arrayBuffer().then(a => resolve(new Uint8Array(a))); }, 'image/jpeg', 0.88);
+    };
+  });
+}
+
 // ---------------- Profile setup
 function setup() {
   if (!ME) return needLogin('#/setup');
   const next = qs().get('next') || '#/';
   const p = MYP || {};
   V.innerHTML = `<h1>${MYP ? 'Edit your profile' : 'Set up your profile'}</h1><p class="mu">${LOCAL ? 'Takes 20 seconds. Saved on this phone.' : 'This is what coaches, scouts and friends see.'}</p>
-    <form id="pf"><div class="row" style="gap:14px;margin:8px 0 4px"><span id="avp">${avatar(p, 72)}</span><label class="btn s g" for="avf">${p.avatar ? 'Change photo' : 'Add a photo'}</label><input id="avf" type="file" accept="image/*" hidden></div><p class="mu" id="avh" style="margin:0"></p><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
+    <form id="pf"><div class="row" style="gap:14px;margin:8px 0 4px"><span id="avp">${avatar(p, 72)}</span><label class="btn s g" for="avf">${p.avatar ? 'Change photo' : 'Add a photo'}</label><button type="button" class="btn s g" id="avadj" ${p.avatar ? '' : 'hidden'}>Adjust</button><input id="avf" type="file" accept="image/*" hidden></div><p class="mu" id="avh" style="margin:0"></p><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
     <label class="f" for="hd">Handle</label><input class="t" id="hd" value="${esc(p.handle || '')}" placeholder="yourname" autocapitalize="off" autocorrect="off" spellcheck="false" required><p class="mu" id="hp" style="margin:4px 0 0"></p>
     <label class="f" for="sp">Main sport</label><select class="t" id="sp">${SPORTS.map(s => `<option ${p.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
     <label class="f" for="ps">Position (optional)</label><input class="t" id="ps" value="${esc(p.position || '')}" placeholder="${esc(POS[p.sport || 'Basketball'] || '')}">
@@ -442,8 +480,10 @@ function setup() {
   hd.oninput = () => { const c = clean(hd.value); if (c !== hd.value) hd.value = c; showH(); };
   sp.onchange = () => { ps.placeholder = POS[sp.value] || ''; };
   showH();
-  let avFile = null;
-  document.getElementById('avf').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; avFile = f; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(f)}" alt="" style="width:72px;height:72px">`; document.querySelector('label[for=avf]').textContent = 'Change photo'; document.getElementById('avh').textContent = 'Looks good. Tap Save profile at the bottom to keep it.'; };
+  let avBytes = null, avSrc = p.avatar ? storage.url(p.avatar) : null;
+  const setAv = bytes => { avBytes = bytes; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }))}" alt="" style="width:72px;height:72px">`; document.querySelector('label[for=avf]').textContent = 'Change photo'; document.getElementById('avadj').hidden = false; document.getElementById('avh').textContent = 'Looks good. Tap Save profile at the bottom to keep it.'; };
+  document.getElementById('avf').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; avSrc = f; const b2 = await cropPhoto(f); if (b2) setAv(b2); };
+  document.getElementById('avadj').onclick = async () => { if (!avSrc) return; const b2 = await cropPhoto(avSrc); if (b2) setAv(b2); };
   document.getElementById('pf').onsubmit = async e => {
     e.preventDefault();
     const handle = clean(hd.value).replace(/^[._]+|[._]+$/g, '');
@@ -451,7 +491,7 @@ function setup() {
     try {
       const sv = e.target.querySelector('button.w'); sv.disabled = true; sv.textContent = 'Saving…';
       let av = p.avatar || null;
-      if (avFile) { const k = `${ME.id}/avatar-${Date.now()}.jpg`; await storage.upload(k, await toJpeg(avFile, 400), 'image/jpeg'); if (p.avatar) storage.remove([p.avatar]).catch(() => {}); av = k; }
+      if (avBytes) { const k = `${ME.id}/avatar-${Date.now()}.jpg`; await storage.upload(k, avBytes, 'image/jpeg'); if (p.avatar) storage.remove([p.avatar]).catch(() => {}); av = k; }
       MYP = await profiles.save({ id: ME.id, name: nm.value.trim(), handle, sport: document.getElementById('sp').value, position: document.getElementById('ps').value.trim(), city: document.getElementById('ct').value.trim(), level: document.getElementById('lv').value || null, bio: document.getElementById('bi').value.trim() || null, avatar: av });
       toast('Profile saved.'); go(next);
     } catch (err) { const sv = e.target.querySelector('button.w'); sv.disabled = false; sv.textContent = 'Save profile'; document.getElementById('pe').innerHTML = `<div class="err">${esc(/duplicate|unique/i.test(err.message) ? 'That handle is taken. Try another.' : err.message)}</div>`; }
