@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125c';
-import * as R from './rec.js?v=20261125c';
-import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js?v=20261125c';
+import * as E from './engine.js?v=20261125d';
+import * as R from './rec.js?v=20261125d';
+import { auth, profiles, games, players, highlights, storage, mode, ready } from './db.js?v=20261125d';
 
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
@@ -37,7 +37,7 @@ async function route() {
     if (ME && !MYP && parts[0] !== 'setup' && parts[0] !== 'login') return go('#/setup?next=' + encodeURIComponent(location.hash || '#/'));
     topbar();
     if (!parts.length) return await home();
-    if (parts[0] === 'login') return LOCAL ? go('#/') : login();
+    if (parts[0] === 'login') { TR.innerHTML = ''; return LOCAL ? go('#/') : login(); }
     if (parts[0] === 'setup') return setup();
     if (parts[0] === 'new') return await newGame();
     if (parts[0] === 'g' && parts[1]) return await gamePage(parts[1]);
@@ -77,15 +77,16 @@ function login() {
   const q = qs(); let up = q.get('mode') === 'up'; const next = q.get('next') || '#/';
   const draw = (msg = '') => {
     V.innerHTML = `<h1>${up ? 'Create your account' : 'Welcome back'}</h1>
-      <form id="lf" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" autocomplete="email" required>
-      <label class="f" for="pw">Password</label><div class="row" style="flex-wrap:nowrap"><input class="t" id="pw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" minlength="6" required style="flex:1"><button type="button" class="btn g" id="eye" aria-pressed="false" aria-label="Show password" style="min-height:48px">Show</button></div>
+      <p class="mu" style="margin-top:-4px">${up ? 'Free. Takes 20 seconds.' : 'Sign in to see your games and plays.'}</p>
+      <form id="lf" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@email.com" required>
+      <label class="f" for="pw">Password</label><div class="pwb"><input class="t" id="pw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="6" placeholder="${up ? 'At least 6 characters' : 'Your password'}" required><button type="button" id="eye" class="eye" aria-pressed="false" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="sl" d="M4 4l16 16"/></svg></button></div>
       ${up ? `<label class="ck"><input type="checkbox" id="age"> <span>I am 18 or older. The Jamoja beta is adults only for now.</span></label>` : ''}
       ${msg ? `<div class="err">${esc(msg)}</div>` : ''}
       <button class="btn w" style="margin-top:14px">${up ? 'Create account' : 'Sign in'}</button></form>
       <p style="margin-top:16px" class="mu">${up ? 'Already have an account?' : 'New to Jamoja?'} <a href="#" id="sw">${up ? 'Sign in' : 'Create one'}</a></p>`;
     document.getElementById('sw').onclick = e => { e.preventDefault(); up = !up; draw(); };
     const eye = document.getElementById('eye'), pwi = document.getElementById('pw');
-    eye.onclick = () => { const show = pwi.type === 'password'; pwi.type = show ? 'text' : 'password'; eye.textContent = show ? 'Hide' : 'Show'; eye.setAttribute('aria-pressed', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); pwi.focus(); };
+    eye.onclick = () => { const show = pwi.type === 'password'; pwi.type = show ? 'text' : 'password'; eye.classList.toggle('on', show); eye.setAttribute('aria-pressed', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); pwi.focus(); };
     document.getElementById('lf').onsubmit = async e => {
       e.preventDefault();
       const em = document.getElementById('em').value.trim(), pw = document.getElementById('pw').value;

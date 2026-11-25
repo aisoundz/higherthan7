@@ -38,8 +38,13 @@ p{margin:0 0 12px}
 .card{background:var(--p);border:1px solid var(--ln);border-radius:16px;padding:14px;margin-bottom:12px}
 label.f{display:block;font-size:14px;color:var(--mu);margin:12px 0 4px}
 input.t,select.t{width:100%;height:48px;border-radius:12px;background:var(--p2);border:1px solid var(--ln);padding:0 12px;font-size:16px}
+.pwb{position:relative}.pwb input{padding-right:52px}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:none;color:var(--mu);display:grid;place-items:center;border-radius:10px}
+.eye svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.eye.on{color:var(--ink)}.eye.on .sl{display:none}
+input.t::placeholder{color:#71717a}
 .ck{display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-size:14px}
-.ck input{width:22px;height:22px;accent-color:var(--o);flex:none;margin-top:1px}
+.ck input{width:24px;height:24px;accent-color:var(--o);flex:none;margin-top:1px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media(min-width:520px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -86,7 +91,7 @@ input.t,select.t{width:100%;height:48px;border-radius:12px;background:var(--p2);
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261125c"></script>
-<script type="module" src="app.js?v=20261125c"></script>
+<script src="vendor/supabase.js?v=20261125d"></script>
+<script type="module" src="app.js?v=20261125d"></script>
 </body>
 </html>
