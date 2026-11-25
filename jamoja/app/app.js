@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125h';
-import * as R from './rec.js?v=20261125h';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125h';
+import * as E from './engine.js?v=20261125i';
+import * as R from './rec.js?v=20261125i';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125i';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -172,15 +172,19 @@ async function drawFeed() {
   catch (e) { console.error(e); box.innerHTML = `<div class="err">Could not load the feed. Pull down to refresh.</div>`; return; }
   const items = [...hl.map(h => ({ t: 'h', at: h.created_at, h })), ...ps.map(x => ({ t: 'p', at: x.created_at, x }))].sort((a, b) => a.at < b.at ? 1 : -1).slice(0, 40);
   const pinned = !FEED_SPORT && FEED_TAB === 'all' && items.length < 3 ? `<article class="post"><div class="pin">Pinned · Welcome to Jamoja</div><video src="../reel.mp4" poster="../poster.jpg" playsinline muted loop preload="metadata"></video><div class="meta"><b>Anis Taylor</b><span class="mu">Founder · Basketball · Anaheim. Built by an athlete, for athletes.</span><a class="mu" href="../profile/">See a full player profile</a></div></article>` : '';
-  const empty = FEED_TAB === 'following' && !fol.length;
+  const empty = FEED_TAB === 'following' && !fol.length && !items.length;
   let sugg = '';
   if (ME && (empty || fol.length < 3)) {
     const people = (await follows.suggested(ME.id).catch(() => [])).filter(p => !fol.includes(p.id)).slice(0, 8);
     if (people.length) sugg = `<div class="card"><b>People to follow</b><div class="people">${people.map(p => `<div class="person"><a href="#/u/${esc(p.handle)}">${avatar(p, 56)}<b>${esc((p.name || '').split(' ')[0])}</b><span class="mu">${esc(p.sport || '')}</span></a><button class="btn s" data-follow="${p.id}">Follow</button></div>`).join('')}</div></div>`;
   }
-  box.innerHTML = (empty ? `<div class="card"><b>Follow athletes to fill this tab.</b><p class="mu" style="margin:4px 0 0">Their posts and plays show up here.</p></div>` : '') + sugg;
+  const invite = ME && FEED_TAB === 'following' && !fol.length && !sugg ? `<div class="card" style="border-color:var(--o)"><b>Bring your crew</b><p class="mu" style="margin:4px 0 10px">Follow the people you play with and their posts and plays land here. Send them the invite.</p><button class="btn s" id="inv">Invite friends</button></div>` : '';
+  const filt = FEED_SPORT ? `<p class="mu" style="margin:0 0 10px">Showing ${esc(FEED_SPORT)} only. <a href="#" id="clr">Show all sports</a></p>` : '';
+  box.innerHTML = filt + (empty && !invite ? `<div class="card"><b>Follow athletes to fill this tab.</b><p class="mu" style="margin:4px 0 0">Their posts and plays show up here.</p></div>` : '') + invite + sugg;
+  const clr = box.querySelector('#clr'); if (clr) clr.onclick = e => { e.preventDefault(); FEED_SPORT = ''; home(); };
+  const inv = box.querySelector('#inv'); if (inv) inv.onclick = () => { const url = shareBase() + '#/u/' + encodeURIComponent(MYP.handle); const text = `I'm on Jamoja, the new app for athletes. Follow me and post your plays: `; if (navigator.share) navigator.share({ title: 'Join me on Jamoja', text, url }).catch(() => {}); else navigator.clipboard.writeText(text + url).then(() => toast('Invite copied. Paste it in the group chat.'), () => toast(url)); };
   const list = document.createElement('div'); box.append(list);
-  await renderItems(list, items, { empty: empty ? '' : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' posts yet.' : 'Nothing here yet.'}</b><p class="mu" style="margin:4px 0 10px">Post something or film your next run.</p>${ME ? `<a class="btn s" href="#/post">Post</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`, fol });
+  await renderItems(list, items, { empty: empty || invite ? '' : `<div class="card"><b>${FEED_SPORT ? 'No ' + esc(FEED_SPORT) + ' posts yet.' : 'Nothing here yet.'}</b><p class="mu" style="margin:4px 0 10px">Post something or film your next run.</p>${ME ? `<a class="btn s" href="#/post">Post</a>` : `<a class="btn s" href="#/login?mode=up">Create free account</a>`}</div>`, fol });
   if (pinned) box.insertAdjacentHTML('beforeend', pinned);
   box.querySelectorAll('.pin ~ video').forEach(v => playWhenSeen(v));
   bindFollow(box, fol);
@@ -301,7 +305,7 @@ async function composer() {
     if (!att) { attEl.innerHTML = ''; return; }
     const x = `<button class="lnkb" id="rm" type="button">Remove</button>`;
     if (att.kind === 'photo') attEl.innerHTML = `<img class="pm" src="${att.url}" alt="">${x}`;
-    else if (att.kind === 'video') attEl.innerHTML = `<video class="pm" src="${att.url}" controls playsinline></video><p class="mu">Videos are trimmed to the first 60 seconds.</p>${x}`;
+    else if (att.kind === 'video') attEl.innerHTML = `<video class="pm" src="${att.url}#t=0.1" controls playsinline preload="metadata"></video><p class="mu">Videos are trimmed to the first 60 seconds.</p>${x}`;
     else attEl.innerHTML = `<img class="pm" src="https://i.ytimg.com/vi/${att.yt}/hqdefault.jpg" alt="">${x}`;
     V.querySelector('#rm').onclick = () => { att = null; showAtt(); };
   };
@@ -422,7 +426,7 @@ function setup() {
   const next = qs().get('next') || '#/';
   const p = MYP || {};
   V.innerHTML = `<h1>${MYP ? 'Edit your profile' : 'Set up your profile'}</h1><p class="mu">${LOCAL ? 'Takes 20 seconds. Saved on this phone.' : 'This is what coaches, scouts and friends see.'}</p>
-    <form id="pf"><div class="row" style="gap:14px;margin:8px 0 4px"><span id="avp">${avatar(p, 72)}</span><label class="btn s g" for="avf">${p.avatar ? 'Change photo' : 'Add a photo'}</label><input id="avf" type="file" accept="image/*" hidden></div><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
+    <form id="pf"><div class="row" style="gap:14px;margin:8px 0 4px"><span id="avp">${avatar(p, 72)}</span><label class="btn s g" for="avf">${p.avatar ? 'Change photo' : 'Add a photo'}</label><input id="avf" type="file" accept="image/*" hidden></div><p class="mu" id="avh" style="margin:0"></p><label class="f" for="nm">Name</label><input class="t" id="nm" value="${esc(p.name || '')}" autocomplete="name" required>
     <label class="f" for="hd">Handle</label><input class="t" id="hd" value="${esc(p.handle || '')}" placeholder="yourname" autocapitalize="off" autocorrect="off" spellcheck="false" required><p class="mu" id="hp" style="margin:4px 0 0"></p>
     <label class="f" for="sp">Main sport</label><select class="t" id="sp">${SPORTS.map(s => `<option ${p.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
     <label class="f" for="ps">Position (optional)</label><input class="t" id="ps" value="${esc(p.position || '')}" placeholder="${esc(POS[p.sport || 'Basketball'] || '')}">
@@ -439,7 +443,7 @@ function setup() {
   sp.onchange = () => { ps.placeholder = POS[sp.value] || ''; };
   showH();
   let avFile = null;
-  document.getElementById('avf').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; avFile = f; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(f)}" alt="" style="width:72px;height:72px">`; };
+  document.getElementById('avf').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; avFile = f; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(f)}" alt="" style="width:72px;height:72px">`; document.querySelector('label[for=avf]').textContent = 'Change photo'; document.getElementById('avh').textContent = 'Looks good. Tap Save profile at the bottom to keep it.'; };
   document.getElementById('pf').onsubmit = async e => {
     e.preventDefault();
     const handle = clean(hd.value).replace(/^[._]+|[._]+$/g, '');
@@ -616,7 +620,7 @@ async function gamePage(id) {
       <select data-pt="${h.id}" aria-label="Play type for ${esc(h.label)}"><option value="">What was the play?</option>${playsFor(g.sport).map(t => `<option ${h.play_type === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
       <div class="row" style="margin-top:6px">${LOCAL ? `<button class="btn s g" data-s1="${h.id}" style="flex:1">${canFiles ? 'Send' : 'Save'}</button>` : ''}${own ? `<button class="btn s g" data-hd="${h.id}" style="flex:1">Delete</button>` : ''}</div></div></div>`).join('')}</div>` : `<p class="mu">No highlights yet.</p>`}
     ${own ? `<div class="row" style="margin-top:16px"><a class="btn g" href="#/new?game=${id}">+ Add more clips</a><button class="btn g" id="dg">Delete game</button></div>` : ''}
-    ${LOCAL ? '' : `<p class="foot">Want highlights from your games? <a href="#/login?mode=up">Create a free Jamoja account</a></p>`}`;
+    ${LOCAL || ME ? '' : `<p class="foot">Want highlights from your games? <a href="#/login?mode=up">Create a free Jamoja account</a></p>`}`;
   const fileFor = async h => { const b = await storage.blob(h.path); return new File([b], `${g.title.replace(/[^\w]+/g, '-')}-${h.label.replace(/\s+/g, '-')}.mp4`, { type: 'video/mp4' }); };
   async function sendFiles(list) {
     const files = await Promise.all(list.map(fileFor));
