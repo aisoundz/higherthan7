@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125n';
-import * as R from './rec.js?v=20261125n';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125n';
+import * as E from './engine.js?v=20261126b';
+import * as R from './rec.js?v=20261126b';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261126b';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -27,6 +27,11 @@ const PLAYS = {
   Softball: ['Home run', 'Hit', 'Strikeout', 'Diving catch', 'Double play'],
   Track: ['Finish', 'Start', 'PR'],
   Tennis: ['Ace', 'Winner', 'Rally'],
+  Training: ['Workout', 'PR', 'Conditioning', 'Agility', 'Mobility', 'Before and after'],
+  Weightlifting: ['PR', 'Squat', 'Bench', 'Deadlift', 'Clean', 'Snatch', 'Overhead press'],
+  CrossFit: ['WOD', 'PR', 'Muscle-up', 'Pull-ups', 'Box jumps', 'Burpees'],
+  Running: ['PR', 'Long run', 'Sprint', 'Race finish', 'Trail run'],
+  Boxing: ['Combo', 'Mitt work', 'Bag work', 'Sparring', 'Knockout'],
   Other: ['Big play'],
 };
 const playsFor = sp => [...(PLAYS[sp] || []), 'Big play'].filter((v, i, a) => a.indexOf(v) === i);
@@ -85,8 +90,8 @@ async function shareClip(h, who, link) {
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
 let ME = null, MYP = null;
-const POS = { Basketball: 'Point guard', Soccer: 'Striker', 'Flag football': 'Wide receiver', Volleyball: 'Outside hitter', Football: 'Linebacker', Baseball: 'Shortstop', Softball: 'Pitcher', Track: '100m and 200m', Tennis: 'Singles', Other: '' };
-const SPORTS = ['Basketball', 'Football', 'Soccer', 'Baseball', 'Softball', 'Volleyball', 'Flag football', 'Track', 'Tennis', 'Other'];
+const POS = { Basketball: 'Point guard', Soccer: 'Striker', 'Flag football': 'Wide receiver', Volleyball: 'Outside hitter', Football: 'Linebacker', Baseball: 'Shortstop', Softball: 'Pitcher', Track: '100m and 200m', Tennis: 'Singles', Training: 'Strength and conditioning', Weightlifting: 'Powerlifting, 93kg', CrossFit: 'Rx', Running: '5K, 10K, marathon', Boxing: 'Welterweight', Other: '' };
+const SPORTS = ['Basketball', 'Football', 'Soccer', 'Training', 'Weightlifting', 'CrossFit', 'Running', 'Baseball', 'Softball', 'Volleyball', 'Flag football', 'Track', 'Tennis', 'Boxing', 'Other'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mmss = t => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
 const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
@@ -149,7 +154,7 @@ let FEED_SPORT = '', FEED_TAB = 'all';
 async function home() {
   const parts = ME ? await R.savedParts() : [];
   const top = !ME
-    ? `${inAppCard()}<section class="hero"><h1>Where athletes get seen.</h1><p>The social network for athletes. Post your work, film your runs, and Jamoja cuts the highlights and puts them on your profile.</p>
+    ? `${inAppCard()}<section class="hero"><h1>Where athletes get seen.</h1><p>The social network for athletes and everyone who trains. Hoopers, lifters, runners, CrossFit. Post your work, film your games, and Jamoja cuts the highlights for you.</p>
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
@@ -305,13 +310,24 @@ async function composer() {
     if (!att) { attEl.innerHTML = ''; return; }
     const x = `<button class="lnkb" id="rm" type="button">Remove</button>`;
     if (att.kind === 'photo') attEl.innerHTML = `<img class="pm" src="${att.url}" alt="">${x}`;
-    else if (att.kind === 'video') { attEl.innerHTML = `<video class="pm" id="ve" src="${att.url}#t=0.1" playsinline muted preload="auto"></video>
+    else if (att.kind === 'video') { attEl.innerHTML = `<div class="ved"><video class="pm" id="ve" src="${att.url}#t=0.1" playsinline muted preload="auto"></video><div class="ovl top" id="ovTop" hidden></div><div class="ovl bot" id="ovBot" hidden></div><div class="ovl tag" id="ovTag" hidden><b>JAMOJA</b> @${esc(MYP.handle)}</div><div class="slowb" id="slowB" hidden>SLOW-MO</div></div>
       <div class="trim" id="tr2" hidden><div class="tl"><b>Trim</b><span class="mu" id="tl"></span></div>
         <label class="f" for="tst">Start <span id="ts"></span></label><input type="range" id="tst" min="0" step="0.1">
         <label class="f" for="ten">End <span id="te"></span></label><input type="range" id="ten" min="0" step="0.1">
         <button class="btn s g" id="tpv" type="button" style="margin-top:8px">▶ Preview clip</button>
         <div class="tl" style="margin-top:16px"><b>Cover</b><span class="mu">Slide to pick the thumbnail</span></div>
-        <div class="cov"><canvas id="cvp" width="160" height="200"></canvas><input type="range" id="tcv" min="0" step="0.1" aria-label="Cover frame"></div></div>
+        <div class="cov"><canvas id="cvp" width="160" height="200"></canvas><input type="range" id="tcv" min="0" step="0.1" aria-label="Cover frame"></div>
+        <div class="tl" style="margin-top:18px"><b>Quick Edit</b><span class="mu">Optional</span></div>
+        <label class="f">Look</label><div class="row chips" id="lk">${[['none', 'None'], ['gameday', 'Game Day'], ['punchy', 'Punchy'], ['bw', 'B&amp;W'], ['vintage', 'Vintage'], ['night', 'Night Run']].map(([k, n]) => `<button type="button" class="chip ${k === 'none' ? 'on' : ''}" data-lk="${k}">${n}</button>`).join('')}</div>
+        <label class="f" for="ebr">Brightness</label><input type="range" id="ebr" min="-0.2" max="0.2" step="0.01" value="0">
+        <label class="f" for="eco">Contrast</label><input type="range" id="eco" min="0.8" max="1.4" step="0.01" value="1">
+        <label class="f">Slow-mo</label><div class="row chips" id="sm">${[0, 1, 2, 3].map(n => `<button type="button" class="chip ${n ? '' : 'on'}" data-sm="${n}">${n ? n + 's' : 'Off'}</button>`).join('')}</div>
+        <div id="smw" hidden><label class="f" for="sma">Slow-mo starts at <span id="smt"></span></label><input type="range" id="sma" min="0" step="0.1"></div>
+        <label class="f" for="ecap">Caption on video</label><input class="t" id="ecap" maxlength="40" placeholder="Like: Tuesday run. Called game.">
+        <div class="row chips" id="cps" style="margin-top:6px"><button type="button" class="chip on" data-cp="bottom">Bottom</button><button type="button" class="chip" data-cp="top">Top</button></div>
+        <label class="f" for="epl">Play label</label><select class="t" id="epl"><option value="">None</option>${playsFor(MYP.sport).map(t => `<option>${esc(t)}</option>`).join('')}</select>
+        <label class="chk" style="margin-top:12px"><input type="checkbox" id="etag"> Add the Jamoja tag with your @handle</label>
+        <button class="btn s g" id="tpv2" type="button" style="margin-top:10px">▶ Preview with edits</button></div>
       <p class="mu" id="tw">Loading your video…</p>${x}`; editVideo(); }
     else attEl.innerHTML = `<img class="pm" src="https://i.ytimg.com/vi/${att.yt}/hqdefault.jpg" alt="">${x}`;
     V.querySelector('#rm').onclick = () => { att = null; showAtt(); };
@@ -342,6 +358,45 @@ async function composer() {
     en.oninput = () => { att.end = Math.max(+en.value, 1); if (att.end - att.start > 60) att.start = att.end - 60; if (att.end < att.start + 1) att.start = Math.max(0, att.end - 1); st.value = att.start; en.value = att.end; label(); seek(att.end); };
     cv.oninput = () => { att.cover = +cv.value; drawCover = true; seek(att.cover); };
     V.querySelector('#tpv').onclick = () => { v.currentTime = att.start; stopAt = att.end; v.muted = false; v.play().catch(() => {}); };
+    // ---- Quick Edit
+    att.ed = att.ed || { look: 'none', bright: 0, contrast: 1, slowLen: 0, slowAt: 0, cap: '', capPos: 'bottom', label: '', tag: false };
+    const ed = att.ed, CSSLOOK = { none: '', gameday: 'contrast(1.15) saturate(1.35) brightness(1.03)', punchy: 'contrast(1.3) saturate(1.2)', bw: 'grayscale(1) contrast(1.2)', vintage: 'sepia(.45) contrast(1.05) saturate(.85)', night: 'brightness(1.18) saturate(1.1)' };
+    const paint = () => {
+      v.style.filter = `${CSSLOOK[ed.look]} brightness(${1 + ed.bright * 2}) contrast(${ed.contrast})`;
+      const top = V.querySelector('#ovTop'), bot = V.querySelector('#ovBot');
+      const capHtml = ed.cap ? `<span class="cap2">${esc(ed.cap)}</span>` : '', lblHtml = ed.label ? `<span class="lbl">${esc(ed.label.toUpperCase())}</span>` : '';
+      top.innerHTML = lblHtml + (ed.capPos === 'top' ? capHtml : ''); top.hidden = !top.innerHTML;
+      bot.innerHTML = ed.capPos === 'bottom' ? capHtml : ''; bot.hidden = !bot.innerHTML;
+      V.querySelector('#ovTag').hidden = !ed.tag;
+      const w = V.querySelector('#smw'); w.hidden = !ed.slowLen;
+      if (ed.slowLen) { const sa = V.querySelector('#sma'); sa.min = att.start; sa.max = Math.max(att.start, att.end - ed.slowLen); if (ed.slowAt < att.start || ed.slowAt > +sa.max) ed.slowAt = att.start + Math.max(0, (att.end - att.start - ed.slowLen) / 2); sa.value = ed.slowAt; V.querySelector('#smt').textContent = mmss(ed.slowAt); }
+    };
+    const chips = (sel, key, attr, num) => V.querySelector(sel).onclick = e => { const b = e.target.closest(`[${attr}]`); if (!b) return; V.querySelectorAll(`${sel} .chip`).forEach(x => x.classList.toggle('on', x === b)); ed[key] = num ? +b.getAttribute(attr) : b.getAttribute(attr); if (key === 'slowLen') ed.slowAt = -1; if (key === 'slowLen' && ed.slowLen > att.end - att.start - 0.6) { ed.slowLen = 0; toast('Clip is too short for that much slow-mo.'); V.querySelectorAll(`${sel} .chip`).forEach((x, i) => x.classList.toggle('on', i === 0)); } paint(); };
+    chips('#lk', 'look', 'data-lk'); chips('#sm', 'slowLen', 'data-sm', true); chips('#cps', 'capPos', 'data-cp');
+    V.querySelector('#ebr').oninput = e => { ed.bright = +e.target.value; paint(); };
+    V.querySelector('#eco').oninput = e => { ed.contrast = +e.target.value; paint(); };
+    V.querySelector('#sma').oninput = e => { ed.slowAt = +e.target.value; paint(); seek(ed.slowAt); };
+    V.querySelector('#ecap').oninput = e => { ed.cap = e.target.value.trim(); paint(); };
+    V.querySelector('#epl').onchange = e => { ed.label = e.target.value; paint(); };
+    V.querySelector('#etag').onchange = e => { ed.tag = e.target.checked; paint(); };
+    V.querySelector('#tpv2').onclick = () => {
+      v.currentTime = att.start; stopAt = att.end; v.muted = false; v.playbackRate = 1; v.play().catch(() => {});
+      const sb = V.querySelector('#slowB');
+      v.ontimeupdate = () => { const inSlow = ed.slowLen && v.currentTime >= ed.slowAt && v.currentTime < ed.slowAt + ed.slowLen; v.playbackRate = inSlow ? 0.5 : 1; sb.hidden = !inSlow; if (v.paused) { v.playbackRate = 1; sb.hidden = true; } };
+    };
+    paint();
+  }
+  const edited = ed => ed && (ed.look !== 'none' || ed.bright || ed.contrast !== 1 || ed.slowLen || ed.cap || ed.label || ed.tag);
+  // Text overlays drawn as images (Jamoja fonts), stamped onto the video.
+  async function overlayPngs(ed) {
+    try { await Promise.all([document.fonts.load('64px "Bebas Neue"'), document.fonts.load('700 30px Inter')]); } catch (e) { /* fallback fonts */ }
+    const mk = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/png')); };
+    const fit = (x, t, max) => { while (x.measureText(t).width > max && t.length > 3) t = t.slice(0, -2) + '…'; return t; };
+    const out = [];
+    if (ed.label) out.push({ pos: 'top', png: await mk(480, 72, (x, w, h) => { x.font = '56px "Bebas Neue", Impact, sans-serif'; const t = fit(x, ed.label.toUpperCase(), w - 40); const tw = x.measureText(t).width + 36; x.fillStyle = '#ff5a1f'; x.beginPath(); (x.roundRect ? x.roundRect((w - tw) / 2, 4, tw, h - 8, 12) : x.rect((w - tw) / 2, 4, tw, h - 8)); x.fill(); x.fillStyle = '#0a0a0b'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t, w / 2, h / 2 + 3); }) });
+    if (ed.cap) out.push({ pos: ed.label && ed.capPos === 'top' ? 'bottom' : ed.capPos, png: await mk(500, 64, (x, w, h) => { x.font = '700 30px Inter, Arial, sans-serif'; const t = fit(x, ed.cap, w - 40); const tw = x.measureText(t).width + 32; x.fillStyle = 'rgba(0,0,0,0.6)'; x.beginPath(); (x.roundRect ? x.roundRect((w - tw) / 2, 6, tw, h - 12, 12) : x.rect((w - tw) / 2, 6, tw, h - 12)); x.fill(); x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t, w / 2, h / 2 + 1); }) });
+    if (ed.tag) out.push({ pos: 'tag', png: await watermark('@' + MYP.handle, ed.label) });
+    return out;
   }
   V.querySelector('#ph').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) { att = { kind: 'photo', file: f, url: URL.createObjectURL(f) }; showAtt(); } };
   V.querySelector('#vd').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) { att = { kind: 'video', file: f, url: URL.createObjectURL(f) }; showAtt(); } };
@@ -362,8 +417,15 @@ async function composer() {
         busy = true; R.keepAwake(true);
         pm.textContent = 'Getting your video ready. Keep this screen open.';
         const src = await E.analyze(att.file);
-        const s0 = att.dur ? att.start : 0, e0 = att.dur ? att.end : Math.min(src.dur || 60, 60);
-        const c = await E.cut(src, s0, Math.min(e0, s0 + 60), p => { pb.style.width = (p * 90) + '%'; }, att.dur ? att.cover : null);
+        const s0 = att.dur ? att.start : 0, e0 = Math.min(att.dur ? att.end : Math.min(src.dur || 60, 60), s0 + 60);
+        const onP = p => { pb.style.width = (p * 90) + '%'; };
+        let c;
+        if (edited(att.ed)) {
+          pm.textContent = 'Applying your edits. This can take 15 to 60 seconds. Keep this screen open.';
+          const ed = att.ed;
+          c = await E.edit(src, { start: s0, end: e0, cover: att.dur ? att.cover : s0 + 1, look: ed.look, bright: ed.bright, contrast: ed.contrast,
+            slow: ed.slowLen ? { a: Math.max(0.3, ed.slowAt - s0), b: Math.min(e0 - s0 - 0.3, ed.slowAt - s0 + ed.slowLen) } : null, overlays: await overlayPngs(ed) }, onP);
+        } else c = await E.cut(src, s0, e0, onP, att.dur ? att.cover : null);
         await E.close(src);
         pm.textContent = 'Uploading…';
         await storage.upload(key + '.mp4', c.video, 'video/mp4'); await storage.upload(key + '-p.jpg', c.poster, 'image/jpeg');

@@ -141,13 +141,23 @@ textarea.ta{width:100%;height:auto;min-height:90px;padding:10px 12px;line-height
 .trim{margin-top:6px}.trim .tl{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .trim input[type=range]{width:100%;accent-color:var(--o);height:32px}
 .cov{display:flex;gap:12px;align-items:center;margin-top:8px}.cov canvas{width:80px;height:100px;border-radius:10px;background:#000;border:2px solid var(--o);flex:none}.cov input{flex:1}
+.ved{position:relative}.ved video{margin:8px 0}
+.ovl{position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;padding:0 8px}
+.ovl.top{top:22px}.ovl.bot{bottom:52px}.ovl.tag{left:10px;right:auto;bottom:18px;align-items:flex-start;background:#0009;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:600;display:block}.ovl.tag b{color:var(--o);font-family:var(--hd);font-size:16px;font-weight:400}
+.ovl[hidden]{display:none!important}
+.lbl{background:var(--o);color:#0a0a0b;font:28px/1 var(--hd);padding:6px 12px 3px;border-radius:8px}
+.cap2{background:#0009;color:#fff;font-weight:700;font-size:15px;padding:6px 12px;border-radius:8px;max-width:100%;text-align:center}
+.slowb{position:absolute;top:12px;right:12px;background:var(--o);color:#0a0a0b;font:18px var(--hd);padding:4px 8px 2px;border-radius:6px}
+.chips{flex-wrap:wrap;gap:6px}.chips .chip{min-height:36px}
+.trim input[type=range]{width:100%}
+.chk{display:flex;gap:10px;align-items:center;font-weight:600}.chk input{width:22px;height:22px;accent-color:var(--o)}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261125n"></script>
-<script type="module" src="app.js?v=20261125n"></script>
+<script src="vendor/supabase.js?v=20261126b"></script>
+<script type="module" src="app.js?v=20261126b"></script>
 </body>
 </html>

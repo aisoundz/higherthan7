@@ -119,3 +119,56 @@ export async function brand(videoBlob, png, onProgress) {
   for (const p of [inp, wm, out]) { try { await f.deleteFile(p); } catch (e) { /* gone */ } }
   return new Blob([data], { type: 'video/mp4' });
 }
+
+// Quick Edit: trim, look, brightness/contrast, slow-mo window, text overlays, in one pass.
+// opts: {start, end, cover, look, bright, contrast, slow: {a, b} (seconds inside the clip) | null, overlays: [{png, pos}]}
+export const LOOKS = {
+  none: '',
+  gameday: 'eq=contrast=1.15:saturation=1.35:brightness=0.02',
+  punchy: 'eq=contrast=1.3:saturation=1.2,unsharp=5:5:0.8',
+  bw: 'hue=s=0,eq=contrast=1.2',
+  vintage: 'curves=preset=vintage',
+  night: 'eq=brightness=0.08:gamma=1.3:saturation=1.1',
+};
+export async function edit(src, o, onProgress) {
+  const f = await ensure();
+  const id = ++seq, out = `/e${id}.mp4`, pos = `/q${id}.jpg`;
+  const D = Math.max(1, o.end - o.start);
+  const scale = "scale='if(gt(iw,ih),-2,540)':'if(gt(iw,ih),540,-2)'";
+  const fx = [LOOKS[o.look] || '', (o.bright || o.contrast !== 1) ? `eq=brightness=${(o.bright || 0).toFixed(3)}:contrast=${(o.contrast || 1).toFixed(3)}` : ''].filter(Boolean).join(',');
+  const aud = !!src.hasAudio;
+  const g = [`[0:v]${scale},fps=30,setsar=1${fx ? ',' + fx : ''}[b]`];
+  let v = 'b', a = aud ? '0:a' : null, outDur = D;
+  if (o.slow) {
+    const s1 = o.slow.a.toFixed(2), s2 = o.slow.b.toFixed(2);
+    g.push(`[b]split=3[v1][v2][v3]`, `[v1]trim=0:${s1},setpts=PTS-STARTPTS[p1]`, `[v2]trim=${s1}:${s2},setpts=2*(PTS-STARTPTS)[p2]`, `[v3]trim=start=${s2},setpts=PTS-STARTPTS[p3]`);
+    if (aud) {
+      g.push(`[0:a]aresample=44100,asplit=3[a1][a2][a3]`, `[a1]atrim=0:${s1},asetpts=PTS-STARTPTS[q1]`, `[a2]atrim=${s1}:${s2},asetpts=PTS-STARTPTS,atempo=0.5[q2]`, `[a3]atrim=start=${s2},asetpts=PTS-STARTPTS[q3]`, `[p1][q1][p2][q2][p3][q3]concat=n=3:v=1:a=1[vc][ac]`);
+      a = '[ac]';
+    } else g.push(`[p1][p2][p3]concat=n=3:v=1:a=0[vc]`);
+    v = 'vc'; outDur = D + (o.slow.b - o.slow.a);
+  }
+  const ins = [];
+  (o.overlays || []).forEach((ov, i) => {
+    const y = ov.pos === 'top' ? '48' : ov.pos === 'tag' ? 'main_h-overlay_h-24' : 'main_h-overlay_h-110';
+    const x = ov.pos === 'tag' ? '16' : '(main_w-overlay_w)/2';
+    g.push(`[${v}][${i + 1}:v]overlay=${x}:${y}[o${i}]`); v = `o${i}`;
+  });
+  for (let i = 0; i < (o.overlays || []).length; i++) { const p = `/t${id}_${i}.png`; await f.writeFile(p, new Uint8Array(o.overlays[i].png)); ins.push('-i', p); }
+  const prog = ({ progress }) => onProgress && onProgress(Math.max(0, Math.min(1, progress)));
+  f.on('progress', prog);
+  try {
+    const args = ['-ss', o.start.toFixed(2), '-t', D.toFixed(2), '-i', src.inp, ...ins, '-filter_complex', g.join(';'), '-map', `[${v}]`];
+    if (a) args.push('-map', a.startsWith('[') ? a : '0:a?', '-c:a', 'aac', '-b:a', '96k', '-ac', '2');
+    args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out);
+    const rc = await f.exec(args);
+    if (rc) throw new Error('Editing failed on this video. Try without slow-mo or a look.');
+  } finally { f.off('progress', prog); }
+  // Cover time inside the edited clip
+  let c = Math.max(0, (o.cover ?? o.start) - o.start);
+  if (o.slow) { if (c > o.slow.b) c += o.slow.b - o.slow.a; else if (c > o.slow.a) c = o.slow.a + 2 * (c - o.slow.a); }
+  await f.exec(['-ss', Math.min(c, outDur - 0.1).toFixed(2), '-i', out, '-frames:v', '1', '-q:v', '5', pos]);
+  const video = await f.readFile(out), poster = await f.readFile(pos);
+  for (const p of [out, pos, ...ins.filter(x => x !== '-i')]) { try { await f.deleteFile(p); } catch (e) { /* gone */ } }
+  return { video, poster, dur: outDur };
+}
