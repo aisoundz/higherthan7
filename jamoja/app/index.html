@@ -66,6 +66,21 @@ input.t,select.t{width:100%;height:48px;border-radius:12px;background:var(--p2);
 .toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top));z-index:50;background:#fff;color:#0a0a0b;border-radius:14px;padding:12px 16px;font-weight:600;font-size:14px;max-width:min(92vw,520px);box-shadow:0 10px 30px #000a}
 .err{background:#ef444422;border:1px solid #ef4444;border-radius:12px;padding:10px 12px;font-size:14px;margin:10px 0}
 .foot{text-align:center;color:var(--mu);font-size:12px;margin-top:30px}
+.rec{position:fixed;inset:0;z-index:100;background:#000;color:#fff}
+.rec video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.rtop{position:relative;display:flex;gap:8px;align-items:center;padding:calc(12px + env(safe-area-inset-top)) 16px 8px;background:linear-gradient(#000a,#0000);font:600 20px var(--num)}
+.rdot{width:12px;height:12px;border-radius:50%;background:#ef4444;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.3}}
+.rhint{position:relative;margin:4px 16px;background:#000b;border-radius:12px;padding:10px 12px;font-size:14px}
+.rflash{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);background:var(--o);color:#0a0a0b;font:30px var(--hd);padding:10px 18px;border-radius:12px;opacity:0;pointer-events:none}
+.rflash.on{animation:fl .9s ease-out}
+@keyframes fl{0%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}100%{opacity:0;transform:translate(-50%,-80%)}}
+.rbot{position:absolute;left:0;right:0;bottom:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:12px;background:linear-gradient(#0000,#000d)}
+.rbot .mu{color:#ddd}
+.bucket{width:156px;height:156px;border-radius:50%;border:6px solid #fff;background:var(--o);color:#0a0a0b;font:36px/1 var(--hd);letter-spacing:1px;padding:0;white-space:nowrap;overflow:hidden;box-shadow:0 8px 30px #000a;touch-action:manipulation}
+.bucket:active{transform:scale(.93)}
+.bucket:disabled{opacity:.5}
+@media(prefers-reduced-motion:reduce){.rdot{animation:none}.rflash.on{animation:none;opacity:1}}
 </style>
 </head>
 <body>
