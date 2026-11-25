@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125j';
-import * as R from './rec.js?v=20261125j';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125j';
+import * as E from './engine.js?v=20261125k';
+import * as R from './rec.js?v=20261125k';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125k';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -149,7 +149,7 @@ let FEED_SPORT = '', FEED_TAB = 'all';
 async function home() {
   const parts = ME ? await R.savedParts() : [];
   const top = !ME
-    ? `${inAppCard()}<section class="hero"><h1>Every game. Seen.</h1><p>The social network for athletes. Post your work, film your runs, and Jamoja cuts the highlights and puts them on your profile.</p>
+    ? `${inAppCard()}<section class="hero"><h1>Where athletes get seen.</h1><p>The social network for athletes. Post your work, film your runs, and Jamoja cuts the highlights and puts them on your profile.</p>
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
