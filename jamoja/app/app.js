@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261125l';
-import * as R from './rec.js?v=20261125l';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125l';
+import * as E from './engine.js?v=20261125n';
+import * as R from './rec.js?v=20261125n';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261125n';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -305,10 +305,44 @@ async function composer() {
     if (!att) { attEl.innerHTML = ''; return; }
     const x = `<button class="lnkb" id="rm" type="button">Remove</button>`;
     if (att.kind === 'photo') attEl.innerHTML = `<img class="pm" src="${att.url}" alt="">${x}`;
-    else if (att.kind === 'video') attEl.innerHTML = `<video class="pm" src="${att.url}#t=0.1" controls playsinline preload="metadata"></video><p class="mu">Videos are trimmed to the first 60 seconds.</p>${x}`;
+    else if (att.kind === 'video') { attEl.innerHTML = `<video class="pm" id="ve" src="${att.url}#t=0.1" playsinline muted preload="auto"></video>
+      <div class="trim" id="tr2" hidden><div class="tl"><b>Trim</b><span class="mu" id="tl"></span></div>
+        <label class="f" for="tst">Start <span id="ts"></span></label><input type="range" id="tst" min="0" step="0.1">
+        <label class="f" for="ten">End <span id="te"></span></label><input type="range" id="ten" min="0" step="0.1">
+        <button class="btn s g" id="tpv" type="button" style="margin-top:8px">▶ Preview clip</button>
+        <div class="tl" style="margin-top:16px"><b>Cover</b><span class="mu">Slide to pick the thumbnail</span></div>
+        <div class="cov"><canvas id="cvp" width="160" height="200"></canvas><input type="range" id="tcv" min="0" step="0.1" aria-label="Cover frame"></div></div>
+      <p class="mu" id="tw">Loading your video…</p>${x}`; editVideo(); }
     else attEl.innerHTML = `<img class="pm" src="https://i.ytimg.com/vi/${att.yt}/hqdefault.jpg" alt="">${x}`;
     V.querySelector('#rm').onclick = () => { att = null; showAtt(); };
   };
+  function editVideo() {
+    const v = V.querySelector('#ve'), st = V.querySelector('#tst'), en = V.querySelector('#ten'), cv = V.querySelector('#tcv'), cvs = V.querySelector('#cvp');
+    let stopAt = 0, drawCover = false;
+    const label = () => {
+      V.querySelector('#ts').textContent = mmss(att.start); V.querySelector('#te').textContent = mmss(att.end);
+      V.querySelector('#tl').textContent = `${mmss(att.start)} to ${mmss(att.end)} · ${Math.round(att.end - att.start)}s (max 60s)`;
+      cv.min = att.start; cv.max = att.end; if (att.cover < att.start || att.cover > att.end) att.cover = Math.min(att.end, att.start + 1); cv.value = att.cover;
+    };
+    const paintCover = () => { try { const k = Math.max(cvs.width / v.videoWidth, cvs.height / v.videoHeight), w = v.videoWidth * k, h = v.videoHeight * k; const c = cvs.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, cvs.width, cvs.height); c.drawImage(v, (cvs.width - w) / 2, (cvs.height - h) / 2, w, h); } catch (e) { /* frame not ready */ } };
+    const seek = t => { v.pause(); stopAt = 0; v.currentTime = t; };
+    v.addEventListener('seeked', () => { if (drawCover) { drawCover = false; paintCover(); } });
+    v.addEventListener('timeupdate', () => { if (stopAt && v.currentTime >= stopAt) { v.pause(); stopAt = 0; } });
+    const ready = () => {
+      const d = v.duration; if (!isFinite(d) || !d) return;
+      att.dur = d; att.start = att.start ?? 0; att.end = att.end ?? Math.min(d, 60); att.cover = att.cover ?? Math.min(att.end, 1);
+      for (const r of [st, en]) r.max = d.toFixed(1);
+      st.value = att.start; en.value = att.end; label();
+      V.querySelector('#tr2').hidden = false; V.querySelector('#tw').textContent = d > 60 ? 'Long video: pick the best 60 seconds.' : '';
+      drawCover = true; seek(att.cover);
+    };
+    v.addEventListener('loadedmetadata', ready); if (v.readyState >= 1) ready();
+    setTimeout(() => { if (!att || att.kind !== 'video' || att.dur) return; V.querySelector('#tw').textContent = 'Preview is not available for this video on this phone. The first 60 seconds will be posted.'; }, 6000);
+    st.oninput = () => { att.start = Math.min(+st.value, att.dur - 1); if (att.end - att.start > 60) att.end = att.start + 60; if (att.end < att.start + 1) att.end = Math.min(att.dur, att.start + 1); st.value = att.start; en.value = att.end; label(); seek(att.start); };
+    en.oninput = () => { att.end = Math.max(+en.value, 1); if (att.end - att.start > 60) att.start = att.end - 60; if (att.end < att.start + 1) att.start = Math.max(0, att.end - 1); st.value = att.start; en.value = att.end; label(); seek(att.end); };
+    cv.oninput = () => { att.cover = +cv.value; drawCover = true; seek(att.cover); };
+    V.querySelector('#tpv').onclick = () => { v.currentTime = att.start; stopAt = att.end; v.muted = false; v.play().catch(() => {}); };
+  }
   V.querySelector('#ph').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) { att = { kind: 'photo', file: f, url: URL.createObjectURL(f) }; showAtt(); } };
   V.querySelector('#vd').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) { att = { kind: 'video', file: f, url: URL.createObjectURL(f) }; showAtt(); } };
   V.querySelector('#ytb').onclick = () => {
@@ -328,7 +362,8 @@ async function composer() {
         busy = true; R.keepAwake(true);
         pm.textContent = 'Getting your video ready. Keep this screen open.';
         const src = await E.analyze(att.file);
-        const c = await E.cut(src, 0, Math.min(src.dur || 60, 60), p => { pb.style.width = (p * 90) + '%'; });
+        const s0 = att.dur ? att.start : 0, e0 = att.dur ? att.end : Math.min(src.dur || 60, 60);
+        const c = await E.cut(src, s0, Math.min(e0, s0 + 60), p => { pb.style.width = (p * 90) + '%'; }, att.dur ? att.cover : null);
         await E.close(src);
         pm.textContent = 'Uploading…';
         await storage.upload(key + '.mp4', c.video, 'video/mp4'); await storage.upload(key + '-p.jpg', c.poster, 'image/jpeg');
@@ -481,7 +516,20 @@ function setup() {
   sp.onchange = () => { ps.placeholder = POS[sp.value] || ''; };
   showH();
   let avBytes = null, avSrc = p.avatar ? storage.url(p.avatar) : null;
-  const setAv = bytes => { avBytes = bytes; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }))}" alt="" style="width:72px;height:72px">`; document.querySelector('label[for=avf]').textContent = 'Change photo'; document.getElementById('avadj').hidden = false; document.getElementById('avh').textContent = 'Looks good. Tap Save profile at the bottom to keep it.'; };
+  const setAv = bytes => { avBytes = bytes; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }))}" alt="" style="width:72px;height:72px">`; document.querySelector('label[for=avf]').textContent = 'Change photo'; document.getElementById('avadj').hidden = false; document.getElementById('avh').textContent = MYP ? 'Saving your photo…' : 'Looks good. Tap Save profile at the bottom to keep it.'; if (MYP) savePhotoNow(); };
+  // Existing profiles: save the photo right away so it never depends on the button at the bottom.
+  async function savePhotoNow() {
+    const h = document.getElementById('avh');
+    try {
+      const k = `${ME.id}/avatar-${Date.now()}.jpg`;
+      await storage.upload(k, avBytes, 'image/jpeg');
+      const old = MYP.avatar;
+      MYP = await profiles.save({ id: ME.id, name: MYP.name, handle: MYP.handle, avatar: k });
+      if (old) storage.remove([old]).catch(() => {});
+      p.avatar = k; avBytes = null; avSrc = storage.url(k); topbar();
+      h.textContent = 'Photo saved.'; toast('Profile photo saved.');
+    } catch (err) { console.error(err); h.innerHTML = `<span class="err" style="display:block">Photo did not save: ${esc(err.message)}. Try again.</span>`; toast('Photo did not save. ' + err.message); }
+  }
   document.getElementById('avf').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; avSrc = f; const b2 = await cropPhoto(f); if (b2) setAv(b2); };
   document.getElementById('avadj').onclick = async () => { if (!avSrc) return; const b2 = await cropPhoto(avSrc); if (b2) setAv(b2); };
   document.getElementById('pf').onsubmit = async e => {
@@ -494,7 +542,7 @@ function setup() {
       if (avBytes) { const k = `${ME.id}/avatar-${Date.now()}.jpg`; await storage.upload(k, avBytes, 'image/jpeg'); if (p.avatar) storage.remove([p.avatar]).catch(() => {}); av = k; }
       MYP = await profiles.save({ id: ME.id, name: nm.value.trim(), handle, sport: document.getElementById('sp').value, position: document.getElementById('ps').value.trim(), city: document.getElementById('ct').value.trim(), level: document.getElementById('lv').value || null, bio: document.getElementById('bi').value.trim() || null, avatar: av });
       toast('Profile saved.'); go(next);
-    } catch (err) { const sv = e.target.querySelector('button.w'); sv.disabled = false; sv.textContent = 'Save profile'; document.getElementById('pe').innerHTML = `<div class="err">${esc(/duplicate|unique/i.test(err.message) ? 'That handle is taken. Try another.' : err.message)}</div>`; }
+    } catch (err) { const sv = e.target.querySelector('button.w'); sv.disabled = false; sv.textContent = 'Save profile'; document.getElementById('pe').innerHTML = `<div class="err">${esc(/duplicate|unique/i.test(err.message) ? 'That handle is taken. Try another.' : err.message)}</div>`; toast(err.message); }
   };
 }
 

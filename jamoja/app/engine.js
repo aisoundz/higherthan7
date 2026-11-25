@@ -77,7 +77,7 @@ export async function analyze(file) {
 }
 
 // Cut one moment into a phone-friendly clip plus a poster image.
-export async function cut(src, start, end, onProgress) {
+export async function cut(src, start, end, onProgress, posterAt) {
   const f = await ensure();
   const d = Math.max(1, end - start);
   const id = ++seq;
@@ -92,7 +92,7 @@ export async function cut(src, start, end, onProgress) {
   args.push('-movflags', '+faststart', out);
   await f.exec(args);
   f.off('progress', prog);
-  await f.exec(['-ss', (start + d * 0.6).toFixed(2), '-i', src.inp, '-frames:v', '1', '-vf', scale, '-q:v', '5', pos]);
+  await f.exec(['-ss', (posterAt != null ? Math.max(0, posterAt) : start + d * 0.6).toFixed(2), '-i', src.inp, '-frames:v', '1', '-vf', scale, '-q:v', '5', pos]);
   const video = await f.readFile(out), poster = await f.readFile(pos);
   await f.deleteFile(out); await f.deleteFile(pos);
   return { video, poster, dur: d };
