@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126x';
-import * as R from './rec.js?v=20261126x';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126x';
+import * as E from './engine.js?v=20261126y';
+import * as R from './rec.js?v=20261126y';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126y';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126x';
+const APP_V = '20261126y';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -181,7 +181,7 @@ async function home() {
   const top = !ME
     ? `${inAppCard()}<section class="hero"><h1>Where athletes get seen.</h1><p>The social network for athletes and everyone who trains. Hoopers, lifters, runners, CrossFit. Post your work, film your games, and Jamoja cuts the highlights for you.</p>
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
-    : `${parts.length ? `<div class="card" id="savedrec" style="border-color:var(--o)"><b>Your recording is saved</b><br><span class="mu">${mmss(parts.reduce((x, p) => x + (p.dur || 0), 0))} of video on this phone${parts.reduce((x, p) => x + (p.marks || []).length, 0) ? `, ${parts.reduce((x, p) => x + (p.marks || []).length, 0)} plays marked` : ''}. Turn it into highlights, or delete it.</span><div class="row" style="margin-top:10px"><a class="btn s" href="#/new">Make highlights</a><button class="btn s g" id="delrec">Delete</button></div></div>` : ''}
+    : `${parts.length ? `<div class="card" id="savedrec" style="border-color:var(--o)"><b>Your recording is saved</b><br><span class="mu">${mmss(parts.reduce((x, p) => x + (p.dur || 0), 0))} of video on this phone${parts.reduce((x, p) => x + (p.marks || []).length, 0) ? `, ${parts.reduce((x, p) => x + (p.marks || []).length, 0)} plays marked` : ''}. Turn it into highlights, or delete it.</span><div class="row" style="margin-top:10px"><a class="btn s" href="#/new?auto=1">Make highlights</a><button class="btn s g" id="delrec">Delete</button></div></div>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
   V.innerHTML = `${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
     <div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
@@ -1070,15 +1070,25 @@ async function newGame() {
     const r = await R.record({ title: existing ? existing.title : (document.getElementById('gt') || {}).value });
     if (!r) return;
     if (!r.parts.length) return toast('Nothing was recorded.');
-    toast('Recording saved. Finding your plays…');
-    await useParts(r.parts);
+    toast('Recording saved. Making your highlights…');
+    await useParts(r.parts); autoMake();
   };
   const rcv = document.getElementById('rcv');
-  if (rcv) rcv.onclick = async () => { document.getElementById('recov').remove(); await useParts(saved); };
+  if (rcv) rcv.onclick = async () => { document.getElementById('recov').remove(); await useParts(saved); autoMake(); };
+  // Highlights from your own recording happen on their own: BUCKET taps (or the loudest moments) are cut right away.
+  function autoMake() {
+    if (!srcs.some(s => s.moments.some(m => m.on))) { toast('No plays found in that recording. Scrub to a play and add it.'); return; }
+    if (!existing && !document.getElementById('gt').value.trim()) document.getElementById('gt').value = 'Run ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const n = srcs.reduce((a, s) => a + s.moments.filter(m => m.on).length, 0);
+    const go2 = document.getElementById('go'); go2.insertAdjacentHTML('afterbegin', `<div class="card" style="border-color:var(--o)"><b>Making ${n} highlight${n > 1 ? 's' : ''} for you</b><p class="mu" style="margin:4px 0 0">Keep this screen open. You can delete any clip you don't like on the game page.</p></div>`);
+    go2.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => document.getElementById('mk').click(), 0);
+  }
+  if (qs().get('auto') && saved.length && !existing) { document.getElementById('recov') && document.getElementById('recov').remove(); await useParts(saved); autoMake(); }
   const rdel = document.getElementById('rdel');
   if (rdel) rdel.onclick = async () => { if (!confirmIn(rdel)) return; await R.clearParts(saved.map(p => p.id)); document.getElementById('recov').remove(); toast('Recording deleted.'); };
   document.getElementById('fi').onchange = async e => { const files = [...e.target.files]; e.target.value = ''; for (const f of files) await addSource(f); };
-  if (window.PENDING_SRC && existing) { const pend = window.PENDING_SRC; window.PENDING_SRC = null; for (const p of pend) await addSource(new File([p.blob], p.name, { type: p.type }), p); document.getElementById('go').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  if (window.PENDING_SRC && existing) { const pend = window.PENDING_SRC; window.PENDING_SRC = null; for (const p of pend) await addSource(new File([p.blob], p.name, { type: p.type }), p); autoMake(); }
 
   document.getElementById('mk').onclick = async () => {
     const jobs = srcs.flatMap(s => s.moments.filter(m => m.on).map(m => ({ s, m })));
