@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126g';
-import * as R from './rec.js?v=20261126g';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126g';
+import * as E from './engine.js?v=20261126h';
+import * as R from './rec.js?v=20261126h';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126h';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -745,11 +745,12 @@ async function newGame() {
   const srcs = [];
   const recParts = new Set();
   const saved = await R.savedParts();
-  V.innerHTML = `${inAppCard()}<h1>${existing ? 'Add clips' : 'New game'}</h1>
+  V.innerHTML = `${inAppCard()}<h1>${existing ? 'Film or add clips' : 'New game'}</h1>
     ${existing ? `<p class="mu">Adding to <b>${esc(existing.title)}</b></p>` : `<div class="card"><label class="f" for="gt" style="margin-top:0">Game name</label><input class="t" id="gt" value="Saturday Run">
       <label class="f" for="gs">Sport</label><select class="t" id="gs">${SPORTS.map(s => `<option ${MYP.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       <label class="f" for="gp">Where</label><input class="t" id="gp" value="${esc(MYP.city || '')}" placeholder="Court or field, city">
-      <label class="f" for="gd">Date</label><input class="t" id="gd" type="date" value="${today()}"></div>`}
+      <label class="f" for="gd">Date</label><input class="t" id="gd" type="date" value="${today()}">
+      <button class="btn w g" id="sv" style="margin-top:14px">Save game, film later</button><p class="mu" style="margin:6px 0 0;font-size:13px">Set it up now. When the game starts, open it and tap Film this game.</p></div>`}
     ${saved.length ? `<div class="card" style="border-color:var(--o)" id="recov"><b>Unfinished recording found</b><p class="mu" style="margin:4px 0 10px">${saved.length} part${saved.length > 1 ? 's' : ''} (${mmss(saved.reduce((a, p) => a + p.dur, 0))}) saved on this phone, with ${(n => n + (n === 1 ? ' play' : ' plays'))(saved.reduce((a, p) => a + p.marks.length, 0))} marked.</p><div class="row"><button class="btn s" id="rcv">Use it</button><button class="btn s g" id="rdel">Delete it</button></div></div>` : ''}
     <div class="card"><b>Add your game</b><p class="mu" style="margin:4px 0 12px">Film right here and tap BUCKET after big plays, or upload clips you already shot.</p>
       ${R.supported() ? `<button class="btn w" id="film" style="min-height:56px;font-size:18px">● Film in Jamoja</button>` : ''}
@@ -793,7 +794,7 @@ async function newGame() {
     const msg = taps ? `${taps} play${taps > 1 ? 's' : ''} from your BUCKET taps.${n > taps ? ' Crowd-noise moments are listed too, unchecked.' : ''}`
       : n ? (s.quiet ? `Not much crowd noise in this clip, so these picks are rough. Check them with Preview, or scrub to a play and add it.` : `Found ${n} big moment${n > 1 ? 's' : ''}. Uncheck any you don't want.`)
       : s.hasAudio ? 'No big moments found. Scrub to a play and add it below.' : 'This clip has no sound. Scrub to a play and add it below.';
-    card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(s.file.name)}</b><span class="mu">${mmss(s.dur)}</span></div>
+    card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(s.file.name)}</b><span class="mu">${mmss(s.dur)} <button class="lnkb" data-rmsrc type="button">Remove</button></span></div>
       <video class="pv" src="${s.url}" playsinline controls preload="metadata"></video>
       <p class="mu" style="margin:0 0 4px">${msg}</p>
       <div class="moms">${s.moments.map((m, i) => `<div class="mom"><input type="checkbox" data-i="${i}" ${m.on ? 'checked' : ''} aria-label="Use moment ${i + 1}"><span><span class="tm">${mmss(m.start)} to ${mmss(m.end)}</span>${m.src === 'tap' ? ' <span class="chip" style="padding:2px 8px;font-size:12px">tap</span>' : ''}<br><button class="btn s g" data-pv="${i}" type="button">Preview</button></span><span class="row"><button class="btn s g" data-sh="${i}" data-d="-2" type="button" aria-label="Earlier">−2s</button><button class="btn s g" data-sh="${i}" data-d="2" type="button" aria-label="Later">+2s</button></span></div>`).join('')}</div>
@@ -801,6 +802,12 @@ async function newGame() {
     const vid = card.querySelector('video');
     let stopAt = 0; vid.ontimeupdate = () => { if (stopAt && vid.currentTime >= stopAt) { vid.pause(); stopAt = 0; } };
     card.onclick = ev => {
+      if (ev.target.closest('[data-rmsrc]')) {
+        const i = srcs.indexOf(s); if (i >= 0) srcs.splice(i, 1);
+        E.close(s).catch(() => {}); URL.revokeObjectURL(s.url);
+        if (s.partId) { R.clearParts([s.partId]); recParts.delete(s.partId); }
+        card.remove(); showGo(); toast('Video removed.'); return;
+      }
       const b = ev.target.closest('[data-pv],[data-sh],[data-add]'); if (!b) return;
       if (b.dataset.pv) { const m = s.moments[+b.dataset.pv]; vid.currentTime = m.start; stopAt = m.end; vid.play().catch(() => {}); }
       else if (b.dataset.sh) { const m = s.moments[+b.dataset.sh], d = +b.dataset.d; const len = m.end - m.start; m.start = Math.max(0, Math.min(Math.max(0, (s.dur || m.end) - len), m.start + d)); m.end = m.start + len; drawSrc(card, s); }
@@ -812,8 +819,16 @@ async function newGame() {
     for (const p of parts) { recParts.add(p.id); await addSource(new File([p.blob], p.name, { type: p.type }), p); }
   }
   const film = document.getElementById('film');
+  const sv = document.getElementById('sv');
+  if (sv) sv.onclick = async () => {
+    sv.disabled = true; sv.textContent = 'Saving…';
+    try {
+      const g = await games.create({ owner_id: ME.id, title: document.getElementById('gt').value.trim() || 'Saturday Run', sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: document.getElementById('gd').value || today() });
+      toast('Game saved. Open it when it is time to film.'); go('#/g/' + g.id);
+    } catch (err) { sv.disabled = false; sv.textContent = 'Save game, film later'; toast(err.message); }
+  };
   if (film) film.onclick = async () => {
-    const r = await R.record();
+    const r = await R.record({ title: existing ? existing.title : (document.getElementById('gt') || {}).value });
     if (!r) return;
     if (!r.parts.length) return toast('Nothing was recorded.');
     toast('Recording saved. Finding your plays…');
@@ -897,7 +912,7 @@ async function gamePage(id) {
       ${own ? `<select data-hp="${h.id}" aria-label="Player in ${esc(h.label)}"><option value="">Who is this?</option>${ps.map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
       <select data-pt="${h.id}" aria-label="Play type for ${esc(h.label)}"><option value="">What was the play?</option>${playsFor(g.sport).map(t => `<option ${h.play_type === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
       <div class="row" style="margin-top:6px">${LOCAL ? `<button class="btn s g" data-s1="${h.id}" style="flex:1">${canFiles ? 'Send' : 'Save'}</button>` : ''}${own ? `<button class="btn s g" data-hd="${h.id}" style="flex:1">Delete</button>` : ''}</div></div></div>`).join('')}</div>` : `<p class="mu">No highlights yet.</p>`}
-    ${own ? `<div class="row" style="margin-top:16px"><a class="btn g" href="#/new?game=${id}">+ Add more clips</a><button class="btn g" id="dg">Delete game</button></div>` : ''}
+    ${own ? `<a class="btn w" href="#/new?game=${id}" style="margin-top:16px;min-height:56px;font-size:18px">● ${hs.length ? 'Film more of this game' : 'Film this game'}</a><div class="row" style="margin-top:10px"><a class="btn g" href="#/new?game=${id}">+ Upload clips</a><button class="btn g" id="dg">Delete game</button></div>` : ''}
     ${LOCAL || ME ? '' : `<p class="foot">Want highlights from your games? <a href="#/login?mode=up">Create a free Jamoja account</a></p>`}`;
   const fileFor = async h => { const b = await storage.blob(h.path); return new File([b], `${g.title.replace(/[^\w]+/g, '-')}-${h.label.replace(/\s+/g, '-')}.mp4`, { type: 'video/mp4' }); };
   async function sendFiles(list) {
