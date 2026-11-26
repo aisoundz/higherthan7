@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127i';
-import * as R from './rec.js?v=20261127i';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127i';
+import * as E from './engine.js?v=20261127j';
+import * as R from './rec.js?v=20261127j';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127j';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127i';
+const APP_V = '20261127j';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -176,7 +176,7 @@ async function route() {
 window.addEventListener('hashchange', route);
 auth.onChange(ev => { if (ev === 'PASSWORD_RECOVERY') { RECOVERY = false; go('#/reset'); return; } refreshMe().then(topbar); });
 
-const gameList = list => `<div class="list">${list.map(g => `<a href="#/g/${g.id}"><span><b>${esc(g.title)}</b><br><span class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}</span></span><span class="mu">${esc(g.played_on || '')}</span></a>`).join('')}</div>`;
+const gameList = list => `<div class="list">${list.map(g => `<a href="#/g/${g.id}"><span><b>${esc(g.title)}</b><br><span class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}</span></span><span class="mu">${esc(g.starts_at ? whenLabel(g.starts_at) : g.played_on ? new Date(g.played_on + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '')}</span></a>`).join('')}</div>`;
 
 // ---------------- Home: the social feed
 let FEED_SPORT = '', FEED_TAB = 'all';
@@ -487,7 +487,7 @@ async function dmPage(handle) {
     <div id="dmopt" class="card" hidden></div>
     <div id="msgs" class="msgs"><p class="mu">Loading…</p></div>
     <form class="dmf" id="dmf"><textarea class="t" id="dmi" rows="1" maxlength="2000" placeholder="Message…" autocomplete="off" aria-label="Message"></textarea><button class="btn s">Send</button></form>`;
-  const box = V.querySelector('#msgs'); let last = '', first = true;
+  const box = V.querySelector('#msgs'); let last = null, first = true; // null so an empty chat still draws
   const draw = async () => {
     const list = await dms.thread(ME.id, other.id).catch(() => null); if (!list) return;
     const sig = list.map(m => m.id + (m.read_at ? 1 : 0)).join(); if (sig === last) return; last = sig;
@@ -745,7 +745,7 @@ function runReport(g, ps, hs) {
   const when = g.starts_at ? new Date(g.starts_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : (g.played_on || '');
   return `<div class="card report"><span class="mu" style="letter-spacing:.12em;font-size:12px">RUN REPORT</span>
     <div class="rp-h"><b>${esc(g.title)}</b><span class="mu">${g.place ? '📍 ' + courtLink(g.place) + ' · ' : ''}${esc(when)}</span></div>
-    <div class="rp-s"><div><b>${hs.length}</b><span>plays</span></div><div><b>${ps.length || '·'}</b><span>players</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>views</span></div></div>
+    <div class="rp-s"><div><b>${hs.length}</b><span>${hs.length === 1 ? 'play' : 'plays'}</span></div><div><b>${ps.length || '·'}</b><span>${ps.length === 1 ? 'player' : 'players'}</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>views</span></div></div>
     ${tline ? `<p class="mu" style="margin:8px 0 0">${tline}</p>` : ''}
     <p style="margin:10px 0 4px"><b>Top plays</b></p><div class="tiles rp-t">${top.map(h => `<span class="tile"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span class="tlab">${esc(h.play_type || h.label)}</span></span>`).join('')}</div></div>`;
 }
@@ -1533,7 +1533,7 @@ async function profilePage(handle) {
     </div>
     <div class="ph-btns">${me ? `<a class="btn s" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit card</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button><a class="btn s g" href="#/dm/${encodeURIComponent(p.handle)}">Message</a>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div>
     ${me && !LOCAL ? `<a class="scout" href="#/viewers"><span class="sc-n">${pv.length}</span><span><b>Who's watching</b><br><span class="mu">profile view${pv.length === 1 ? '' : 's'} in the last 30 days · see who →</span></span></a>` : ''}
-    ${nextRun ? `<a class="card pnext" href="#/g/${nextRun.id}"><span class="mu" style="font-size:12px;letter-spacing:.1em">NEXT RUN</span><b>${esc(nextRun.title)}</b><span class="mu">${esc(whenLabel(nextRun.starts_at))}${nextRun.place ? ' · ' + esc(nextRun.place) : ''}</span><span class="pn-go">${me ? 'Open · go live' : "I'm in →"}</span></a>` : ''}
+    ${nextRun ? `<a class="card pnext" href="#/g/${nextRun.id}"><span class="mu" style="font-size:12px;letter-spacing:.1em">${new Date(nextRun.starts_at) <= Date.now() ? 'PLAYING NOW' : 'NEXT RUN'}</span><b>${esc(nextRun.title)}</b><span class="mu">${esc(whenLabel(nextRun.starts_at))}${nextRun.place ? ' · ' + esc(nextRun.place) : ''}</span><span class="pn-go">${me ? 'Open · go live' : "I'm in →"}</span></a>` : ''}
     ${courts.length ? `<div class="pcourts">${courts.slice(0, 6).map(([c, n]) => `<a href="${courtUrl(c)}">📍 ${esc(c)} <span>${n}</span></a>`).join('')}</div>` : me ? `<a class="pcourts-empty mu" href="#/post">📍 Tap + then Go live at your court to add it to your card</a>` : ''}
     <div class="ptabs" role="tablist"><button data-pt2="posts" class="on">Posts <span>${mine.length}</span></button><button data-pt2="plays">Highlights <span>${plays}</span></button><button data-pt2="games">Games <span>${made.length}</span></button></div>
     <div id="pgrid"></div>
