@@ -240,3 +240,20 @@ export async function join(blobs, type = 'video/mp4') {
   if (!data) throw new Error('Could not put the stream pieces together');
   return new Blob([data], { type: 'video/mp4' });
 }
+
+// Stitch clips of different sizes into one 720p reel (letterboxed, same frame rate, same audio format).
+export async function reel(blobs, onProgress) {
+  const f = await ensure(); const id = ++seq; const ins = [];
+  for (let i = 0; i < blobs.length; i++) { const n = `/r${id}_${i}.mp4`; await f.writeFile(n, new Uint8Array(await blobs[i].arrayBuffer())); ins.push('-i', n); }
+  const out = `/r${id}_out.mp4`, N = blobs.length;
+  const vf = blobs.map((_, i) => `[${i}:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v${i}]`).join(';');
+  const af = blobs.map((_, i) => `[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`).join(';');
+  if (onProgress) f.on('progress', ({ progress }) => onProgress(Math.min(1, progress || 0)));
+  let rc = await f.exec([...ins, '-filter_complex', `${vf};${af};${blobs.map((_, i) => `[v${i}][a${i}]`).join('')}concat=n=${N}:v=1:a=1[v][a]`, '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '24', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out]);
+  if (rc !== 0) rc = await f.exec([...ins, '-filter_complex', `${vf};${blobs.map((_, i) => `[v${i}]`).join('')}concat=n=${N}:v=1:a=0[v]`, '-map', '[v]', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '24', '-movflags', '+faststart', out]);
+  const data = rc === 0 ? await f.readFile(out) : null;
+  for (let i = 0; i < N; i++) { try { await f.deleteFile(`/r${id}_${i}.mp4`); } catch (e) { /* gone */ } }
+  try { await f.deleteFile(out); } catch (e) { /* gone */ }
+  if (!data) throw new Error('Could not make the reel');
+  return new Blob([data], { type: 'video/mp4' });
+}

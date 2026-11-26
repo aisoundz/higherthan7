@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127f';
-import * as R from './rec.js?v=20261127f';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127f';
+import * as E from './engine.js?v=20261127g';
+import * as R from './rec.js?v=20261127g';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127g';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127f';
+const APP_V = '20261127g';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1398,6 +1398,7 @@ async function gamePage(id) {
   }
   const [ps, hsAll] = await Promise.all([players.list(id), highlights.list(id)]);
   const hs = hsAll.filter(h => !h.hidden && h.play_type !== 'Warmup'); const warm = hsAll.length - hs.length;
+  const myP = new Set(ps.filter(p => ME && p.user_id === ME.id).map(p => p.id)); const mineList = hs.filter(h => myP.has(h.player_id)); const mineN = mineList.length;
   await storage.prep(hs.flatMap(h => [h.path, h.poster]));
   const own = ME && g.owner_id === ME.id;
   const link = shareBase() + '#/g/' + id;
@@ -1418,7 +1419,7 @@ async function gamePage(id) {
     ${own ? `<form id="af" class="row" style="margin-top:10px"><input class="t" id="an" placeholder="Name or shirt, like Jay or white shirt" style="flex:1"><button class="btn s">Add</button></form>` : ''}
     ${!myClaim && ps.some(p => !p.user_id) ? `<div class="card" style="margin-top:12px"><b>${LOCAL ? 'Which one is you?' : 'Are you in this game?'}</b><p class="mu" style="margin:4px 0 10px">Tap your name to put these plays on your profile.</p><div class="row">${ps.filter(p => !p.user_id).map(p => `<button class="btn s" data-claim="${p.id}">I'm ${esc(p.label)}</button>`).join('')}</div></div>` : ''}
     ${myClaim ? `<p class="mu" style="margin-top:10px">You are <b>${esc(myClaim.label)}</b> in this game. <button class="btn s g" data-release="${myClaim.id}">Not me</button></p>` : ''}
-    ${hs.length ? `<button class="btn w g" id="tape" style="margin:14px 0 0">▶ Watch the run (${hs.length} plays)</button>` : ''}
+    ${hs.length ? `<div class="row" style="gap:8px;margin:14px 0 0;flex-wrap:nowrap"><button class="btn g" id="tape" style="flex:1">▶ Watch the run (${hs.length})</button>${mineN ? `<button class="btn" id="tapeme" style="flex:1">▶ Just mine (${mineN})</button>` : ''}</div>` : ''}
     ${hs.length && ME ? `<button class="btn w" id="rvgo" style="margin:14px 0 4px">⚡ Review plays (${hs.length})</button><p class="mu" style="margin:0 0 8px;font-size:13px">Swipe through. Fix the play type, tap "That's me" on yours. Right guesses take one tap.</p>` : ''}
     <h2>Highlights</h2>${warm && own ? `<p class="mu" style="margin-top:-6px">${warm} warmup clip${warm > 1 ? 's' : ''} left out of the game.</p>` : ''}
     ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}${h.views ? ' · ' + views(h.views) : ''}</span>
@@ -1464,6 +1465,7 @@ async function gamePage(id) {
   V.querySelectorAll('[data-nx]').forEach(b => b.onclick = async ev => { ev.stopPropagation(); b.disabled = true; try { await nextUp.leave(g.id, b.dataset.nx); gamePage(id); } catch (err) { b.disabled = false; toast(err.message); } });
   const ss = document.getElementById('setspot'); if (ss) ss.onclick = async () => { ss.disabled = true; ss.textContent = '📍 Finding your court…'; await stampSpot(g); if (g.place) { toast('Court added: ' + g.place); gamePage(id); } else { ss.disabled = false; ss.textContent = '📍 Add this court (use my location)'; toast('Could not get your location. Check location permission for your browser.'); } };
   const tp = document.getElementById('tape'); if (tp) tp.onclick = () => playTape(g, [...hs].sort((a, b) => (a.start_s || 0) - (b.start_s || 0)), ps);
+  const tme = document.getElementById('tapeme'); if (tme) tme.onclick = () => playTape(g, [...mineList].sort((a, b) => (a.start_s || 0) - (b.start_s || 0)), ps);
   const rv = document.getElementById('rvgo'); if (rv) rv.onclick = () => reviewPlays(g, hs, ps, own, id);
   if (rv && qs().get('review')) setTimeout(() => reviewPlays(g, hs, ps, own, id), 300);
   const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
@@ -1538,11 +1540,29 @@ async function profilePage(handle) {
   const show = t => {
     V.querySelectorAll('[data-pt2]').forEach(b2 => b2.classList.toggle('on', b2.dataset.pt2 === t));
     if (t === 'posts') grid.innerHTML = mine.length ? `<div class="tiles">${mine.map(postTile).join('')}</div>` : `<p class="mu">${me ? 'Nothing posted yet. <a href="#/post">Make your first post</a>.' : 'No posts yet.'}</p>`;
-    else if (t === 'plays') grid.innerHTML = hs.length ? `<div class="tiles">${hs.map(playTile).join('')}</div>` : `<p class="mu">${me ? 'Your game highlights live here: clips from games filmed in Jamoja where you are tagged. When a friend sends you their game link, tap "I\'m [your name]" and your plays land here.' : 'No game highlights yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
+    else if (t === 'plays') grid.innerHTML = hs.length ? `<div class="row" style="gap:8px;margin:10px 0;flex-wrap:nowrap"><button class="btn g" id="myreel" style="flex:1">▶ ${me ? 'My reel' : 'Watch reel'} (${hs.length})</button>${me ? `<button class="btn" id="savereel" style="flex:1">⬇ Save my reel</button>` : ''}</div><p class="mu" id="reelmsg" style="margin:0 0 8px;font-size:13px"></p><div class="tiles">${hs.map(playTile).join('')}</div>` : `<p class="mu">${me ? 'Your game highlights live here: clips from games filmed in Jamoja where you are tagged. When a friend sends you their game link, tap "I\'m [your name]" and your plays land here.' : 'No game highlights yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
     else grid.innerHTML = made.length ? (emptyIds.length ? `<button class="btn w g" id="cleanup" style="margin:10px 0">🧹 Delete ${emptyIds.length} empty run${emptyIds.length > 1 ? 's' : ''} (no clips, nobody joined)</button>` : '') + gameList(made) : `<p class="mu">${me ? 'Games you film show up here.' : 'No games filmed yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
   };
   V.querySelector('.ptabs').onclick = e => { const b2 = e.target.closest('[data-pt2]'); if (b2) show(b2.dataset.pt2); };
   grid.addEventListener('click', async e => {
+    const mr = e.target.closest('#myreel');
+    if (mr) { playTape({ title: (me ? 'My reel' : p.name + "'s reel") }, [...hs].sort((a, b) => a.created_at < b.created_at ? -1 : 1), tags); return; }
+    const sr = e.target.closest('#savereel');
+    if (sr) {
+      const msg = document.getElementById('reelmsg'); sr.disabled = true;
+      try {
+        const list = [...hs].sort((a, b) => a.created_at < b.created_at ? -1 : 1).slice(0, 12);
+        msg.textContent = 'Getting your clips…';
+        const blobs = []; for (const h of list) blobs.push(await (await fetch(storage.url(h.path))).blob());
+        msg.textContent = 'Putting your reel together… keep this screen open.';
+        const out = await E.reel(blobs, pr => { msg.textContent = `Putting your reel together… ${Math.round(pr * 100)}%`; });
+        await E.reset().catch(() => {});
+        const file = new File([out], `${p.handle}-jamoja-reel.mp4`, { type: 'video/mp4' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { msg.textContent = 'Ready. Pick "Save Video" or send it.'; await navigator.share({ files: [file], title: 'My Jamoja reel' }).catch(() => {}); }
+        else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); msg.textContent = 'Saved to your downloads.'; }
+      } catch (err) { msg.textContent = 'Could not make the reel: ' + (err.message || err); }
+      sr.disabled = false; return;
+    }
     const c = e.target.closest('#cleanup'); if (!c) return;
     if (!confirmIn(c)) return;
     c.disabled = true; c.textContent = 'Deleting…';
