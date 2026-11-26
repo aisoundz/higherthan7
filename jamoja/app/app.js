@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127h';
-import * as R from './rec.js?v=20261127h';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127h';
+import * as E from './engine.js?v=20261127i';
+import * as R from './rec.js?v=20261127i';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127i';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127h';
+const APP_V = '20261127i';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -309,10 +309,15 @@ async function renderItems(box, items, opt = {}) {
     if (cm) { const art = cm.closest('article'); const [kind, id] = cm.dataset.cm.split(':'); openComments(art, kind === 'p' ? 'post' : 'highlight', id, cm.querySelector('b')); }
   };
 }
+// A text box that grows down as you type (up to ~6 lines) and shrinks back after sending.
+function growBox(ta) { const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 150) + 'px'; }; ta.addEventListener('input', fit); ta.form && ta.form.addEventListener('submit', () => setTimeout(fit, 0)); fit(); }
+// Hide the bottom menu while the keyboard is up, so it doesn't float over what you're typing.
+document.addEventListener('focusin', e => { if (e.target.matches('input:not([type=checkbox]):not([type=range]):not([type=file]),textarea')) document.body.classList.add('typing'); });
+document.addEventListener('focusout', () => setTimeout(() => { const a = document.activeElement; if (!a || !a.matches('input,textarea')) document.body.classList.remove('typing'); }, 50));
 async function openComments(art, kind, id, countEl) {
   const nx = art.nextElementSibling;
   if (nx && nx.classList.contains('cmt')) { nx.remove(); return; }
-  art.insertAdjacentHTML('afterend', `<div class="card cmt"><div class="cl"><p class="mu">Loading…</p></div>${ME ? `<form class="cf"><input class="t" maxlength="500" placeholder="Add a comment" aria-label="Comment"><button class="btn s">Send</button></form>` : `<a class="btn s g" href="#/login">Sign in to comment</a>`}</div>`);
+  art.insertAdjacentHTML('afterend', `<div class="card cmt"><div class="cl"><p class="mu">Loading…</p></div>${ME ? `<form class="cf"><textarea class="t" rows="1" maxlength="500" placeholder="Add a comment" aria-label="Comment"></textarea><button class="btn s">Send</button></form>` : `<a class="btn s g" href="#/login">Sign in to comment</a>`}</div>`);
   const panel = art.nextElementSibling, cl = panel.querySelector('.cl');
   const draw = async () => {
     const list = await comments.list(kind, id).catch(() => []);
@@ -322,7 +327,8 @@ async function openComments(art, kind, id, countEl) {
   };
   await draw();
   const cf = panel.querySelector('.cf');
-  if (cf) cf.onsubmit = async e => { e.preventDefault(); const inp = cf.querySelector('input'); const v = inp.value.trim(); if (!v) return; inp.value = ''; try { await comments.add(kind, id, v); await draw(); } catch (err) { toast(err.message); } };
+  if (cf) { const ta = cf.querySelector('textarea'); growBox(ta); ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)) { e.preventDefault(); cf.requestSubmit(); } }); }
+  if (cf) cf.onsubmit = async e => { e.preventDefault(); const inp = cf.querySelector('textarea'); const v = inp.value.trim(); if (!v) return; inp.value = ''; try { await comments.add(kind, id, v); await draw(); } catch (err) { toast(err.message); } };
   panel.onclick = async e => { const d = e.target.closest('[data-cdel]'); if (!d) return; try { await comments.remove(d.dataset.cdel); await draw(); } catch (err) { toast(err.message); } };
 }
 async function postPage(id) {
