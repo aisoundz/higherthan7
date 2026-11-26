@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127g';
-import * as R from './rec.js?v=20261127g';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127g';
+import * as E from './engine.js?v=20261127h';
+import * as R from './rec.js?v=20261127h';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127h';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127g';
+const APP_V = '20261127h';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -480,7 +480,7 @@ async function dmPage(handle) {
   V.innerHTML = `<div class="dmh"><a href="#/inbox" class="dmb" aria-label="Back">‹</a><a href="#/u/${esc(other.handle)}" class="dmu">${avatar(other, 36)}<span><b>${esc(other.name)}</b><br><span class="mu" style="font-size:12px">@${esc(other.handle)}</span></span></a><button class="lnkb" id="dmm" aria-label="Options">⋯</button></div>
     <div id="dmopt" class="card" hidden></div>
     <div id="msgs" class="msgs"><p class="mu">Loading…</p></div>
-    <form class="dmf" id="dmf"><input class="t" id="dmi" maxlength="2000" placeholder="Message…" autocomplete="off" aria-label="Message"><button class="btn s">Send</button></form>`;
+    <form class="dmf" id="dmf"><textarea class="t" id="dmi" rows="1" maxlength="2000" placeholder="Message…" autocomplete="off" aria-label="Message"></textarea><button class="btn s">Send</button></form>`;
   const box = V.querySelector('#msgs'); let last = '', first = true;
   const draw = async () => {
     const list = await dms.thread(ME.id, other.id).catch(() => null); if (!list) return;
@@ -494,9 +494,13 @@ async function dmPage(handle) {
   await draw();
   clearInterval(DM_T); DM_T = setInterval(draw, 4000);
   const f = V.querySelector('#dmf'), inp = V.querySelector('#dmi');
+  // The box grows as you type (up to about 6 lines), so you can see the whole message.
+  const fit = () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 150) + 'px'; };
+  inp.addEventListener('input', fit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)) { e.preventDefault(); f.requestSubmit(); } });
   f.onsubmit = async e => {
     e.preventDefault(); const v = inp.value.trim(); if (!v) return;
-    inp.value = ''; try { await dms.send(other.id, v); last = ''; await draw(); window.scrollTo(0, document.body.scrollHeight); } catch (err) { inp.value = v; toast(err.message); }
+    inp.value = ''; fit(); try { await dms.send(other.id, v); last = ''; await draw(); window.scrollTo(0, document.body.scrollHeight); } catch (err) { inp.value = v; toast(err.message); }
   };
   const opt = V.querySelector('#dmopt');
   const drawOpt = () => { opt.innerHTML = `<button class="btn s g" id="blk">${blocked ? 'Unblock' : 'Block'} ${esc(other.name.split(' ')[0])}</button><p class="mu" style="margin:8px 0 0;font-size:13px">Blocked people can't message you. They aren't told.</p>`; opt.querySelector('#blk').onclick = async () => { try { blocked = !blocked; await blocks.set(ME.id, other.id, blocked); toast(blocked ? 'Blocked.' : 'Unblocked.'); drawOpt(); } catch (err) { toast(err.message); } }; };
