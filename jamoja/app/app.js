@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126c';
-import * as R from './rec.js?v=20261126c';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261126c';
+import * as E from './engine.js?v=20261126d';
+import * as R from './rec.js?v=20261126d';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, storage, mode, ready } from './db.js?v=20261126d';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -140,6 +140,7 @@ async function route() {
     if (parts[0] === 'u' && parts[1] && (parts[2] === 'followers' || parts[2] === 'following')) return await followPage(decodeURIComponent(parts[1]), parts[2]);
     if (parts[0] === 'u' && parts[1]) return await profilePage(decodeURIComponent(parts[1]));
     if (parts[0] === 'people') return await peoplePage();
+    if (parts[0] === 'viewers') return await viewersPage();
     V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`;
   } catch (e) {
     console.error(e);
@@ -328,6 +329,22 @@ async function followPage(handle, dir) {
   V.innerHTML = `<a class="mu" href="#/u/${esc(p.handle)}">← ${esc(p.name)}</a><h1>${dir === 'followers' ? 'Followers' : 'Following'}</h1>
     <div class="tabs"><a href="#/u/${esc(p.handle)}/followers" class="${dir === 'followers' ? 'on' : ''}">Followers</a><a href="#/u/${esc(p.handle)}/following" class="${dir === 'following' ? 'on' : ''}">Following</a></div>
     ${list.length ? list.map(x => personRow(x, fol)).join('') : `<p class="mu">${dir === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'} <a href="#/people">Find people</a></p>`}`;
+  bindFollow(V, fol);
+}
+
+async function viewersPage() {
+  if (!ME) return needLogin('#/viewers');
+  const list = await profileViews.list(ME.id);
+  const seen = list.filter(v => v.viewer), anon = list.length - seen.length;
+  const people = []; const at = {};
+  for (const v of seen) { if (!at[v.viewer_id]) { at[v.viewer_id] = { ...v, n: 0 }; people.push(at[v.viewer_id]); } at[v.viewer_id].n++; }
+  await storage.prep(people.map(v => v.viewer.avatar).filter(Boolean));
+  const fol = await follows.ids(ME.id).catch(() => []);
+  V.innerHTML = `<a class="mu" href="#/u/${esc(MYP.handle)}">← Your profile</a><h1>Who viewed your profile</h1>
+    <div class="row stats"><div><b>${list.length}</b><span>Views, 30 days</span></div><div><b>${people.length}</b><span>Members</span></div><div><b>${anon}</b><span>Not signed in</span></div></div>
+    <div style="margin-top:12px">${people.length ? people.map(v => personRow(v.viewer, fol).replace('</span></span></a>', ` · viewed ${ago(v.viewed_at)}${v.n > 1 ? ` · ${v.n} days` : ''}</span></span></a>`)).join('') : `<p class="mu">No members have viewed your profile yet. Post, film a run and share your profile link to get seen.</p>`}</div>
+    ${anon ? `<p class="mu">${anon} visit${anon === 1 ? '' : 's'} from people who were not signed in. They are counted but we can't show who.</p>` : ''}
+    <p class="foot">When you're signed in and view someone's profile, they can see it was you.</p>`;
   bindFollow(V, fol);
 }
 
@@ -863,11 +880,14 @@ async function profilePage(handle) {
   await storage.prep([...hs.flatMap(h => [h.path, h.poster]), p.avatar].filter(Boolean));
   const link = shareBase() + '#/u/' + encodeURIComponent(p.handle);
   const following = fol.includes(p.id);
+  if (!me && !LOCAL) { const k = 'jm.pv.' + p.id; try { if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); profileViews.record(p.id).catch(() => {}); } } catch (e) { profileViews.record(p.id).catch(() => {}); } }
+  const pv = me && !LOCAL ? await profileViews.list(p.id).catch(() => []) : [];
   V.innerHTML = `<div class="row" style="gap:14px;flex-wrap:nowrap">${avatar(p, 84)}<div><h1 style="margin:0">${esc(p.name)}</h1><p class="mu" style="margin:0">@${esc(p.handle)} ${lvBadge(p)}<br>${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}</p></div></div>
     ${p.bio ? `<p style="margin:12px 0 0">${nl(p.bio)}</p>` : me ? `<p class="mu" style="margin:12px 0 0"><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Add a bio and photo</a> so people know who you are.</p>` : ''}
     <div class="row stats"><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b><span>Followers</span></a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b><span>Following</span></a><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div></div>
+    ${me && !LOCAL ? `<a class="card pvc" href="#/viewers"><span class="pvn">${pv.length}</span><span><b>profile view${pv.length === 1 ? '' : 's'} in the last 30 days</b><br><span class="mu">${pv.filter(v => v.viewer).length ? 'See who checked you out →' : 'Share your profile to get seen →'}</span></span></a>` : ''}
     <div class="row" style="margin-top:14px">${!me && !LOCAL ? `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button>` : ''}${LOCAL ? '' : `<button class="btn s g" id="cp">Copy profile link</button>`}${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>${LOCAL ? '' : `<button class="btn s g" id="so">Sign out</button>`}` : ''}</div>
-    <h2>Plays</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'In a game, tap "I\'m …" on your name and your plays show up here.' : 'No plays yet.'}</p>`}
+    <h2>Game highlights</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'Clips from games filmed in Jamoja where you are tagged. Film a run, or when a friend sends you their game link, tap "I\'m [your name]" and your plays land here.' : 'No game highlights yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`}
     <h2>Posts</h2><div id="pp"></div>
     <h2>Games filmed</h2>${made.length ? gameList(made) : `<p class="mu">None yet.</p>`}
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;

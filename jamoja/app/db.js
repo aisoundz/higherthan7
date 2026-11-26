@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126c';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126d';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -245,6 +245,15 @@ export const comments = {
     M.comments = M.comments || {}; const r = { id: uid(), user_id: M.session.id, created_at: now(), post_id: null, highlight_id: null, ...row }; M.comments[r.id] = r; await save(); return r;
   },
   async remove(id) { if (sb) { chk(await sb.from('comments').delete().eq('id', id)); return; } delete M.comments[id]; await save(); },
+};
+
+export const profileViews = {
+  async record(profileId) { if (sb) { await sb.rpc('record_profile_view', { p_profile: profileId }); return; } M.pviews = M.pviews || []; const v = M.session && M.session.id; if (v === profileId) return; M.pviews.push({ profile_id: profileId, viewer_id: v || null, viewed_at: now() }); await save(); },
+  async list(me, days = 30) {
+    const since = new Date(Date.now() - days * 864e5).toISOString();
+    if (sb) return chk(await sb.from('profile_views').select(`viewer_id, viewed_at, viewer:profiles!profile_views_viewer_id_fkey(${PROF},city)`).eq('profile_id', me).gte('viewed_at', since).order('viewed_at', { ascending: false }).limit(300));
+    return (M.pviews || []).filter(v => v.profile_id === me && v.viewed_at >= since).map(v => ({ ...v, viewer: v.viewer_id ? M.profiles[v.viewer_id] : null })).reverse();
+  },
 };
 
 export const fires = {
