@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127j';
-import * as R from './rec.js?v=20261127j';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127j';
+import * as E from './engine.js?v=20261127k';
+import * as R from './rec.js?v=20261127k';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127k';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127j';
+const APP_V = '20261127k';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -56,7 +56,7 @@ const LINK_ERR = /error_description=([^&]+)/.exec(location.hash);
 function countViews(root) {
   root.querySelectorAll('video[data-hid]').forEach(v => {
     let t = null;
-    v.addEventListener('play', () => { const id = v.dataset.hid; if (sessionStorage.getItem('jm.v.' + id)) return; t = setTimeout(() => { try { sessionStorage.setItem('jm.v.' + id, '1'); } catch (e) { /* private mode */ } highlights.view(id).catch(() => {}); }, 2000); });
+    v.addEventListener('play', () => { const id = v.dataset.hid, k = 'jm.v.' + id; let seen = 0; try { seen = +localStorage.getItem(k) || 0; } catch (e) { /* private mode */ } if (Date.now() - seen < 864e5) return; t = setTimeout(() => { try { localStorage.setItem(k, String(Date.now())); } catch (e) { /* private mode */ } highlights.view(id).catch(() => {}); }, 2000); });
     v.addEventListener('pause', () => clearTimeout(t));
   });
 }
