@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126h';
-import * as R from './rec.js?v=20261126h';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126h';
+import * as E from './engine.js?v=20261126m';
+import * as R from './rec.js?v=20261126m';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126m';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -108,17 +108,27 @@ async function refreshMe() { ME = await auth.user(); MYP = ME ? await profiles.b
 let BDG_T = null;
 async function refreshBadge() {
   const b = document.getElementById('bdg'); if (!b || !ME || LOCAL) return;
-  try { const n = await notes.unread(ME.id); b.hidden = !n; b.textContent = n > 9 ? '9+' : n; document.title = (n ? `(${n}) ` : '') + 'Jamoja'; } catch (e) { /* offline */ }
+  try { const n = await notes.unread(ME.id); b.hidden = !n; b.textContent = n > 9 ? '9+' : n; const nd = document.getElementById('ndot'); if (nd) { nd.hidden = !n; nd.textContent = n > 99 ? '99+' : n; } document.title = (n ? `(${n}) ` : '') + 'Jamoja'; } catch (e) { /* offline */ }
 }
 function topbar() {
   clearInterval(BDG_T); if (ME && !LOCAL) { setTimeout(refreshBadge, 50); BDG_T = setInterval(refreshBadge, 60000); }
   TR.innerHTML = ME
-    ? (MYP ? `<a class="bell" href="#/alerts" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="bdg" id="bdg" hidden></span></a><a class="btn s" href="#/post">+ Post</a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
+    ? (MYP ? `<a class="bell" href="#/alerts" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="bdg" id="bdg" hidden></span></a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
     : LOCAL ? '' : `<a class="btn s g" href="#/login">Sign in</a>`;
   const nav = document.getElementById('nav'); if (!nav) return;
   const h = location.hash || '#/';
   nav.hidden = !(ME && MYP) || /^#\/(login|setup)/.test(h);
-  if (!nav.hidden) nav.innerHTML = `<a href="#/" class="${h === '#/' || h === '#' ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Feed</a><a href="#/people" class="${h.startsWith('#/people') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M16 14.6c2.8-.3 4.9 1.4 5.5 4.4"/></svg>People</a><a href="#/post" class="film"><span>+</span>Post</a><a href="#/u/${esc(MYP.handle)}" class="${h.startsWith('#/u/') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Me</a>`;
+  if (!nav.hidden) {
+    const mine = h.startsWith('#/u/' + encodeURIComponent(MYP.handle)) || h.startsWith('#/u/' + MYP.handle) || h.startsWith('#/viewers') || h.startsWith('#/setup');
+    const on = { feed: h === '#/' || h === '#' || h === '' || h.startsWith('#/p/'), people: h.startsWith('#/people'), post: /^#\/(post|new)/.test(h), alerts: h.startsWith('#/alerts'), me: mine };
+    const I = {
+      feed: f => `<svg viewBox="0 0 24 24" class="${f ? 'fill' : ''}"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>`,
+      people: f => `<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" ${f ? 'stroke-width="3"' : ''}/><path d="m20.5 20.5-4.5-4.5" ${f ? 'stroke-width="3"' : ''}/></svg>`,
+      post: f => `<svg viewBox="0 0 24 24" class="${f ? 'fill' : ''}"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8v8M8 12h8" class="pl"/></svg>`,
+      alerts: f => `<svg viewBox="0 0 24 24" class="${f ? 'fill' : ''}"><path d="M12 20.5s-8-4.6-8-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.8-8 10.4-8 10.4z"/></svg>`,
+    };
+    nav.innerHTML = `<a href="#/" class="${on.feed ? 'on' : ''}">${I.feed(on.feed)}<small>Home</small></a><a href="#/people" class="${on.people ? 'on' : ''}">${I.people(on.people)}<small>People</small></a><a href="#/post" class="plus ${on.post ? 'on' : ''}" aria-label="Post"><span>+</span></a><a href="#/alerts" class="${on.alerts ? 'on' : ''}">${I.alerts(on.alerts)}<i class="ndot" id="ndot" hidden></i><small>Activity</small></a><a href="#/u/${esc(MYP.handle)}" class="me ${on.me ? 'on' : ''}">${avatar(MYP, 28)}<small>Profile</small></a>`;
+  }
 }
 function needLogin(next) { go(LOCAL ? '#/setup?next=' + encodeURIComponent(next || '#/') : '#/login?next=' + encodeURIComponent(next || location.hash)); }
 
@@ -705,6 +715,7 @@ function setup() {
   hd.oninput = () => { const c = clean(hd.value); if (c !== hd.value) hd.value = c; showH(); };
   sp.onchange = () => { ps.placeholder = POS[sp.value] || ''; };
   showH();
+  if (MYP && !LOCAL) { V.insertAdjacentHTML('beforeend', `<button class="btn w g" id="so" style="margin-top:24px">Sign out</button>`); document.getElementById('so').onclick = async () => { await auth.signOut(); toast('Signed out.'); go('#/'); }; }
   let avBytes = null, avSrc = p.avatar ? storage.url(p.avatar) : null;
   const setAv = bytes => { avBytes = bytes; document.getElementById('avp').innerHTML = `<img class="avi" src="${URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }))}" alt="" style="width:72px;height:72px">`; document.querySelector('label[for=avf]').textContent = 'Change photo'; document.getElementById('avadj').hidden = false; document.getElementById('avh').textContent = MYP ? 'Saving your photo…' : 'Looks good. Tap Save profile at the bottom to keep it.'; if (MYP) savePhotoNow(); };
   // Existing profiles: save the photo right away so it never depends on the button at the bottom.
@@ -969,18 +980,48 @@ async function profilePage(handle) {
   const following = fol.includes(p.id);
   if (!me && !LOCAL) { const k = 'jm.pv.' + p.id; try { if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); profileViews.record(p.id).catch(() => {}); } } catch (e) { profileViews.record(p.id).catch(() => {}); } }
   const pv = me && !LOCAL ? await profileViews.list(p.id).catch(() => []) : [];
-  V.innerHTML = `<div class="row" style="gap:14px;flex-wrap:nowrap">${avatar(p, 84)}<div><h1 style="margin:0">${esc(p.name)}</h1><p class="mu" style="margin:0">@${esc(p.handle)} ${lvBadge(p)}<br>${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}</p></div></div>
-    ${p.bio ? `<p style="margin:12px 0 0">${nl(p.bio)}</p>` : me ? `<p class="mu" style="margin:12px 0 0"><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Add a bio and photo</a> so people know who you are.</p>` : ''}
-    <div class="row stats"><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b><span>Followers</span></a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b><span>Following</span></a><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div></div>
-    ${me && !LOCAL ? `<a class="card pvc" href="#/viewers"><span class="pvn">${pv.length}</span><span><b>profile view${pv.length === 1 ? '' : 's'} in the last 30 days</b><br><span class="mu">${pv.filter(v => v.viewer).length ? 'See who checked you out →' : 'Share your profile to get seen →'}</span></span></a>` : ''}
-    <div class="row" style="margin-top:14px">${!me && !LOCAL ? `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button>` : ''}${LOCAL ? '' : `<button class="btn s g" id="cp">Copy profile link</button>`}${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>${LOCAL ? '' : `<button class="btn s g" id="so">Sign out</button>`}` : ''}</div>
-    <h2>Game highlights</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'Clips from games filmed in Jamoja where you are tagged. Film a run, or when a friend sends you their game link, tap "I\'m [your name]" and your plays land here.' : 'No game highlights yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`}
-    <h2>Posts</h2><div id="pp"></div>
-    <h2>Games filmed</h2>${made.length ? gameList(made) : `<p class="mu">None yet.</p>`}
+  const ICON = {
+    grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>',
+    play: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M10 8.5v7l6-3.5z"/></svg>',
+    ball: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/></svg>',
+  };
+  const plays = hs.length, totalViews = hs.reduce((a, h) => a + (h.views || 0), 0);
+  V.innerHTML = `<div class="phead"><div class="ph-handle">@${esc(p.handle)} ${lvBadge(p)}</div>
+    <div class="ph-top">${avatar(p, 86)}<div class="ph-right"><b class="ph-name">${esc(p.name)}</b>
+      <div class="ph-stats"><span><b>${mine.length}</b>posts</span><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b>followers</a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b>following</a></div></div></div>
+    <div class="ph-bio">${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}${p.bio ? `<br>${nl(p.bio)}` : me ? `<br><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}" class="mu">+ Add a bio</a>` : ''}</div>
+    ${me && !LOCAL ? `<a class="dash" href="#/viewers"><b>Your dashboard</b><span class="mu">${pv.length} profile view${pv.length === 1 ? '' : 's'} in the last 30 days${plays ? ` · ${plays} play${plays === 1 ? '' : 's'} · ${totalViews} video view${totalViews === 1 ? '' : 's'}` : ''}</span></a>` : ''}
+    <div class="ph-btns">${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share profile</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div></div>
+    <div class="ptabs" role="tablist"><button data-pt2="posts" class="on" aria-label="Posts">${ICON.grid}</button><button data-pt2="plays" aria-label="Game highlights">${ICON.play}</button><button data-pt2="games" aria-label="Games filmed">${ICON.ball}</button></div>
+    <div id="pgrid"></div>
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;
-  await renderItems(V.querySelector('#pp'), mine.map(x => ({ t: 'p', at: x.created_at, x })), { fol, noFollow: true, empty: `<p class="mu">${me ? 'Nothing posted yet. <a href="#/post">Make your first post</a>.' : 'No posts yet.'}</p>` });
+  await storage.prep(mine.flatMap(x => [x.media, x.poster]).filter(Boolean));
+  const tile = (href, bg, inner, cls = '') => `<a class="tile ${cls}" href="${href}">${bg ? `<img src="${esc(bg)}" alt="" loading="lazy">` : ''}${inner}</a>`;
+  const postTile = x => x.kind === 'photo' ? tile('#/p/' + x.id, storage.url(x.media), x.fire ? `<span class="tb">🔥 ${x.fire}</span>` : '')
+    : x.kind === 'video' ? tile('#/p/' + x.id, storage.url(x.poster), `<span class="tp">▶</span>${x.fire ? `<span class="tb">🔥 ${x.fire}</span>` : ''}`)
+    : x.kind === 'youtube' ? tile('#/p/' + x.id, `https://i.ytimg.com/vi/${x.youtube_id}/hqdefault.jpg`, `<span class="tp yt">▶</span>`)
+    : tile('#/p/' + x.id, '', `<span class="tt">${esc((x.body || '').slice(0, 90))}</span>`, 'txt');
+  const playTile = h => `<button class="tile" data-play="${h.id}"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span class="tp">▶</span>${h.play_type ? `<span class="tl2">${esc(h.play_type)}</span>` : ''}${h.views ? `<span class="tb">${views(h.views)}</span>` : ''}</button>`;
+  const grid = V.querySelector('#pgrid');
+  const show = t => {
+    V.querySelectorAll('[data-pt2]').forEach(b2 => b2.classList.toggle('on', b2.dataset.pt2 === t));
+    if (t === 'posts') grid.innerHTML = mine.length ? `<div class="tiles">${mine.map(postTile).join('')}</div>` : `<p class="mu">${me ? 'Nothing posted yet. <a href="#/post">Make your first post</a>.' : 'No posts yet.'}</p>`;
+    else if (t === 'plays') grid.innerHTML = hs.length ? `<div class="tiles">${hs.map(playTile).join('')}</div>` : `<p class="mu">${me ? 'Your game highlights live here: clips from games filmed in Jamoja where you are tagged. When a friend sends you their game link, tap "I\'m [your name]" and your plays land here.' : 'No game highlights yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
+    else grid.innerHTML = made.length ? gameList(made) : `<p class="mu">${me ? 'Games you film show up here.' : 'No games filmed yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
+  };
+  V.querySelector('.ptabs').onclick = e => { const b2 = e.target.closest('[data-pt2]'); if (b2) show(b2.dataset.pt2); };
+  grid.onclick = e => {
+    const b2 = e.target.closest('[data-play]'); if (!b2) return;
+    const h = hs.find(x => x.id === b2.dataset.play); if (!h) return;
+    const ov = document.createElement('div'); ov.className = 'viewer';
+    ov.innerHTML = `<button class="rx" aria-label="Close">✕</button><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls autoplay playsinline loop></video><div class="vcap"><b>${esc(h.play_type || h.label)}</b> <a href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Open the game')} →</a></div>`;
+    document.body.append(ov); countViews(ov);
+    const shut = () => { ov.remove(); window.removeEventListener('hashchange', shut); };
+    ov.querySelector('.rx').onclick = shut; ov.querySelector('a').onclick = shut; window.addEventListener('hashchange', shut);
+  };
+  show('posts');
   countViews(V); bindFollow(V, fol);
-  const cp = document.getElementById('cp'); if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(link); toast('Profile link copied.'); } catch (e) { toast(link); } };
+  const cp = document.getElementById('cp'); if (cp) cp.onclick = async () => { if (navigator.share) { navigator.share({ title: p.name + ' on Jamoja', text: `Check out ${p.name} on Jamoja`, url: link }).catch(() => {}); return; } try { await navigator.clipboard.writeText(link); toast('Profile link copied.'); } catch (e) { toast(link); } };
   const so = document.getElementById('so'); if (so) so.onclick = async () => { await auth.signOut(); toast('Signed out.'); go('#/'); };
 }
 
