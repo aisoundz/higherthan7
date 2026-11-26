@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126y';
-import * as R from './rec.js?v=20261126y';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126y';
+import * as E from './engine.js?v=20261126z';
+import * as R from './rec.js?v=20261126z';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126z';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126y';
+const APP_V = '20261126z';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -135,9 +135,11 @@ function topbar() {
 }
 function needLogin(next) { go(LOCAL ? '#/setup?next=' + encodeURIComponent(next || '#/') : '#/login?next=' + encodeURIComponent(next || location.hash)); }
 
+let ROUTE_N = 0;
 async function route() {
   if (busy) { toast('Still cutting highlights. Stay on this screen until it finishes.'); return; }
   window.scrollTo(0, 0);
+  const tok = ++ROUTE_N;
   const [path] = location.hash.slice(1).split('?');
   const parts = (path || '/').split('/').filter(Boolean);
   try {
@@ -166,6 +168,7 @@ async function route() {
     V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`;
   } catch (e) {
     console.error(e);
+    if (tok !== ROUTE_N) return; // an old screen failed after you moved on: leave the current one alone
     V.innerHTML = `<h1>Something went wrong</h1><div class="err">${esc(e.message)}</div><a class="btn g" href="#/">Go home</a>`;
   }
 }
@@ -996,7 +999,7 @@ async function newGame() {
     <div id="eng" class="mu"></div><div id="tip"></div><div id="srcs"></div>
     <div id="go" hidden><button class="btn w" id="mk" style="min-height:56px;font-size:18px">Make highlights</button><div id="prog" hidden><div class="bar"><b id="pb"></b></div><p class="mu" id="pt"></p></div></div>`;
   const eng = document.getElementById('eng');
-  const showGo = () => { document.getElementById('go').hidden = !srcs.some(s => s.moments.some(m => m.on)); };
+  const showGo = () => { const g = document.getElementById('go'); if (g) g.hidden = !srcs.some(s => s.moments.some(m => m.on)); };
 
   async function addSource(file, extra) {
     const card = document.createElement('div'); card.className = 'card';
@@ -1004,7 +1007,7 @@ async function newGame() {
     document.getElementById('srcs').append(card);
     try {
       eng.textContent = srcs.length ? '' : 'Loading the highlight engine. The first time takes a moment (about 30 MB).';
-      const s = await E.analyze(file); eng.textContent = '';
+      const s = await E.analyze(file); if (!card.isConnected) return; eng.textContent = '';
       s.url = URL.createObjectURL(file);
       if (!s.dur && extra && extra.dur) s.dur = extra.dur;
       const auto = s.moments.map(m => ({ ...m, on: true, src: 'crowd' }));
@@ -1017,11 +1020,11 @@ async function newGame() {
       s.quiet = s.hasAudio && auto.length > 0 && Math.max(...s.moments.filter(m => m.src === 'crowd').map(m => m.lift || 0)) < 5;
       if (extra && extra.id) s.partId = extra.id;
       srcs.push(s); drawSrc(card, s); tips(s);
-    } catch (err) { console.error(err); eng.textContent = ''; card.innerHTML = `<b>${esc(file.name)}</b><div class="err">Could not read this video. Try a different clip.</div>`; }
+    } catch (err) { console.error(err); if (!card.isConnected) return; eng.textContent = ''; card.innerHTML = `<b>${esc(file.name)}</b><div class="err">Could not read this video. Try a different clip.</div>`; }
     showGo();
   }
   function tips(s) {
-    const t = document.getElementById('tip');
+    const t = document.getElementById('tip'); if (!t) return;
     if (s.codec === 'hevc' && !localStorage.getItem('jm.tip.hevc')) {
       localStorage.setItem('jm.tip.hevc', '1');
       t.innerHTML = `<div class="card"><b>Tip: make highlights about 10 times faster</b><p class="mu" style="margin:4px 0 0">This video is in iPhone's High Efficiency format, so each highlight takes 30 to 60 seconds to convert. Next time, film inside Jamoja, or set iPhone Settings, Camera, Formats to Most Compatible.</p></div>`;
@@ -1078,11 +1081,12 @@ async function newGame() {
   // Highlights from your own recording happen on their own: BUCKET taps (or the loudest moments) are cut right away.
   function autoMake() {
     if (!srcs.some(s => s.moments.some(m => m.on))) { toast('No plays found in that recording. Scrub to a play and add it.'); return; }
+    if (!document.getElementById('go')) return;
     if (!existing && !document.getElementById('gt').value.trim()) document.getElementById('gt').value = 'Run ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const n = srcs.reduce((a, s) => a + s.moments.filter(m => m.on).length, 0);
-    const go2 = document.getElementById('go'); go2.insertAdjacentHTML('afterbegin', `<div class="card" style="border-color:var(--o)"><b>Making ${n} highlight${n > 1 ? 's' : ''} for you</b><p class="mu" style="margin:4px 0 0">Keep this screen open. You can delete any clip you don't like on the game page.</p></div>`);
+    const go2 = document.getElementById('go'); if (!go2) return; go2.insertAdjacentHTML('afterbegin', `<div class="card" style="border-color:var(--o)"><b>Making ${n} highlight${n > 1 ? 's' : ''} for you</b><p class="mu" style="margin:4px 0 0">Keep this screen open. You can delete any clip you don't like on the game page.</p></div>`);
     go2.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => document.getElementById('mk').click(), 0);
+    setTimeout(() => { const m = document.getElementById('mk'); if (m) m.click(); }, 0);
   }
   if (qs().get('auto') && saved.length && !existing) { document.getElementById('recov') && document.getElementById('recov').remove(); await useParts(saved); autoMake(); }
   const rdel = document.getElementById('rdel');
