@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zf';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zg';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -154,12 +154,12 @@ export const highlights = {
   },
   async forGames(ids) {
     if (!ids.length) return [];
-    if (sb) return chk(await sb.from('highlights').select('*, game:games(id,title)').in('game_id', ids).eq('hidden', false).order('created_at', { ascending: false }).limit(60));
+    if (sb) return chk(await sb.from('highlights').select('*, game:games(id,title)').in('game_id', ids).eq('hidden', false).order('created_at', { ascending: false }).limit(60)).filter(h => h.play_type !== 'Warmup');
     return Object.values(M.highlights).filter(h => ids.includes(h.game_id) && !h.hidden).map(h => ({ ...h, game: M.games[h.game_id] }));
   },
   async forPlayers(ids) {
     if (!ids.length) return [];
-    if (sb) return chk(await sb.from('highlights').select('*, game:games(id,title)').in('player_id', ids).order('created_at', { ascending: false }));
+    if (sb) return chk(await sb.from('highlights').select('*, game:games(id,title)').in('player_id', ids).eq('hidden', false).order('created_at', { ascending: false })).filter(h => h.play_type !== 'Warmup');
     return Object.values(M.highlights).filter(h => ids.includes(h.player_id)).map(h => ({ ...h, game: M.games[h.game_id] }));
   },
   // The public feed: newest highlights from every game, optionally one sport.
@@ -171,7 +171,7 @@ export const highlights = {
       let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
       if (sport) q = q.eq('game.sport', sport);
       if (ids) q = q.or(`created_by.in.(${ids.join(',')})` + (pids.length ? `,player_id.in.(${pids.join(',')})` : ''));
-      return chk(await q).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
+      return chk(await q).filter(h => h.play_type !== 'Warmup').map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
     }
     return Object.values(M.highlights).map(h => {
       const g = M.games[h.game_id] || {}; const o = M.profiles[g.owner_id]; const p = M.players[h.player_id];
@@ -179,7 +179,7 @@ export const highlights = {
     }).filter(h => !h.hidden && (!sport || h.game.sport === sport) && (!ids || ids.includes(h.created_by) || (h.player_id && M.players[h.player_id] && ids.includes(M.players[h.player_id].user_id)))).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
   },
   async atCourt(place, limit = 40) {
-    if (sb) return chk(await sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).ilike('game.place', place).order('created_at', { ascending: false }).limit(limit)).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
+    if (sb) return chk(await sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).ilike('game.place', place).order('created_at', { ascending: false }).limit(limit)).filter(h => h.play_type !== 'Warmup').map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
     return (await this.feed(null, 200)).filter(h => (h.game.place || '').toLowerCase() === place.toLowerCase()).slice(0, limit);
   },
   async add(h) { if (sb) return chk(await sb.from('highlights').insert(h).select().single()); const r = { id: uid(), created_at: now(), player_id: null, ...h }; M.highlights[r.id] = r; await save(); return r; },

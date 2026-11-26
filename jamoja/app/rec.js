@@ -1,7 +1,7 @@
 // Film in Jamoja: full-screen camera with a Bucket button.
 // Records in parts (a new part every few minutes) and saves each part on the phone as soon as it ends,
 // so a long run never becomes one giant file and nothing is lost if the browser closes.
-import { local } from './db.js?v=20261126zf';
+import { local } from './db.js?v=20261126zg';
 
 const PART_SECONDS = 120;
 const CHECKPOINT_SECONDS = 20;
@@ -34,7 +34,7 @@ export function record(opts = {}) {
       <div class="rtop"><span class="rdot" id="rdot"></span><b id="rt">0:00</b><span id="rst" class="mu">Ready</span></div>
       ${opts.live ? `<div class="rlive" id="rlive" hidden>● LIVE</div>` : ''}${opts.title ? `<div class="rtitle">${opts.title.replace(/[<>&]/g, '')}</div>` : ''}
       <div class="rhint" id="rh">Prop the phone so it sees the hoop. <b>Tap the rim</b> to turn on Auto Bucket, then press ${opts.live ? 'Go live' : 'Start'}.</div>
-      <div class="rring" id="rring" hidden></div><div class="rauto" id="rauto" hidden>AUTO BUCKET ON</div>
+      <div class="rring" id="rring" hidden></div><div class="rauto" id="rauto" hidden>AUTO BUCKET ON</div><button class="rwarm" id="rwarm" hidden>Warming up? Tap</button>
       <div class="rflash" id="rf">Play saved</div>
       <div class="rsheet" id="rsh" hidden></div>
       <div class="rbot">
@@ -69,7 +69,7 @@ export function record(opts = {}) {
       if (opts.live && $('rlive')) $('rlive').hidden = st !== 'rec';
       $('rdot').classList.toggle('off', st !== 'rec');
       $('rgo').hidden = st === 'rec'; $('rgo').textContent = st === 'paused' ? 'RESUME' : opts.live ? 'GO LIVE' : 'START';
-      $('bk').hidden = st !== 'rec'; $('pz').hidden = st !== 'rec';
+      $('bk').hidden = st !== 'rec'; $('pz').hidden = st !== 'rec'; $('rwarm').hidden = !(st === 'rec' && rim);
       $('rs').hidden = !(st === 'rec' || parts.length || st === 'paused');
     };
 
@@ -123,6 +123,7 @@ export function record(opts = {}) {
     }, 500);
     let count = 0;
     // ---------- Auto Bucket: watch the net. When the ball drops through, the net jumps; mark the play.
+    let warm = false; // during warmups/shootaround, Auto Bucket does not count makes
     let rim = null, prevPx = null, lastAuto = -1e9, autoN = 0; const cv = document.createElement('canvas'); cv.width = 160; cv.height = 90; const cx = cv.getContext('2d', { willReadFrequently: true });
     const mark = (src) => {
       marks.push((performance.now() - partStart) / 1000);
@@ -137,7 +138,7 @@ export function record(opts = {}) {
       if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return;
       rim = { x: nx, y: ny }; prevPx = null;
       const ring = $('rring'); ring.style.left = (ev.clientX - r.left) + 'px'; ring.style.top = (ev.clientY - r.top) + 'px'; ring.hidden = false;
-      $('rauto').hidden = false; $('rh').innerHTML = 'Auto Bucket is on. Jamoja marks every make at this rim. Tap BUCKET for anything else.';
+      $('rauto').hidden = false; if (recording()) $('rwarm').hidden = false; $('rh').innerHTML = 'Auto Bucket is on. Jamoja marks every make at this rim. Tap BUCKET for anything else.';
       try { localStorage.setItem('jm.autobucket', '1'); } catch (e) { /* private mode */ }
     });
     const box = (x0, y0, w, h) => { let a = 0, n = 0; return { x0: Math.max(0, Math.round(x0)), y0: Math.max(0, Math.round(y0)), x1: Math.min(160, Math.round(x0 + w)), y1: Math.min(90, Math.round(y0 + h)) }; };
@@ -152,11 +153,17 @@ export function record(opts = {}) {
         const net = avgDiff(g, prevPx, box(X - 6, Y - 1, 12, 11));   // rim and net
         const board = avgDiff(g, prevPx, box(X - 12, Y - 14, 24, 11)); // backboard: if it moves, the camera moved
         const sc2 = net - 1.5 * board, t = performance.now();
-        if (sc2 > 16 && t - lastAuto > 6000) { lastAuto = t; autoN++; mark('auto'); }
+        if (sc2 > 16 && t - lastAuto > 6000) { lastAuto = t; if (!warm) { autoN++; mark('auto'); } }
       }
       prevPx = g;
     }, 100);
     $('rgo').onclick = () => { $('rh').textContent = rim ? 'Recording. Auto Bucket is watching the rim.' : 'Recording. Tap BUCKET right after a big play (or tap the rim for Auto Bucket).'; startPart(); };
+    $('rwarm').onclick = () => {
+      warm = !warm; const b = $('rwarm'); b.classList.toggle('on', warm);
+      b.textContent = warm ? 'WARMUPS · not counting. Tap at tip-off' : 'Warming up? Tap';
+      $('rauto').textContent = warm ? 'AUTO BUCKET PAUSED' : 'AUTO BUCKET ON';
+      if (!warm) { const f = $('rf'); f.textContent = 'Game on. Counting buckets'; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+    };
     $('pz').onclick = () => { if (!recording()) return; after = 'pause'; $('pz').hidden = true; rec.stop(); };
     $('bk').onclick = () => { if (!recording()) return; mark('tap'); $('rh').hidden = true; };
     const stopThen = what => { after = what; if (recording()) rec.stop(); else if (what === 'finish') finish(); else discard(); };
