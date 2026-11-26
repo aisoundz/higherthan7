@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126n';
-import * as R from './rec.js?v=20261126n';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, storage, mode, ready } from './db.js?v=20261126n';
+import * as E from './engine.js?v=20261126o';
+import * as R from './rec.js?v=20261126o';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, storage, mode, ready } from './db.js?v=20261126o';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -185,7 +185,12 @@ async function home() {
     <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
-  if (ME && FEED_TAB === 'all' && !FEED_SPORT) { const extra = (await recapCard()) + installCard(); if (extra) { V.querySelector('.tabs').insertAdjacentHTML('beforebegin', extra); bindInstall(); } }
+  const tabsEl = V.querySelector('.tabs');
+  if (ME && tabsEl && FEED_TAB === 'all' && !FEED_SPORT) {
+    const extra = (await recapCard().catch(() => '')) + installCard();
+    // The screen may have changed while the recap loaded: only add it if Home is still showing.
+    if (extra && tabsEl.isConnected) { tabsEl.insertAdjacentHTML('beforebegin', extra); bindInstall(); }
+  }
   const tabs = V.querySelector('.tabs'); if (tabs) tabs.onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; FEED_TAB = b.dataset.tab; home(); };
   await drawFeed();
   if (ME && !LOCAL) drawMine();
