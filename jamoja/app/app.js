@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126v';
-import * as R from './rec.js?v=20261126v';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126v';
+import * as E from './engine.js?v=20261126x';
+import * as R from './rec.js?v=20261126x';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126x';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126v';
+const APP_V = '20261126x';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -230,7 +230,7 @@ async function drawFeed() {
   bindFollow(box, fol);
 }
 const IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 }) : null;
-function playWhenSeen(v) { if (IO) IO.observe(v); v.onclick = () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); toast(v.muted ? 'Sound off' : 'Sound on'); }; }
+function playWhenSeen(v) { if (IO) IO.observe(v); v.onclick = () => { const art = v.closest('article'); const capEl = art && art.querySelector('.meta, .pb'); openViewer({ video: v.currentSrc || v.src, poster: v.poster, hid: v.dataset.hid, start: v.currentTime, cap: capEl ? capEl.innerHTML : '' }); }; }
 function bindFollow(root, fol) {
   if (root._fh) root.removeEventListener('click', root._fh);
   root.addEventListener('click', root._fh = async e => {
@@ -271,6 +271,7 @@ async function renderItems(box, items, opt = {}) {
   box.onclick = async e => {
     const q = sel => e.target.closest(sel);
     const f = q('[data-fire]'), pf = q('[data-pfire]'), sh = q('[data-share]'), psh = q('[data-pshare]'), mo = q('[data-more]'), rp = q('[data-rep]'), cm = q('[data-cm]'), yt = q('[data-yt]'), del = q('[data-pdel]');
+    const im = e.target.closest('img.pm'); if (im) { openViewer({ img: im.src }); return; }
     if (yt) { yt.outerHTML = `<iframe class="pm ytf" src="https://www.youtube-nocookie.com/embed/${esc(yt.dataset.yt)}?autoplay=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="YouTube video"></iframe>`; return; }
     if (f || pf) {
       if (!ME) return needLogin('#/');
@@ -287,10 +288,13 @@ async function renderItems(box, items, opt = {}) {
       box.querySelectorAll('.rep').forEach(x => x.remove()); if (open) return;
       const [kind, id] = mo.dataset.more.split(':');
       const mine = kind === 'p' && ME && (ps.find(x => x.id === id) || {}).user_id === ME.id;
-      art.insertAdjacentHTML('afterend', mine ? `<div class="card rep"><button class="btn s g" data-pdel="${id}">Delete this post</button></div>`
+      const px = ps.find(y => y.id === id);
+      art.insertAdjacentHTML('afterend', mine ? `<div class="card rep"><div class="row">${px && px.kind === 'video' ? `<button class="btn s g" data-pcov="${id}">Change cover</button>` : ''}<button class="btn s g" data-pdel="${id}">Delete this post</button></div></div>`
         : `<div class="card rep"><b>Report this</b><p class="mu" style="margin:4px 0 10px">Two reports take it off the feed until we review it.</p><div class="row">${["I'm in it and want it removed", 'Inappropriate', 'Not real', 'Spam'].map(r => `<button class="btn s g" data-rep="${kind}:${id}" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`);
       return;
     }
+    const pcov = q('[data-pcov]');
+    if (pcov) { const x = ps.find(y => y.id === pcov.dataset.pcov); if (x) changeCover(x, () => { const pv = box.querySelector(`[data-pid="${x.id}"] video`); if (pv) pv.poster = storage.url(x.poster); pcov.closest('.rep').remove(); }); return; }
     if (del) { if (!confirmIn(del)) return; try { const x = ps.find(y => y.id === del.dataset.pdel); await posts.remove(x.id); if (x.media) await storage.remove([x.media, x.poster].filter(Boolean)); del.closest('.rep').previousElementSibling.remove(); del.closest('.rep').remove(); toast('Post deleted.'); } catch (err) { toast(err.message); } return; }
     if (rp) {
       if (!ME) return needLogin('#/');
@@ -493,6 +497,53 @@ async function dmPage(handle) {
   const opt = V.querySelector('#dmopt');
   const drawOpt = () => { opt.innerHTML = `<button class="btn s g" id="blk">${blocked ? 'Unblock' : 'Block'} ${esc(other.name.split(' ')[0])}</button><p class="mu" style="margin:8px 0 0;font-size:13px">Blocked people can't message you. They aren't told.</p>`; opt.querySelector('#blk').onclick = async () => { try { blocked = !blocked; await blocks.set(ME.id, other.id, blocked); toast(blocked ? 'Blocked.' : 'Unblocked.'); drawOpt(); } catch (err) { toast(err.message); } }; };
   V.querySelector('#dmm').onclick = () => { opt.hidden = !opt.hidden; if (!opt.hidden) drawOpt(); };
+}
+
+// Full-screen viewer for a video or photo. Closes with ✕, the back button, or a swipe down.
+function openViewer(o) {
+  const ov = document.createElement('div'); ov.className = 'viewer';
+  ov.innerHTML = `<button class="rx" aria-label="Close">✕</button>${o.video ? `<video ${o.hid ? `data-hid="${esc(o.hid)}"` : ''} src="${esc(o.video)}" poster="${esc(o.poster || '')}" playsinline autoplay loop controls></video>` : `<img src="${esc(o.img)}" alt="">`}${o.cap ? `<div class="vcap">${o.cap}</div>` : ''}`;
+  document.body.append(ov); document.documentElement.style.overflow = 'hidden';
+  const v = ov.querySelector('video'); if (v) { if (o.start) v.currentTime = o.start; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); countViews(ov); }
+  history.pushState({ viewer: 1 }, '', location.href);
+  let closed = false;
+  const shut = (fromPop) => { if (closed) return; closed = true; if (v) v.pause(); ov.remove(); document.documentElement.style.overflow = ''; window.removeEventListener('popstate', onPop); if (!fromPop) history.back(); };
+  const onPop = () => shut(true);
+  window.addEventListener('popstate', onPop);
+  ov.querySelector('.rx').onclick = () => shut(false);
+  ov.querySelectorAll('.vcap a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); const h = a.getAttribute('href'); shut(false); setTimeout(() => { location.hash = h; }, 50); }));
+  let y0 = null; ov.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true }); ov.addEventListener('touchend', e => { if (y0 != null && e.changedTouches[0].clientY - y0 > 120) shut(false); y0 = null; }, { passive: true });
+}
+
+// Grab the frame a <video> is showing at time t as a JPEG (what you see is what gets saved).
+async function grabFrame(v, t, max = 720) {
+  await new Promise((ok, bad) => { const done = () => { v.removeEventListener('seeked', done); ok(); }; v.addEventListener('seeked', done); setTimeout(done, 3000); v.pause(); v.currentTime = Math.max(0, t); });
+  if (!v.videoWidth) throw new Error('Could not read that frame');
+  const k = Math.min(1, max / Math.max(v.videoWidth, v.videoHeight)); const c = document.createElement('canvas'); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  return new Promise((ok, bad) => c.toBlob(b => b ? b.arrayBuffer().then(a => ok(new Uint8Array(a))) : bad(new Error('Could not save that frame')), 'image/jpeg', 0.86));
+}
+// Change the cover of one of your video posts.
+async function changeCover(x, after) {
+  const ov = document.createElement('div'); ov.className = 'crop';
+  ov.innerHTML = `<div class="cbox" style="width:min(420px,100%)"><b style="font:28px var(--hd)">Pick the cover</b><p class="mu" style="margin:0 0 10px">Slide to the frame you want people to see.</p>
+    <video src="${esc(storage.url(x.media))}" crossorigin="anonymous" playsinline muted preload="auto" style="width:100%;max-height:52vh;border-radius:12px;background:#000"></video>
+    <input type="range" class="zm" min="0" step="0.05" value="0" aria-label="Cover frame">
+    <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn g s" data-x>Cancel</button><button class="btn s" data-ok>Save cover</button></div></div>`;
+  document.body.append(ov);
+  const v = ov.querySelector('video'), r = ov.querySelector('input');
+  v.onloadedmetadata = () => { r.max = (v.duration || 1).toFixed(2); r.value = Math.min(1, v.duration / 2).toFixed(2); v.currentTime = +r.value; };
+  r.oninput = () => { v.currentTime = +r.value; };
+  ov.querySelector('[data-x]').onclick = () => ov.remove();
+  ov.querySelector('[data-ok]').onclick = async e => {
+    const b = e.target; b.disabled = true; b.textContent = 'Saving…';
+    try {
+      const jpg = await grabFrame(v, +r.value);
+      const k = `${ME.id}/posts/cover-${Date.now()}.jpg`; await storage.upload(k, jpg, 'image/jpeg');
+      const old = x.poster; await posts.setCover(x.id, k); x.poster = k; if (old) storage.remove([old]).catch(() => {});
+      ov.remove(); toast('Cover saved.'); if (after) after();
+    } catch (err) { b.disabled = false; b.textContent = 'Save cover'; toast(err.message); }
+  };
 }
 
 // ---------------- Runs and live
@@ -739,7 +790,9 @@ async function composer() {
         } else c = await E.cut(src, s0, e0, onP, att.dur ? att.cover : null);
         await E.close(src);
         pm.textContent = 'Uploading…';
-        await storage.upload(key + '.mp4', c.video, 'video/mp4'); await storage.upload(key + '-p.jpg', c.poster, 'image/jpeg');
+        let cover = c.poster;
+        if (att.dur && !edited(att.ed)) { try { cover = await grabFrame(V.querySelector('#ve'), att.cover); } catch (e) { console.warn('cover grab failed, using generated one', e); } }
+        await storage.upload(key + '.mp4', c.video, 'video/mp4'); await storage.upload(key + '-p.jpg', cover, 'image/jpeg');
         row.media = key + '.mp4'; row.poster = key + '-p.jpg';
       }
       if (att && att.kind === 'youtube') row.youtube_id = att.yt;
@@ -1186,8 +1239,9 @@ async function profilePage(handle) {
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;
   await storage.prep(mine.flatMap(x => [x.media, x.poster]).filter(Boolean));
   const tile = (href, bg, inner, cls = '') => `<a class="tile ${cls}" href="${href}">${bg ? `<img src="${esc(bg)}" alt="" loading="lazy">` : ''}${inner}</a>`;
-  const postTile = x => x.kind === 'photo' ? tile('#/p/' + x.id, storage.url(x.media), x.fire ? `<span class="tb">🔥 ${x.fire}</span>` : '')
-    : x.kind === 'video' ? tile('#/p/' + x.id, storage.url(x.poster), `<span class="tp">▶</span>${x.fire ? `<span class="tb">🔥 ${x.fire}</span>` : ''}`)
+  const btile = (id, bg, inner) => `<button class="tile" data-pv2="${id}"><img src="${esc(bg)}" alt="" loading="lazy">${inner}</button>`;
+  const postTile = x => x.kind === 'photo' ? btile(x.id, storage.url(x.media), x.fire ? `<span class="tb">🔥 ${x.fire}</span>` : '')
+    : x.kind === 'video' ? btile(x.id, storage.url(x.poster), `<span class="tp">▶</span>${x.fire ? `<span class="tb">🔥 ${x.fire}</span>` : ''}`)
     : x.kind === 'youtube' ? tile('#/p/' + x.id, `https://i.ytimg.com/vi/${x.youtube_id}/hqdefault.jpg`, `<span class="tp yt">▶</span>`)
     : tile('#/p/' + x.id, '', `<span class="tt">${esc((x.body || '').slice(0, 90))}</span>`, 'txt');
   const playTile = h => `<button class="tile" data-play="${h.id}"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span class="tp">▶</span>${h.play_type ? `<span class="tl2">${esc(h.play_type)}</span>` : ''}${h.views ? `<span class="tb">${views(h.views)}</span>` : ''}</button>`;
@@ -1200,13 +1254,11 @@ async function profilePage(handle) {
   };
   V.querySelector('.ptabs').onclick = e => { const b2 = e.target.closest('[data-pt2]'); if (b2) show(b2.dataset.pt2); };
   grid.onclick = e => {
+    const pv = e.target.closest('[data-pv2]');
+    if (pv) { const x = mine.find(y => y.id === pv.dataset.pv2); if (!x) return; const cap = `${x.body ? nl(x.body) + '<br>' : ''}<a href="#/p/${x.id}">🔥 ${x.fire || 0} · Comments and more →</a>`; if (x.kind === 'video') openViewer({ video: storage.url(x.media), poster: storage.url(x.poster), cap }); else openViewer({ img: storage.url(x.media), cap }); return; }
     const b2 = e.target.closest('[data-play]'); if (!b2) return;
     const h = hs.find(x => x.id === b2.dataset.play); if (!h) return;
-    const ov = document.createElement('div'); ov.className = 'viewer';
-    ov.innerHTML = `<button class="rx" aria-label="Close">✕</button><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls autoplay playsinline loop></video><div class="vcap"><b>${esc(h.play_type || h.label)}</b> <a href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Open the game')} →</a></div>`;
-    document.body.append(ov); countViews(ov);
-    const shut = () => { ov.remove(); window.removeEventListener('hashchange', shut); };
-    ov.querySelector('.rx').onclick = shut; ov.querySelector('a').onclick = shut; window.addEventListener('hashchange', shut);
+    openViewer({ video: storage.url(h.path), poster: storage.url(h.poster), hid: h.id, cap: `<b>${esc(h.play_type || h.label)}</b> <a href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Open the game')} →</a>` });
   };
   show('posts');
   countViews(V); bindFollow(V, fol);

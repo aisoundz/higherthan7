@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126v';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126x';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -187,6 +187,7 @@ export const posts = {
   async get(id) { if (sb) { const r = chk(await sb.from('posts').select(`*, user:profiles(${PROF}), post_fires(count)`).eq('id', id).maybeSingle()); return r && { ...r, fire: (r.post_fires && r.post_fires[0] && r.post_fires[0].count) || 0 }; } const x = (M.posts || {})[id]; return x ? { ...x, user: M.profiles[x.user_id], fire: 0 } : null; },
   async byUser(userId) { return posts.feed('', 50, [userId]); },
   async remove(id) { if (sb) { chk(await sb.from('posts').delete().eq('id', id)); return; } delete M.posts[id]; await save(); },
+  async setCover(id, poster) { if (sb) { chk(await sb.from('posts').update({ poster }).eq('id', id)); return; } M.posts[id].poster = poster; await save(); },
   async report(id, reason) {
     if (sb) { const r = await sb.from('reports').insert({ post_id: id, reason }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); return; }
     M.preports = M.preports || {}; M.preports[id + ':' + M.session.id] = reason; if (Object.keys(M.preports).filter(k => k.startsWith(id + ':')).length >= 2) M.posts[id].hidden = true; await save();
