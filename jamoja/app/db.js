@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126ze';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zf';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -151,6 +151,11 @@ export const highlights = {
   async list(gameId) {
     if (sb) return chk(await sb.from('highlights').select('*').eq('game_id', gameId).order('created_at'));
     return Object.values(M.highlights).filter(h => h.game_id === gameId).sort((a, b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0);
+  },
+  async forGames(ids) {
+    if (!ids.length) return [];
+    if (sb) return chk(await sb.from('highlights').select('*, game:games(id,title)').in('game_id', ids).eq('hidden', false).order('created_at', { ascending: false }).limit(60));
+    return Object.values(M.highlights).filter(h => ids.includes(h.game_id) && !h.hidden).map(h => ({ ...h, game: M.games[h.game_id] }));
   },
   async forPlayers(ids) {
     if (!ids.length) return [];
