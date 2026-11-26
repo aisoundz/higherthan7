@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126f';
-import * as R from './rec.js?v=20261126f';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126f';
+import * as E from './engine.js?v=20261126g';
+import * as R from './rec.js?v=20261126g';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126g';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -412,7 +412,7 @@ function installCard() {
   if (PUSH_OK() && !/iPhone|iPad|iPod/i.test(UA)) { const pc = pushCard(); if (pc) return pc; }
   try { if (localStorage.getItem('jm.inst.x')) return ''; } catch (e) { /* private */ }
   const ios = /iPhone|iPad|iPod/i.test(UA);
-  return `<div class="card inst"><button class="lnkb x" id="instx" aria-label="Dismiss">✕</button><b>Add Jamoja to your Home Screen</b><p class="mu" style="margin:4px 0 ${ios ? 0 : 10}px">${ios ? 'Opens like an app and lets Jamoja notify you. In Safari tap the Share button <span class="shr">⬆︎</span>, then <b>Add to Home Screen</b>.' : 'Opens like an app and lets Jamoja notify you.'}</p>${ios ? '' : `<button class="btn s" id="inst">Add to Home Screen</button>`}</div>`;
+  return `<div class="card inst"><button class="lnkb x" id="instx" aria-label="Dismiss">✕</button><b>Add Jamoja to your Home Screen</b><p class="mu" style="margin:4px 0 ${ios ? 0 : 10}px">${ios ? 'Opens like an app and lets Jamoja notify you. In Safari tap the Share button <svg class="shr" viewBox="0 0 24 24" aria-label="Share"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M8 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2"/></svg> (the square with the arrow, at the bottom of Safari), then <b>Add to Home Screen</b>.' : 'Opens like an app and lets Jamoja notify you.'}</p>${ios ? '' : `<button class="btn s" id="inst">Add to Home Screen</button>`}</div>`;
 }
 function bindInstall() {
   bindPush();
