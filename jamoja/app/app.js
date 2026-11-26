@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127e';
-import * as R from './rec.js?v=20261127e';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127e';
+import * as E from './engine.js?v=20261127f';
+import * as R from './rec.js?v=20261127f';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127f';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127e';
+const APP_V = '20261127f';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -772,6 +772,33 @@ async function scanRim(url, rim, dur, onProgress, host) {
   } finally { v.pause(); v.remove(); }
   return hits;
 }
+// The run's highlight tape: every play back to back, credited to whoever made it.
+function playTape(g, list, ps) {
+  if (!list.length) return;
+  let i = 0;
+  const el = document.createElement('div'); el.className = 'rv tape'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
+  el.innerHTML = `<div class="rv-top"><b>${esc(g.title)}</b><button class="rv-x" data-x aria-label="Close">✕</button></div>
+    <div class="rv-vw"><video class="rv-v" playsinline autoplay></video><button class="rv-fs" data-fs aria-label="Full screen">⤢</button></div>
+    <div class="tp-cap"></div><div class="tp-bar"></div>
+    <div class="rv-nav"><button class="btn g" data-prev>‹</button><button class="btn" data-next>Next ›</button></div>`;
+  const v = el.querySelector('video'), cap = el.querySelector('.tp-cap'), bar = el.querySelector('.tp-bar');
+  const show = () => {
+    const h = list[i], p = h.player_id && ps.find(x => x.id === h.player_id);
+    v.src = storage.url(h.path); v.play().catch(() => {});
+    cap.innerHTML = `<span class="cap">${esc(h.play_type || 'Play')}</span> <b>${p ? esc(p.label) : 'Unknown player'}</b>${p && p.user_id ? '' : ' <span class="mu">· is this you? Tap Review plays</span>'}`;
+    bar.innerHTML = list.map((_, k) => `<i class="${k < i ? 'd' : k === i ? 'on' : ''}"></i>`).join('');
+  };
+  const close = () => { v.pause(); el.remove(); document.documentElement.style.overflow = ''; };
+  v.onended = () => { if (i < list.length - 1) { i++; show(); } else { cap.innerHTML += ' <span class="mu">· end of the run</span>'; } };
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.x !== undefined) return close();
+    if (b.dataset.next !== undefined) { if (i < list.length - 1) { i++; show(); } else close(); return; }
+    if (b.dataset.prev !== undefined) { i = Math.max(0, i - 1); show(); return; }
+    if (b.dataset.fs !== undefined) { try { if (v.webkitEnterFullscreen) v.webkitEnterFullscreen(); else if (v.requestFullscreen) await v.requestFullscreen(); } catch (err) { /* not allowed */ } }
+  });
+  show();
+}
 // ---------- Review plays: one clip at a time, big buttons. A right guess costs one tap (Next).
 const QUICK = { Basketball: ['Bucket', 'Three', 'Layup', 'Rebound', 'Block', 'Steal', 'Dime', 'Miss'] };
 function reviewPlays(g, list, ps, own, gameId) {
@@ -794,9 +821,9 @@ function reviewPlays(g, list, ps, own, gameId) {
         <div class="rv-l" style="margin-top:12px">Who?</div>
         <div class="rv-c">${mine ? `<span class="chip on">✓ You</span><button class="chip" data-notme>Not me</button>`
           : who && who.user_id ? `<span class="chip on">${esc(who.label || 'Tagged')}</span>`
-          : `<button class="chip me" data-me>🙋 That's me</button>${own ? `<select data-who aria-label="Someone else"><option value="">Someone else…</option>${ps.filter(p => !p.user_id || p.id !== myPid()).map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>` : ''}`}</div>
+          : `<button class="chip me" data-me>🙋 That's me</button><span class="mu rv-nm">Not you? Just tap Next. It stays in the run's tape.</span>${own ? `<select data-who aria-label="Someone else"><option value="">Someone else…</option>${ps.filter(p => !p.user_id || p.id !== myPid()).map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>` : ''}`}</div>
       </div>
-      <div class="rv-nav"><button class="btn g" data-prev ${i ? '' : 'disabled'}>‹ Back</button>${own ? `<button class="btn g" data-del>🗑</button>` : ''}<button class="btn" data-next>${i === list.length - 1 ? 'Done ✓' : 'Next ›'}</button></div>`;
+      <div class="rv-nav"><button class="btn g" data-prev ${i ? '' : 'disabled'}>‹ Back</button>${own ? `<button class="btn g" data-del title="Delete for everyone">Bad clip</button>` : ''}<button class="btn" data-next>${i === list.length - 1 ? 'Done ✓' : 'Next ›'}</button></div>`;
   };
   const go2 = d => { i = Math.max(0, Math.min(list.length - 1, i + d)); draw(); };
   const save1 = async (patch) => { try { await highlights.update(list[i].id, patch); Object.assign(list[i], patch); changed = true; } catch (e) { toast(e.message); } };
@@ -1391,6 +1418,7 @@ async function gamePage(id) {
     ${own ? `<form id="af" class="row" style="margin-top:10px"><input class="t" id="an" placeholder="Name or shirt, like Jay or white shirt" style="flex:1"><button class="btn s">Add</button></form>` : ''}
     ${!myClaim && ps.some(p => !p.user_id) ? `<div class="card" style="margin-top:12px"><b>${LOCAL ? 'Which one is you?' : 'Are you in this game?'}</b><p class="mu" style="margin:4px 0 10px">Tap your name to put these plays on your profile.</p><div class="row">${ps.filter(p => !p.user_id).map(p => `<button class="btn s" data-claim="${p.id}">I'm ${esc(p.label)}</button>`).join('')}</div></div>` : ''}
     ${myClaim ? `<p class="mu" style="margin-top:10px">You are <b>${esc(myClaim.label)}</b> in this game. <button class="btn s g" data-release="${myClaim.id}">Not me</button></p>` : ''}
+    ${hs.length ? `<button class="btn w g" id="tape" style="margin:14px 0 0">▶ Watch the run (${hs.length} plays)</button>` : ''}
     ${hs.length && ME ? `<button class="btn w" id="rvgo" style="margin:14px 0 4px">⚡ Review plays (${hs.length})</button><p class="mu" style="margin:0 0 8px;font-size:13px">Swipe through. Fix the play type, tap "That's me" on yours. Right guesses take one tap.</p>` : ''}
     <h2>Highlights</h2>${warm && own ? `<p class="mu" style="margin-top:-6px">${warm} warmup clip${warm > 1 ? 's' : ''} left out of the game.</p>` : ''}
     ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}${h.views ? ' · ' + views(h.views) : ''}</span>
@@ -1435,6 +1463,7 @@ async function gamePage(id) {
   const gn = document.getElementById('gotnext'); if (gn) gn.onclick = async () => { gn.disabled = true; try { await nextUp.join(g.id); toast("You got next."); gamePage(id); } catch (err) { gn.disabled = false; toast(err.message); } };
   V.querySelectorAll('[data-nx]').forEach(b => b.onclick = async ev => { ev.stopPropagation(); b.disabled = true; try { await nextUp.leave(g.id, b.dataset.nx); gamePage(id); } catch (err) { b.disabled = false; toast(err.message); } });
   const ss = document.getElementById('setspot'); if (ss) ss.onclick = async () => { ss.disabled = true; ss.textContent = '📍 Finding your court…'; await stampSpot(g); if (g.place) { toast('Court added: ' + g.place); gamePage(id); } else { ss.disabled = false; ss.textContent = '📍 Add this court (use my location)'; toast('Could not get your location. Check location permission for your browser.'); } };
+  const tp = document.getElementById('tape'); if (tp) tp.onclick = () => playTape(g, [...hs].sort((a, b) => (a.start_s || 0) - (b.start_s || 0)), ps);
   const rv = document.getElementById('rvgo'); if (rv) rv.onclick = () => reviewPlays(g, hs, ps, own, id);
   if (rv && qs().get('review')) setTimeout(() => reviewPlays(g, hs, ps, own, id), 300);
   const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
@@ -1462,8 +1491,7 @@ async function profilePage(handle) {
   const me = ME && ME.id === p.id;
   const [tags, made, cnt, fol, mine] = await Promise.all([players.mine(p.id), games.mine(p.id), follows.counts(p.id).catch(() => ({ followers: 0, following: 0 })), ME ? follows.ids(ME.id).catch(() => []) : [], posts.byUser(p.id).catch(() => [])]);
   const tagged = await highlights.forPlayers(tags.map(t => t.id));
-  const filmed = await highlights.forGames(made.map(g => g.id)).catch(() => []);
-  const hs = [...tagged, ...filmed.filter(f => !tagged.some(t => t.id === f.id))]; // plays they're in, then plays they filmed
+  const hs = tagged; // only plays tagged to this athlete. Plays they filmed live on the game page (the run's tape).
   await storage.prep([...hs.flatMap(h => [h.path, h.poster]), p.avatar].filter(Boolean));
   const link = shareBase() + '#/u/' + encodeURIComponent(p.handle);
   const following = fol.includes(p.id);
