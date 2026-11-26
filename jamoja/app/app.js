@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126t';
-import * as R from './rec.js?v=20261126t';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126t';
+import * as E from './engine.js?v=20261126v';
+import * as R from './rec.js?v=20261126v';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126v';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126t';
+const APP_V = '20261126v';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -181,12 +181,13 @@ async function home() {
   const top = !ME
     ? `${inAppCard()}<section class="hero"><h1>Where athletes get seen.</h1><p>The social network for athletes and everyone who trains. Hoopers, lifters, runners, CrossFit. Post your work, film your games, and Jamoja cuts the highlights for you.</p>
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
-    : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
+    : `${parts.length ? `<div class="card" id="savedrec" style="border-color:var(--o)"><b>Your recording is saved</b><br><span class="mu">${mmss(parts.reduce((x, p) => x + (p.dur || 0), 0))} of video on this phone${parts.reduce((x, p) => x + (p.marks || []).length, 0) ? `, ${parts.reduce((x, p) => x + (p.marks || []).length, 0)} plays marked` : ''}. Turn it into highlights, or delete it.</span><div class="row" style="margin-top:10px"><a class="btn s" href="#/new">Make highlights</a><button class="btn s g" id="delrec">Delete</button></div></div>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
   V.innerHTML = `${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
     <div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
     <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
+  const dr = V.querySelector('#delrec'); if (dr) dr.onclick = async () => { if (!confirmIn(dr)) return; await R.clearParts(parts.map(p => p.id)); V.querySelector('#savedrec').remove(); toast('Recording deleted.'); };
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
   const railEl = V.querySelector('#rail');
   const fillRail = () => runsRail().then(h => { if (railEl.isConnected) railEl.innerHTML = h; }).catch(() => {});
@@ -520,12 +521,17 @@ async function runBox(g, own) {
 }
 async function liveBox(g) {
   if (LOCAL) return '';
+  const own = ME && g.owner_id === ME.id;
   const ss = await live.sessions(g.id).catch(() => []);
   await storage.prep(ss.map(x => x.user && x.user.avatar).filter(Boolean));
   const mins = x => Math.max(1, Math.round((new Date(x.last) - new Date(x.first)) / 60000));
-  return `<div class="card livebox"><div class="lb-h"><b>${ss.some(x => x.isLive) ? '<span class="lvdot"></span> Live now' : 'Watch'}</b>${ME ? `<button class="btn s" id="golive">● Go live</button>` : ''}</div>
-    ${ss.length ? `<div class="lb-list">${ss.map(x => `<button class="lb-s" data-watch="${esc(x.session)}" data-live="${x.isLive ? 1 : ''}">${avatar(x.user, 28)}<span><b>${esc(x.user ? x.user.name : 'Someone')}</b><br><span class="mu">${x.isLive ? '🔴 Live now' : `Replay · ${mins(x)} min`}</span></span><span class="btn s g">${x.isLive ? 'Watch' : 'Play'}</span></button>`).join('')}</div>` : `<p class="mu" style="margin:6px 0 0">${ME ? 'At the run? Tap Go live and anyone can watch from here, about 10 seconds behind. Players or fans can stream.' : 'When someone goes live at this run, you can watch it here.'}</p>`}
-    <div id="player"></div></div>`;
+  const onAir = ss.some(x => x.isLive);
+  const day = ME ? `<div class="gameday"><b class="gd-t">Game day</b>
+      <button class="btn w gd-live" id="golive"><span class="lvdot"></span> Go live${own ? ' + highlights' : ''}</button>
+      <p class="mu gd-how">${own ? 'Everyone can watch live. Tap BUCKET after big plays, and when you end, your plays are ready to turn into highlights.' : 'Stream the run so people can watch from anywhere.'}</p>
+      ${own ? `<a class="lnkb gd-rec" href="#/new?game=${g.id}">Record only, no live</a>` : ''}</div>` : '';
+  const list = ss.length ? `<div class="lb-list">${ss.map(x => `<button class="lb-s" data-watch="${esc(x.session)}" data-live="${x.isLive ? 1 : ''}">${avatar(x.user, 28)}<span><b>${esc(x.user ? x.user.name : 'Someone')}</b><br><span class="mu">${x.isLive ? '🔴 Live now' : `Replay · ${mins(x)} min`}</span></span><span class="btn s g">${x.isLive ? 'Watch' : 'Play'}</span></button>`).join('')}</div>` : '';
+  return `<div class="card livebox ${onAir ? 'onair' : ''}">${onAir ? `<div class="lb-h"><b><span class="lvdot"></span> Live now</b></div>` : ''}${day}${list ? `<div class="lb-h" style="margin-top:12px"><b>${onAir ? 'Streams' : 'Replays'}</b></div>${list}` : ''}<div id="player"></div></div>`;
 }
 // Broadcaster: records 6-second chunks and uploads each one as it finishes.
 async function goLive(g) {
@@ -538,8 +544,30 @@ async function goLive(g) {
     failed++;
   }); };
   const r = await R.record({ live: true, title: g.title, onPart: up });
-  if (r && r.parts.length) { toast('Finishing the upload…'); await chain; if (r.parts.length && sent) { const lastSeq = r.parts.length - 1; } toast(failed ? `Stream saved with ${failed} missing piece${failed > 1 ? 's' : ''} (weak signal).` : 'Stream saved. People can watch the replay.'); }
-  gamePage(g.id);
+  if (!r || !r.parts.length) { gamePage(g.id); return; }
+  V.innerHTML = `<div class="card" style="margin-top:20px"><b>Saving your stream…</b><p class="mu" id="gls">Finishing the upload.</p><div class="bar"><b id="glb" style="width:30%"></b></div></div>`;
+  await chain;
+  const own = g.owner_id === ME.id;
+  // Turn each BUCKET tap into a short source: the pieces around the tap, joined together.
+  let t0 = 0; const parts = r.parts.map(p => { const x = { ...p, t0 }; t0 += p.dur; return x; });
+  const taps = parts.flatMap(p => p.marks.map(m => p.t0 + m));
+  if (!own || !taps.length) { toast(failed ? `Stream saved with ${failed} missing piece${failed > 1 ? 's' : ''} (weak signal).` : own ? 'Stream saved. No BUCKET taps, so no highlights this time. The replay is on the run page.' : 'Stream saved. People can watch the replay.'); gamePage(g.id); return; }
+  const srcs = [];
+  try {
+    document.getElementById('gls').textContent = 'Getting your plays ready…';
+    for (let k = 0; k < taps.length; k++) {
+      const T = taps[k], from = T - 9, to = T + 3;
+      const pick = parts.filter(p => p.t0 + p.dur > from && p.t0 < to);
+      if (!pick.length) continue;
+      const blob = pick.length === 1 ? pick[0].blob : await E.join(pick.map(p => p.blob), pick[0].type);
+      srcs.push({ id: 'live-' + k, name: `Play ${k + 1}.mp4`, type: 'video/mp4', blob, dur: pick.reduce((a, p) => a + p.dur, 0), marks: [T - pick[0].t0] });
+      document.getElementById('glb').style.width = (30 + 70 * (k + 1) / taps.length) + '%';
+    }
+  } catch (e) { console.error(e); }
+  if (!srcs.length) { toast('Stream saved. The replay is on the run page.'); gamePage(g.id); return; }
+  window.PENDING_SRC = srcs;
+  toast(`${srcs.length} play${srcs.length > 1 ? 's' : ''} from your BUCKET taps. Tap Make highlights.`);
+  go('#/new?game=' + g.id);
 }
 // Viewer: plays chunks back to back. Live: starts near the newest chunk and keeps checking for more.
 let WATCH = null;
@@ -908,7 +936,7 @@ async function newGame() {
       <label class="f" for="gw">When</label><input class="t" id="gw" type="datetime-local" value="${nextHour()}">
       <label class="f" for="gn">Notes (optional)</label><input class="t" id="gn" maxlength="300" placeholder="Full court. Bring a dark and a light shirt.">
       <button class="btn w" id="sv" style="margin-top:14px;min-height:52px">Post this run</button><p class="mu" style="margin:6px 0 0;font-size:13px">It shows on everyone's Home under Runs so your crew can meet you. When you get there, open it to go live or film.</p></div>`}
-    ${saved.length ? `<div class="card" style="border-color:var(--o)" id="recov"><b>Unfinished recording found</b><p class="mu" style="margin:4px 0 10px">${saved.length} part${saved.length > 1 ? 's' : ''} (${mmss(saved.reduce((a, p) => a + p.dur, 0))}) saved on this phone, with ${(n => n + (n === 1 ? ' play' : ' plays'))(saved.reduce((a, p) => a + p.marks.length, 0))} marked.</p><div class="row"><button class="btn s" id="rcv">Use it</button><button class="btn s g" id="rdel">Delete it</button></div></div>` : ''}
+    ${saved.length ? `<div class="card" style="border-color:var(--o)" id="recov"><b>Your recording is saved</b><p class="mu" style="margin:4px 0 10px">${saved.length} part${saved.length > 1 ? 's' : ''} (${mmss(saved.reduce((a, p) => a + p.dur, 0))}) saved on this phone, with ${(n => n + (n === 1 ? ' play' : ' plays'))(saved.reduce((a, p) => a + p.marks.length, 0))} marked.</p><div class="row"><button class="btn s" id="rcv">Use it</button><button class="btn s g" id="rdel">Delete it</button></div></div>` : ''}
     <div class="card"><b>Add your game</b><p class="mu" style="margin:4px 0 12px">Film right here and tap BUCKET after big plays, or upload clips you already shot.</p>
       ${R.supported() ? `<button class="btn w" id="film" style="min-height:56px;font-size:18px">● Film in Jamoja</button>` : ''}
       <label class="btn w g" for="fi" style="margin-top:8px">Upload videos</label><input id="fi" type="file" accept="video/*" multiple hidden></div>
@@ -997,6 +1025,7 @@ async function newGame() {
   const rdel = document.getElementById('rdel');
   if (rdel) rdel.onclick = async () => { if (!confirmIn(rdel)) return; await R.clearParts(saved.map(p => p.id)); document.getElementById('recov').remove(); toast('Recording deleted.'); };
   document.getElementById('fi').onchange = async e => { const files = [...e.target.files]; e.target.value = ''; for (const f of files) await addSource(f); };
+  if (window.PENDING_SRC && existing) { const pend = window.PENDING_SRC; window.PENDING_SRC = null; for (const p of pend) await addSource(new File([p.blob], p.name, { type: p.type }), p); document.getElementById('go').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 
   document.getElementById('mk').onclick = async () => {
     const jobs = srcs.flatMap(s => s.moments.filter(m => m.on).map(m => ({ s, m })));
@@ -1072,7 +1101,7 @@ async function gamePage(id) {
       ${own ? `<select data-hp="${h.id}" aria-label="Player in ${esc(h.label)}"><option value="">Who is this?</option>${ps.map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
       <select data-pt="${h.id}" aria-label="Play type for ${esc(h.label)}"><option value="">What was the play?</option>${playsFor(g.sport).map(t => `<option ${h.play_type === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
       <div class="row" style="margin-top:6px">${LOCAL ? `<button class="btn s g" data-s1="${h.id}" style="flex:1">${canFiles ? 'Send' : 'Save'}</button>` : ''}${own ? `<button class="btn s g" data-hd="${h.id}" style="flex:1">Delete</button>` : ''}</div></div></div>`).join('')}</div>` : `<p class="mu">No highlights yet.</p>`}
-    ${own ? `<a class="btn w" href="#/new?game=${id}" style="margin-top:16px;min-height:56px;font-size:18px">● ${hs.length ? 'Film more of this game' : 'Film this game'}</a><div class="row" style="margin-top:10px"><a class="btn g" href="#/new?game=${id}">+ Upload clips</a><button class="btn g" id="dg">Delete game</button></div>` : ''}
+    ${own ? `<div class="row" style="margin-top:16px"><a class="btn g" href="#/new?game=${id}">+ Upload or record clips</a><button class="btn g" id="dg">Delete game</button></div>` : ''}
     ${LOCAL || ME ? '' : `<p class="foot">Want highlights from your games? <a href="#/login?mode=up">Create a free Jamoja account</a></p>`}`;
   const fileFor = async h => { const b = await storage.blob(h.path); return new File([b], `${g.title.replace(/[^\w]+/g, '-')}-${h.label.replace(/\s+/g, '-')}.mp4`, { type: 'video/mp4' }); };
   async function sendFiles(list) {

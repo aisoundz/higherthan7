@@ -185,3 +185,23 @@ export async function edit(src, o, onProgress) {
   for (const p of [out, pos, ...ins.filter(x => x !== '-i')]) { try { await f.deleteFile(p); } catch (e) { /* gone */ } }
   return { video, poster, dur: outDur };
 }
+
+// Join several short video pieces (from a live stream) into one file. Tries a fast copy first, then a full conversion.
+export async function join(blobs, type = 'video/mp4') {
+  const f = await ensure();
+  const id = ++seq, ext = type.includes('webm') ? 'webm' : 'mp4';
+  const names = [];
+  for (let i = 0; i < blobs.length; i++) { const n = `/j${id}_${i}.${ext}`; await f.writeFile(n, new Uint8Array(await blobs[i].arrayBuffer())); names.push(n); }
+  const list = `/j${id}.txt`, out = `/j${id}_out.mp4`;
+  await f.writeFile(list, new TextEncoder().encode(names.map(n => `file '${n}'`).join('\n')));
+  const size = async p => { try { return (await f.readFile(p)).length; } catch (e) { return 0; } };
+  let rc = await f.exec(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', out]);
+  if (rc !== 0 || (await size(out)) < 20000) {
+    try { await f.deleteFile(out); } catch (e) { /* none */ }
+    rc = await f.exec(['-f', 'concat', '-safe', '0', '-i', list, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-ac', '2', '-movflags', '+faststart', out]);
+  }
+  const data = rc === 0 ? await f.readFile(out) : null;
+  for (const p of [...names, list, out]) { try { await f.deleteFile(p); } catch (e) { /* gone */ } }
+  if (!data) throw new Error('Could not put the stream pieces together');
+  return new Blob([data], { type: 'video/mp4' });
+}
