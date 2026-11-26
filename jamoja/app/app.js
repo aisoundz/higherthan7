@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126o';
-import * as R from './rec.js?v=20261126o';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, storage, mode, ready } from './db.js?v=20261126o';
+import * as E from './engine.js?v=20261126p';
+import * as R from './rec.js?v=20261126p';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, storage, mode, ready } from './db.js?v=20261126p';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -1042,13 +1042,17 @@ async function profilePage(handle) {
     ball: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/></svg>',
   };
   const plays = hs.length, totalViews = hs.reduce((a, h) => a + (h.views || 0), 0);
-  V.innerHTML = `<div class="phead"><div class="ph-handle">@${esc(p.handle)} ${lvBadge(p)}</div>
-    <div class="ph-top">${avatar(p, 86)}<div class="ph-right"><b class="ph-name">${esc(p.name)}</b>
-      <div class="ph-stats"><span><b>${mine.length}</b>posts</span><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b>followers</a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b>following</a></div></div></div>
-    <div class="ph-bio">${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}${p.bio ? `<br>${nl(p.bio)}` : me ? `<br><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}" class="mu">+ Add a bio</a>` : ''}</div>
-    ${me && !LOCAL ? `<a class="dash" href="#/viewers"><b>Your dashboard</b><span class="mu">${pv.length} profile view${pv.length === 1 ? '' : 's'} in the last 30 days${plays ? ` · ${plays} play${plays === 1 ? '' : 's'} · ${totalViews} video view${totalViews === 1 ? '' : 's'}` : ''}</span></a>` : ''}
-    <div class="ph-btns">${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button><a class="btn s g" href="#/dm/${encodeURIComponent(p.handle)}">Message</a>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share profile</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div></div>
-    <div class="ptabs" role="tablist"><button data-pt2="posts" class="on" aria-label="Posts">${ICON.grid}</button><button data-pt2="plays" aria-label="Game highlights">${ICON.play}</button><button data-pt2="games" aria-label="Games filmed">${ICON.ball}</button></div>
+  const fireTotal = mine.reduce((a, x) => a + (x.fire || 0), 0);
+  const SPORT_ICON = { Basketball: '🏀', Football: '🏈', Soccer: '⚽', Baseball: '⚾', Softball: '🥎', Volleyball: '🏐', 'Flag football': '🏈', Track: '🏃', Running: '🏃', Tennis: '🎾', Boxing: '🥊', Weightlifting: '🏋️', CrossFit: '🏋️', Training: '💪', Other: '⭐' };
+  V.innerHTML = `<div class="pcard">
+      <div class="pc-top"><span class="pc-chip">${SPORT_ICON[p.sport] || '⭐'} ${esc(p.sport || 'Athlete')}</span>${p.level ? `<span class="pc-chip lvl">${esc(LV[p.level] || p.level)}</span>` : ''}<span class="pc-brand">JAM<i></i>JA</span></div>
+      <div class="pc-main">${avatar(p, 104)}<div class="pc-id"><div class="pc-name">${esc(p.name)}</div><div class="pc-sub">@${esc(p.handle)}</div><div class="pc-pos">${[p.position, p.city].filter(Boolean).map(esc).join(' · ')}</div></div></div>
+      ${p.bio ? `<div class="pc-bio">${nl(p.bio)}</div>` : me ? `<a class="pc-bio mu" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">+ Add a bio so scouts and teammates know your game</a>` : ''}
+      <div class="pc-stats"><div><b>${plays}</b><span>Plays</span></div><div><b>${totalViews}</b><span>Views</span></div><div><b>${fireTotal}</b><span>🔥</span></div><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b><span>Followers</span></a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b><span>Following</span></a></div>
+    </div>
+    <div class="ph-btns">${me ? `<a class="btn s" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit card</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button><a class="btn s g" href="#/dm/${encodeURIComponent(p.handle)}">Message</a>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div>
+    ${me && !LOCAL ? `<a class="scout" href="#/viewers"><span class="sc-n">${pv.length}</span><span><b>Who's watching</b><br><span class="mu">profile view${pv.length === 1 ? '' : 's'} in the last 30 days · see who →</span></span></a>` : ''}
+    <div class="ptabs" role="tablist"><button data-pt2="posts" class="on">Posts <span>${mine.length}</span></button><button data-pt2="plays">Highlights <span>${plays}</span></button><button data-pt2="games">Games <span>${made.length}</span></button></div>
     <div id="pgrid"></div>
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;
   await storage.prep(mine.flatMap(x => [x.media, x.poster]).filter(Boolean));
