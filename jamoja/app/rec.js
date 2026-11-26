@@ -1,7 +1,7 @@
 // Film in Jamoja: full-screen camera with a Bucket button.
 // Records in parts (a new part every few minutes) and saves each part on the phone as soon as it ends,
 // so a long run never becomes one giant file and nothing is lost if the browser closes.
-import { local } from './db.js?v=20261126zb';
+import { local } from './db.js?v=20261126zd';
 
 const PART_SECONDS = 120;
 const CHECKPOINT_SECONDS = 20;
@@ -33,7 +33,8 @@ export function record(opts = {}) {
       <button class="rx" id="rx" aria-label="Exit">✕</button>
       <div class="rtop"><span class="rdot" id="rdot"></span><b id="rt">0:00</b><span id="rst" class="mu">Ready</span></div>
       ${opts.live ? `<div class="rlive" id="rlive" hidden>● LIVE</div>` : ''}${opts.title ? `<div class="rtitle">${opts.title.replace(/[<>&]/g, '')}</div>` : ''}
-      <div class="rhint" id="rh">Prop the phone where it sees the court. Press Start when the game starts. Tap BUCKET right after a big play.</div>
+      <div class="rhint" id="rh">Prop the phone so it sees the hoop. <b>Tap the rim</b> to turn on Auto Bucket, then press ${opts.live ? 'Go live' : 'Start'}.</div>
+      <div class="rring" id="rring" hidden></div><div class="rauto" id="rauto" hidden>AUTO BUCKET ON</div>
       <div class="rflash" id="rf">Play saved</div>
       <div class="rsheet" id="rsh" hidden></div>
       <div class="rbot">
@@ -44,7 +45,8 @@ export function record(opts = {}) {
     document.body.append(el);
     document.documentElement.style.overflow = 'hidden';
     const vid = el.querySelector('video'), $ = id => el.querySelector('#' + id);
-    const close = () => { el.remove(); document.documentElement.style.overflow = ''; };
+    let sampler = 0;
+    const close = () => { clearInterval(sampler); el.remove(); document.documentElement.style.overflow = ''; };
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: opts.live ? 960 : 1280 }, height: { ideal: opts.live ? 540 : 720 }, frameRate: { ideal: 30 } }, audio: true });
@@ -120,16 +122,43 @@ export function record(opts = {}) {
       }
     }, 500);
     let count = 0;
-    $('rgo').onclick = () => { $('rh').textContent = 'Recording. Tap BUCKET right after a big play.'; startPart(); };
-    $('pz').onclick = () => { if (!recording()) return; after = 'pause'; $('pz').hidden = true; rec.stop(); };
-    $('bk').onclick = () => {
-      if (!recording()) return;
+    // ---------- Auto Bucket: watch the net. When the ball drops through, the net jumps; mark the play.
+    let rim = null, prevPx = null, lastAuto = -1e9, autoN = 0; const cv = document.createElement('canvas'); cv.width = 160; cv.height = 90; const cx = cv.getContext('2d', { willReadFrequently: true });
+    const mark = (src) => {
       marks.push((performance.now() - partStart) / 1000);
-      count++; $('rm').textContent = count + (count === 1 ? ' play marked' : ' plays marked');
-      const f = $('rf'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+      count++; $('rm').textContent = count + (count === 1 ? ' play marked' : ' plays marked') + (autoN ? ` · ${autoN} auto` : '');
+      const f = $('rf'); f.textContent = src === 'auto' ? 'Bucket! Auto-saved' : 'Play saved'; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
       try { navigator.vibrate && navigator.vibrate(40); } catch (e) { /* no vibration */ }
-      $('rh').hidden = true;
     };
+    vid.addEventListener('click', ev => {
+      const r = vid.getBoundingClientRect(), vw = vid.videoWidth, vh = vid.videoHeight; if (!vw) return;
+      const sc = Math.min(r.width / vw, r.height / vh), ox = (r.width - vw * sc) / 2, oy = (r.height - vh * sc) / 2;
+      const nx = (ev.clientX - r.left - ox) / (vw * sc), ny = (ev.clientY - r.top - oy) / (vh * sc);
+      if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return;
+      rim = { x: nx, y: ny }; prevPx = null;
+      const ring = $('rring'); ring.style.left = (ev.clientX - r.left) + 'px'; ring.style.top = (ev.clientY - r.top) + 'px'; ring.hidden = false;
+      $('rauto').hidden = false; $('rh').innerHTML = 'Auto Bucket is on. Jamoja marks every make at this rim. Tap BUCKET for anything else.';
+      try { localStorage.setItem('jm.autobucket', '1'); } catch (e) { /* private mode */ }
+    });
+    const box = (x0, y0, w, h) => { let a = 0, n = 0; return { x0: Math.max(0, Math.round(x0)), y0: Math.max(0, Math.round(y0)), x1: Math.min(160, Math.round(x0 + w)), y1: Math.min(90, Math.round(y0 + h)) }; };
+    const avgDiff = (cur, prev, b) => { let t = 0, n = 0; for (let y = b.y0; y < b.y1; y++) for (let x = b.x0; x < b.x1; x++) { const i = (y * 160 + x); t += Math.abs(cur[i] - prev[i]); n++; } return n ? t / n : 0; };
+    sampler = setInterval(() => {
+      if (!rim || !recording() || !vid.videoWidth) { prevPx = null; return; }
+      cx.drawImage(vid, 0, 0, 160, 90);
+      const d = cx.getImageData(0, 0, 160, 90).data, g = new Uint8Array(160 * 90);
+      for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+      if (prevPx) {
+        const X = rim.x * 160, Y = rim.y * 90;
+        const net = avgDiff(g, prevPx, box(X - 6, Y - 1, 12, 11));   // rim and net
+        const board = avgDiff(g, prevPx, box(X - 12, Y - 14, 24, 11)); // backboard: if it moves, the camera moved
+        const sc2 = net - 1.5 * board, t = performance.now();
+        if (sc2 > 16 && t - lastAuto > 6000) { lastAuto = t; autoN++; mark('auto'); }
+      }
+      prevPx = g;
+    }, 100);
+    $('rgo').onclick = () => { $('rh').textContent = rim ? 'Recording. Auto Bucket is watching the rim.' : 'Recording. Tap BUCKET right after a big play (or tap the rim for Auto Bucket).'; startPart(); };
+    $('pz').onclick = () => { if (!recording()) return; after = 'pause'; $('pz').hidden = true; rec.stop(); };
+    $('bk').onclick = () => { if (!recording()) return; mark('tap'); $('rh').hidden = true; };
     const stopThen = what => { after = what; if (recording()) rec.stop(); else if (what === 'finish') finish(); else discard(); };
     $('rs').onclick = () => {
       const b = $('rs');
