@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126z';
-import * as R from './rec.js?v=20261126z';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126z';
+import * as E from './engine.js?v=20261126za';
+import * as R from './rec.js?v=20261126za';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126za';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126z';
+const APP_V = '20261126za';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -658,10 +658,26 @@ async function watchSession(box, gameId, session, isLive) {
 }
 
 // ---------------- Post composer: text, photo, video, YouTube link
+// One tap to go live: reuse your run from today, or start a new one, then open its Game day card.
+async function quickLive() {
+  const q = document.getElementById('qlive'); if (q) q.disabled = true;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const mine = await games.mine(ME.id).catch(() => []);
+    let g = mine.find(x => x.played_on === today);
+    if (!g) {
+      const at = new Date();
+      g = await games.create({ owner_id: ME.id, title: 'Run ' + at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), sport: (MYP && MYP.sport) || 'Basketball', place: '', played_on: today, starts_at: at.toISOString(), notes: null });
+    }
+    location.hash = '#/g/' + g.id + '?live=1';
+  } catch (e) { toast(e.message || 'Could not start live. Try again.'); if (q) q.disabled = false; }
+}
 async function composer() {
   if (!ME) return needLogin('#/post');
+  setTimeout(() => { const q = document.getElementById('qlive'); if (q) q.onclick = quickLive; }, 0);
   let att = null; // {kind, file?, yt?}
-  V.innerHTML = `<h1>New post</h1>
+  V.innerHTML = `<div class="row" style="gap:8px;margin-bottom:14px;flex-wrap:nowrap"><button class="btn gd-live" id="qlive" type="button" style="flex:1"><span class="lvdot"></span> Go live</button><a class="btn g" href="#/new" style="flex:1;min-height:58px;display:flex;align-items:center;justify-content:center">📍 Post a run</a></div>
+    <h1>New post</h1>
     <div class="card"><div class="row" style="flex-wrap:nowrap;align-items:flex-start;gap:10px">${avatar(MYP, 40)}<textarea id="pt" class="t ta" maxlength="1000" rows="4" placeholder="What's up? A workout, a big win, a run you're putting together…"></textarea></div>
       <div id="att"></div>
       <div class="row" style="margin-top:10px"><label class="btn s g" for="ph">📷 Photo</label><input id="ph" type="file" accept="image/*" hidden>
@@ -1204,6 +1220,7 @@ async function gamePage(id) {
   const rb = document.getElementById('rsvp');
   if (rb) rb.onclick = async () => { const on = !rb.classList.contains('g'); rb.disabled = true; try { await rsvps.set(g.id, ME.id, on); toast(on ? "You're in. See you there." : 'Removed.'); gamePage(id); } catch (err) { rb.disabled = false; toast(err.message); } };
   const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
+  if (gl && qs().get('live')) { gl.scrollIntoView({ block: 'center' }); gl.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: 700, iterations: 3 }); toast('Tap Go live when you\'re ready. Camera opens first, nothing streams until you tap.'); }
   V.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { watchSession(V.querySelector('#player'), g.id, b.dataset.watch, !!b.dataset.live); V.querySelector('#player').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
   const autoLive = V.querySelector('[data-watch][data-live="1"]'); if (autoLive && !own) autoLive.click();
   clearInterval(window.LB_T);
