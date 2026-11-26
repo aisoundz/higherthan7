@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126zh';
-import * as R from './rec.js?v=20261126zh';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zh';
+import * as E from './engine.js?v=20261126zi';
+import * as R from './rec.js?v=20261126zi';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zi';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126zh';
+const APP_V = '20261126zi';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1236,6 +1236,7 @@ async function newGame() {
     } catch (err) {
       console.error(err); busy = false; R.keepAwake(false);
       const done = jobs.filter(j => j.m.done).length;
+      if (!existing && madeGame && !done) { try { await games.remove(madeGame.id); } catch (e2) { /* leave it */ } madeGame = null; } // nothing saved: don't leave an empty run behind
       if (/memory|RuntimeError/i.test(String(err && err.message))) { pt.innerHTML = `<span class="err" style="display:block">Your phone ran low on memory on highlight ${done + 1} of ${jobs.length}.${done ? ` ${done} ${done > 1 ? 'are' : 'is'} already saved.` : ''} Close other apps, then tap Make highlights again. It picks up where it stopped.</span>`; mk.hidden = false; mk.disabled = false; return; }
       pt.innerHTML = `<span class="err" style="display:block">${esc(err && err.message ? err.message : 'Something went wrong making that highlight (' + String(err && (err.name || err.code || err.errno) || err) + ')')}. Your clips are still here. Try again.</span>`; mk.hidden = false; mk.disabled = false;
     }
@@ -1355,6 +1356,7 @@ async function profilePage(handle) {
   const home = courts.length ? courts[0][0] : null;
   let crown = null;
   if (home) { const hsc = await highlights.atCourt(home).catch(() => []); const k = {}; for (const h of hsc) { const u = h.player && h.player.user; if (u) k[u.handle] = (k[u.handle] || 0) + 1; } const top = Object.entries(k).sort((a, b) => b[1] - a[1])[0]; if (top && top[0] === p.handle) crown = home; }
+  const emptyIds = me ? await games.empty(made).catch(() => []) : [];
   const nextRun = made.filter(g => g.starts_at && new Date(g.starts_at).getTime() > Date.now() - 3 * 3600e3).sort((a, b) => a.starts_at < b.starts_at ? -1 : 1)[0];
   const ICON = {
     grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>',
@@ -1390,9 +1392,16 @@ async function profilePage(handle) {
     V.querySelectorAll('[data-pt2]').forEach(b2 => b2.classList.toggle('on', b2.dataset.pt2 === t));
     if (t === 'posts') grid.innerHTML = mine.length ? `<div class="tiles">${mine.map(postTile).join('')}</div>` : `<p class="mu">${me ? 'Nothing posted yet. <a href="#/post">Make your first post</a>.' : 'No posts yet.'}</p>`;
     else if (t === 'plays') grid.innerHTML = hs.length ? `<div class="tiles">${hs.map(playTile).join('')}</div>` : `<p class="mu">${me ? 'Your game highlights live here: clips from games filmed in Jamoja where you are tagged. When a friend sends you their game link, tap "I\'m [your name]" and your plays land here.' : 'No game highlights yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
-    else grid.innerHTML = made.length ? gameList(made) : `<p class="mu">${me ? 'Games you film show up here.' : 'No games filmed yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
+    else grid.innerHTML = made.length ? (emptyIds.length ? `<button class="btn w g" id="cleanup" style="margin:10px 0">🧹 Delete ${emptyIds.length} empty run${emptyIds.length > 1 ? 's' : ''} (no clips, nobody joined)</button>` : '') + gameList(made) : `<p class="mu">${me ? 'Games you film show up here.' : 'No games filmed yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
   };
   V.querySelector('.ptabs').onclick = e => { const b2 = e.target.closest('[data-pt2]'); if (b2) show(b2.dataset.pt2); };
+  grid.addEventListener('click', async e => {
+    const c = e.target.closest('#cleanup'); if (!c) return;
+    if (!confirmIn(c)) return;
+    c.disabled = true; c.textContent = 'Deleting…';
+    let n = 0; for (const id of emptyIds) { try { await games.remove(id); n++; } catch (err) { console.warn(err); } }
+    toast(`Deleted ${n} empty run${n === 1 ? '' : 's'}.`); profilePage(handle).then(() => { const t = V.querySelector('[data-pt2="games"]'); if (t) t.click(); });
+  });
   grid.onclick = e => {
     const pv = e.target.closest('[data-pv2]');
     if (pv) { const x = mine.find(y => y.id === pv.dataset.pv2); if (!x) return; const cap = `${x.body ? nl(x.body) + '<br>' : ''}<a href="#/p/${x.id}">🔥 ${x.fire || 0} · Comments and more →</a>`; if (x.kind === 'video') openViewer({ video: storage.url(x.media), poster: storage.url(x.poster), cap }); else openViewer({ img: storage.url(x.media), cap }); return; }

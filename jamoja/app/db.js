@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zh';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zi';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -97,6 +97,17 @@ export const games = {
   },
   async mine(userId) { if (sb) return chk(await sb.from('games').select('*').eq('owner_id', userId).order('created_at', { ascending: false })); return Object.values(M.games).filter(g => g.owner_id === userId).reverse(); },
   async recent() { if (sb) return chk(await sb.from('games').select('*, owner:profiles!games_owner_id_fkey(name,handle)').order('created_at', { ascending: false }).limit(20)); return Object.values(M.games).reverse().slice(0, 20).map(g => ({ ...g, owner: M.profiles[g.owner_id] })); },
+  // Runs with nothing in them (no clips, no live video, nobody joined) whose time has passed.
+  async empty(list) {
+    const past = list.filter(g => !g.starts_at || new Date(g.starts_at).getTime() < Date.now()).map(g => g.id);
+    if (!past.length) return [];
+    if (sb) {
+      const [h, l, r] = await Promise.all([sb.from('highlights').select('game_id').in('game_id', past), sb.from('live_segments').select('game_id').in('game_id', past), sb.from('rsvps').select('game_id').in('game_id', past)]);
+      const used = new Set([...(h.data || []), ...(l.data || []), ...(r.data || [])].map(x => x.game_id));
+      return past.filter(id => !used.has(id));
+    }
+    return past.filter(id => !Object.values(M.highlights).some(x => x.game_id === id));
+  },
   async setSpot(id, spot) { if (sb) { chk(await sb.from('games').update(spot).eq('id', id)); return; } Object.assign(M.games[id], spot); await save(); },
   // A court someone already named within about 150 m, so everyone at the same court lands on the same page.
   async near(lat, lng) {
