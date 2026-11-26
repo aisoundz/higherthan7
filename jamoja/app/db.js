@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126e';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126f';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -254,6 +254,15 @@ export const profileViews = {
     if (sb) return chk(await sb.from('profile_views').select(`viewer_id, viewed_at, viewer:profiles!profile_views_viewer_id_fkey(${PROF},city)`).eq('profile_id', me).gte('viewed_at', since).order('viewed_at', { ascending: false }).limit(300));
     return (M.pviews || []).filter(v => v.profile_id === me && v.viewed_at >= since).map(v => ({ ...v, viewer: v.viewer_id ? M.profiles[v.viewer_id] : null })).reverse();
   },
+};
+
+export const pushSubs = {
+  async publicKey() { const r = await fetch(SUPABASE_URL + '/functions/v1/push'); if (!r.ok) throw new Error('Notifications are not available right now.'); return (await r.json()).publicKey; },
+  async save(sub) {
+    const j = sub.toJSON(); const row = { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || null };
+    if (!sb) return; const r = await sb.from('push_subs').insert(row); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message);
+  },
+  async remove(endpoint) { if (sb) await sb.from('push_subs').delete().eq('endpoint', endpoint); },
 };
 
 export const notes = {

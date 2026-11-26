@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126e';
-import * as R from './rec.js?v=20261126e';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, storage, mode, ready } from './db.js?v=20261126e';
+import * as E from './engine.js?v=20261126f';
+import * as R from './rec.js?v=20261126f';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126f';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -389,13 +389,33 @@ async function recapCard() {
 let DEFER_PROMPT = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); DEFER_PROMPT = e; });
 const STANDALONE = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+// Push: only offered where the phone can actually receive it (on iPhone, after Add to Home Screen).
+const PUSH_OK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function pushCard() {
+  if (!ME || LOCAL || !PUSH_OK() || Notification.permission === 'denied') return '';
+  if (Notification.permission === 'granted') { ensurePush(false); return ''; }
+  return `<div class="card inst" style="border-color:var(--o)"><b>Turn on notifications</b><p class="mu" style="margin:4px 0 10px">Know when someone follows you, 🔥 your plays, comments or tags you in a game. Nothing between 11 PM and 8 AM.</p><button class="btn s" id="pushon">Turn on notifications</button></div>`;
+}
+async function ensurePush(ask) {
+  try {
+    if (ask) { const p = await Notification.requestPermission(); if (p !== 'granted') { toast('Notifications are off. You can turn them on later in your phone settings.'); return false; } }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) { const key = await pushSubs.publicKey(); const raw = atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - key.length % 4) % 4)); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(raw, c => c.charCodeAt(0)) }); }
+    await pushSubs.save(sub);
+    return true;
+  } catch (e) { console.error(e); if (ask) toast('Could not turn on notifications: ' + e.message); return false; }
+}
+function bindPush() { const b = document.getElementById('pushon'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Turning on…'; if (await ensurePush(true)) { b.closest('.inst').innerHTML = '<b>Notifications are on 🔔</b>'; toast('Notifications are on.'); } else { b.disabled = false; b.textContent = 'Turn on notifications'; } }; }
 function installCard() {
-  if (STANDALONE() || IN_APP) return '';
+  if (STANDALONE() || IN_APP) return pushCard();
+  if (PUSH_OK() && !/iPhone|iPad|iPod/i.test(UA)) { const pc = pushCard(); if (pc) return pc; }
   try { if (localStorage.getItem('jm.inst.x')) return ''; } catch (e) { /* private */ }
   const ios = /iPhone|iPad|iPod/i.test(UA);
   return `<div class="card inst"><button class="lnkb x" id="instx" aria-label="Dismiss">✕</button><b>Add Jamoja to your Home Screen</b><p class="mu" style="margin:4px 0 ${ios ? 0 : 10}px">${ios ? 'Opens like an app and lets Jamoja notify you. In Safari tap the Share button <span class="shr">⬆︎</span>, then <b>Add to Home Screen</b>.' : 'Opens like an app and lets Jamoja notify you.'}</p>${ios ? '' : `<button class="btn s" id="inst">Add to Home Screen</button>`}</div>`;
 }
 function bindInstall() {
+  bindPush();
   const x = document.getElementById('instx'); if (x) x.onclick = () => { try { localStorage.setItem('jm.inst.x', '1'); } catch (e) { /* private */ } x.closest('.inst').remove(); };
   const b = document.getElementById('inst'); if (b) b.onclick = async () => { if (DEFER_PROMPT) { DEFER_PROMPT.prompt(); DEFER_PROMPT = null; } else toast('Open your browser menu (⋮) and tap Add to Home screen.'); };
 }
