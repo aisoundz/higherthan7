@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126zm';
-import * as R from './rec.js?v=20261126zm';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zm';
+import * as E from './engine.js?v=20261127a';
+import * as R from './rec.js?v=20261127a';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127a';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126zm';
+const APP_V = '20261127a';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -712,7 +712,7 @@ async function courtPage(place) {
     <h2>Next runs here</h2>${soonRuns.length ? gameList(soonRuns) : `<p class="mu">Nothing posted. Post one and your crew will see it.</p>`}
     <h2>👑 King of the Court</h2>${board.length ? `<div class="list">${board.map((k, i) => `<a href="#/u/${esc(k.u.handle)}"><span class="row" style="gap:10px;flex-wrap:nowrap"><b style="width:18px">${i + 1}</b>${avatar(k.u, 34)}<span><b>${esc(k.u.name)}</b><br><span class="mu">${k.n} highlight${k.n === 1 ? '' : 's'} · 🔥 ${k.f}</span></span></span></a>`).join('')}</div>` : `<p class="mu">No crown yet. Claim your plays from a game filmed here to get on the board.</p>`}
     ${regulars.length ? `<h2>Regulars</h2><div class="row">${regulars.map(r => `<a href="#/u/${esc(r.u.handle)}" title="${esc(r.u.name)}">${avatar(r.u, 40)}</a>`).join('')}</div>` : ''}
-    <h2>Best plays here</h2>${hs.length ? `<div class="tiles">${[...hs].sort((a, b) => (b.fire || 0) - (a.fire || 0)).slice(0, 12).map(h => `<a class="tile" href="#/g/${h.game_id}"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span>🔥 ${h.fire || 0}</span></a>`).join('')}</div>` : `<p class="mu">No highlights from this court yet.</p>`}
+    <h2>Best plays here</h2>${hs.length ? `<div class="tiles">${[...hs].sort((a, b) => (b.fire || 0) - (a.fire || 0)).slice(0, 12).map(h => `<a class="tile" href="#/g/${h.game_id}"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span class="tlab">🔥 ${h.fire || 0}</span></a>`).join('')}</div>` : `<p class="mu">No highlights from this court yet.</p>`}
     ${past.length ? `<h2>Past games</h2>${gameList(past.slice(0, 10))}` : ''}`;
 }
 // "I got next": the line for the next game on this court.
@@ -737,7 +737,7 @@ function runReport(g, ps, hs) {
     <div class="rp-h"><b>${esc(g.title)}</b><span class="mu">${g.place ? '📍 ' + courtLink(g.place) + ' · ' : ''}${esc(when)}</span></div>
     <div class="rp-s"><div><b>${hs.length}</b><span>plays</span></div><div><b>${ps.length || '·'}</b><span>players</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>views</span></div></div>
     ${tline ? `<p class="mu" style="margin:8px 0 0">${tline}</p>` : ''}
-    <p style="margin:10px 0 4px"><b>Top plays</b></p><div class="tiles rp-t">${top.map(h => `<span class="tile"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span>${esc(h.play_type || h.label)}</span></span>`).join('')}</div></div>`;
+    <p style="margin:10px 0 4px"><b>Top plays</b></p><div class="tiles rp-t">${top.map(h => `<span class="tile"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span class="tlab">${esc(h.play_type || h.label)}</span></span>`).join('')}</div></div>`;
 }
 // Play the video fast in the background and watch the net. A make jerks the net; the backboard staying still means the camera did not move.
 async function scanRim(url, rim, dur, onProgress, host) {
