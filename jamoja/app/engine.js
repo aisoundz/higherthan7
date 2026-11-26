@@ -84,17 +84,30 @@ export async function cut(src, start, end, onProgress, posterAt) {
   const out = `/c${id}.mp4`, pos = `/p${id}.jpg`;
   const scale = "scale='if(gt(iw,ih),-2,540)':'if(gt(iw,ih),540,-2)'";
   const prog = ({ progress }) => onProgress && onProgress(Math.max(0, Math.min(1, progress)));
+  const size = async p => { try { return (await f.readFile(p)).length; } catch (e) { return 0; } };
+  const del = async p => { try { await f.deleteFile(p); } catch (e) { /* gone */ } };
+  const encode = ['-vf', scale, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-ac', '2'];
   f.on('progress', prog);
-  const copy = src.codec === 'h264';
-  const args = ['-ss', start.toFixed(2), '-i', src.inp, '-t', d.toFixed(2)];
-  if (copy) args.push('-c', 'copy');
-  else args.push('-vf', scale, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-ac', '2');
-  args.push('-movflags', '+faststart', out);
-  await f.exec(args);
-  f.off('progress', prog);
-  await f.exec(['-ss', (posterAt != null ? Math.max(0, posterAt) : start + d * 0.6).toFixed(2), '-i', src.inp, '-frames:v', '1', '-vf', scale, '-q:v', '5', pos]);
-  const video = await f.readFile(out), poster = await f.readFile(pos);
-  await f.deleteFile(out); await f.deleteFile(pos);
+  try {
+    // Fast path: copy without re-encoding (only for H.264). Videos filmed inside the browser can refuse this, so check the result.
+    let ok = false;
+    if (src.codec === 'h264') {
+      const rc = await f.exec(['-ss', start.toFixed(2), '-i', src.inp, '-t', d.toFixed(2), '-c', 'copy', '-movflags', '+faststart', out]);
+      ok = rc === 0 && (await size(out)) > 20000;
+      if (!ok) await del(out);
+    }
+    if (!ok) {
+      const rc = await f.exec(['-ss', start.toFixed(2), '-i', src.inp, '-t', d.toFixed(2), ...encode, '-movflags', '+faststart', out]);
+      if (rc !== 0 || (await size(out)) < 2000) { await del(out); throw new Error('Could not cut this clip. The video may be damaged or too short at that spot'); }
+    }
+  } finally { f.off('progress', prog); }
+  // Cover image: from the source, or from the finished clip if that fails.
+  let rc = await f.exec(['-ss', (posterAt != null ? Math.max(0, posterAt) : start + d * 0.6).toFixed(2), '-i', src.inp, '-frames:v', '1', '-vf', scale, '-q:v', '5', pos]);
+  if (rc !== 0 || !(await size(pos))) { await del(pos); rc = await f.exec(['-ss', (d * 0.5).toFixed(2), '-i', out, '-frames:v', '1', '-q:v', '5', pos]); }
+  if (rc !== 0 || !(await size(pos))) { await del(pos); await f.exec(['-i', out, '-frames:v', '1', '-q:v', '5', pos]); }
+  const video = await f.readFile(out);
+  let poster; try { poster = await f.readFile(pos); } catch (e) { throw new Error('Could not make a cover image for this clip'); }
+  await del(out); await del(pos);
   return { video, poster, dur: d };
 }
 
