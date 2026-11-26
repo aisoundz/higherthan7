@@ -4,6 +4,24 @@
 import { FFmpeg } from './vendor/ffmpeg/index.js';
 
 let ff = null, loading = null, seq = 0;
+const mounted = new Set();
+// iPhones give the browser little memory. ffmpeg.wasm can corrupt its memory there ("Out of bounds memory access"),
+// and after that every command fails. So on iOS each clip gets a fresh engine, and any crash restarts it and retries once.
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+export async function reset() {
+  const old = ff; ff = null; loading = null; mounted.clear();
+  try { if (old) old.terminate(); } catch (e) { /* already gone */ }
+}
+async function ready(src) {
+  const f = await ensure();
+  if (src && src.file && !mounted.has(src.dir)) {
+    try { await f.createDir(src.dir); } catch (e) { /* exists */ }
+    await f.mount('WORKERFS', { files: [src.file] }, src.dir);
+    mounted.add(src.dir);
+  }
+  return f;
+}
+const crashed = e => e && !e.jm && /memory|RuntimeError|abort|terminat|unreachable|called before load|not loaded/i.test(String(e.message || e));
 const base = new URL('.', import.meta.url);
 
 export async function ensure() {
@@ -51,6 +69,7 @@ export async function analyze(file) {
   const dir = '/src' + (++seq);
   await f.createDir(dir);
   await f.mount('WORKERFS', { files: [file] }, dir);
+  mounted.add(dir);
   const inp = dir + '/' + file.name;
   let log = '';
   const h = ({ message }) => { log += message + '\n'; };
@@ -78,7 +97,21 @@ export async function analyze(file) {
 
 // Cut one moment into a phone-friendly clip plus a poster image.
 export async function cut(src, start, end, onProgress, posterAt) {
-  const f = await ensure();
+  try {
+    const r = await cutOnce(src, start, end, onProgress, posterAt);
+    if (IOS) await reset(); // start the next clip with clean memory
+    return r;
+  } catch (e) {
+    if (!crashed(e)) throw e;
+    console.warn('engine crashed, restarting', e);
+    await reset();
+    const r = await cutOnce(src, start, end, onProgress, posterAt);
+    if (IOS) await reset();
+    return r;
+  }
+}
+async function cutOnce(src, start, end, onProgress, posterAt) {
+  const f = await ready(src);
   const d = Math.max(1, end - start);
   const id = ++seq;
   const out = `/c${id}.mp4`, pos = `/p${id}.jpg`;
@@ -98,7 +131,7 @@ export async function cut(src, start, end, onProgress, posterAt) {
     }
     if (!ok) {
       const rc = await f.exec(['-ss', start.toFixed(2), '-i', src.inp, '-t', d.toFixed(2), ...encode, '-movflags', '+faststart', out]);
-      if (rc !== 0 || (await size(out)) < 2000) { await del(out); throw new Error('Could not cut this clip. The video may be damaged or too short at that spot'); }
+      if (rc !== 0 || (await size(out)) < 2000) { await del(out); const er = new Error('Could not cut this clip. The video may be damaged or too short at that spot'); er.jm = 1; throw er; }
     }
   } finally { f.off('progress', prog); }
   // Cover image: from the source, or from the finished clip if that fails.
@@ -106,13 +139,15 @@ export async function cut(src, start, end, onProgress, posterAt) {
   if (rc !== 0 || !(await size(pos))) { await del(pos); rc = await f.exec(['-ss', (d * 0.5).toFixed(2), '-i', out, '-frames:v', '1', '-q:v', '5', pos]); }
   if (rc !== 0 || !(await size(pos))) { await del(pos); await f.exec(['-i', out, '-frames:v', '1', '-q:v', '5', pos]); }
   const video = await f.readFile(out);
-  let poster; try { poster = await f.readFile(pos); } catch (e) { throw new Error('Could not make a cover image for this clip'); }
+  let poster; try { poster = await f.readFile(pos); } catch (e) { const er = new Error('Could not make a cover image for this clip'); er.jm = 1; throw er; }
   await del(out); await del(pos);
   return { video, poster, dur: d };
 }
 
 export async function close(src) {
-  try { await (await ensure()).unmount(src.dir); await ff.deleteDir(src.dir); } catch (e) { /* already closed */ }
+  if (!ff || !mounted.has(src.dir)) return;
+  try { await ff.unmount(src.dir); await ff.deleteDir(src.dir); } catch (e) { /* already closed */ }
+  mounted.delete(src.dir);
 }
 
 // Stamp a watermark image (PNG bytes) onto a clip so every repost carries the brand.

@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126zg';
-import * as R from './rec.js?v=20261126zg';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zg';
+import * as E from './engine.js?v=20261126zh';
+import * as R from './rec.js?v=20261126zh';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zh';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126zg';
+const APP_V = '20261126zh';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1217,6 +1217,7 @@ async function newGame() {
       const already = existing ? (await highlights.list(game.id)).length : 0;
       for (let k = 0; k < jobs.length; k++) {
         const { s, m } = jobs[k];
+        if (m.done) continue; // made on an earlier try: don't make it twice
         pt.textContent = `Cutting highlight ${k + 1} of ${jobs.length}. Keep this screen open.`;
         const c = await E.cut(s, m.start, m.end, p => { pb.style.width = ((k + p * 0.9) / jobs.length * 100) + '%'; });
         pt.textContent = `Saving highlight ${k + 1} of ${jobs.length}…`;
@@ -1224,6 +1225,7 @@ async function newGame() {
         await storage.upload(key + '.mp4', c.video, 'video/mp4');
         await storage.upload(key + '.jpg', c.poster, 'image/jpeg');
         await highlights.add({ game_id: game.id, created_by: ME.id, label: 'Play ' + (already + k + 1), path: key + '.mp4', poster: key + '.jpg', dur_s: +c.dur.toFixed(2), start_s: +m.start.toFixed(2) });
+        m.done = true;
         pb.style.width = ((k + 1) / jobs.length * 100) + '%';
       }
       for (const s of srcs) { await E.close(s); URL.revokeObjectURL(s.url); }
@@ -1233,6 +1235,8 @@ async function newGame() {
       go('#/g/' + game.id + '?fresh=1');
     } catch (err) {
       console.error(err); busy = false; R.keepAwake(false);
+      const done = jobs.filter(j => j.m.done).length;
+      if (/memory|RuntimeError/i.test(String(err && err.message))) { pt.innerHTML = `<span class="err" style="display:block">Your phone ran low on memory on highlight ${done + 1} of ${jobs.length}.${done ? ` ${done} ${done > 1 ? 'are' : 'is'} already saved.` : ''} Close other apps, then tap Make highlights again. It picks up where it stopped.</span>`; mk.hidden = false; mk.disabled = false; return; }
       pt.innerHTML = `<span class="err" style="display:block">${esc(err && err.message ? err.message : 'Something went wrong making that highlight (' + String(err && (err.name || err.code || err.errno) || err) + ')')}. Your clips are still here. Try again.</span>`; mk.hidden = false; mk.disabled = false;
     }
   };
