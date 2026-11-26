@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126m';
-import * as R from './rec.js?v=20261126m';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, storage, mode, ready } from './db.js?v=20261126m';
+import * as E from './engine.js?v=20261126n';
+import * as R from './rec.js?v=20261126n';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, storage, mode, ready } from './db.js?v=20261126n';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -108,16 +108,16 @@ async function refreshMe() { ME = await auth.user(); MYP = ME ? await profiles.b
 let BDG_T = null;
 async function refreshBadge() {
   const b = document.getElementById('bdg'); if (!b || !ME || LOCAL) return;
-  try { const n = await notes.unread(ME.id); b.hidden = !n; b.textContent = n > 9 ? '9+' : n; const nd = document.getElementById('ndot'); if (nd) { nd.hidden = !n; nd.textContent = n > 99 ? '99+' : n; } document.title = (n ? `(${n}) ` : '') + 'Jamoja'; } catch (e) { /* offline */ }
+  try { const [n, d] = await Promise.all([notes.unread(ME.id), dms.unread(ME.id).catch(() => 0)]); b.hidden = !d; b.textContent = d > 9 ? '9+' : d; const nd = document.getElementById('ndot'); if (nd) { nd.hidden = !n; nd.textContent = n > 99 ? '99+' : n; } document.title = (n + d ? `(${n + d}) ` : '') + 'Jamoja'; } catch (e) { /* offline */ }
 }
 function topbar() {
   clearInterval(BDG_T); if (ME && !LOCAL) { setTimeout(refreshBadge, 50); BDG_T = setInterval(refreshBadge, 60000); }
   TR.innerHTML = ME
-    ? (MYP ? `<a class="bell" href="#/alerts" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="bdg" id="bdg" hidden></span></a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
+    ? (MYP ? `<a class="bell" href="#/inbox" aria-label="Messages"><svg viewBox="0 0 24 24"><path d="M21.5 3.5 10.5 13.5M21.5 3.5l-7 18-4-8-8-4z"/></svg><span class="bdg" id="bdg" hidden></span></a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
     : LOCAL ? '' : `<a class="btn s g" href="#/login">Sign in</a>`;
   const nav = document.getElementById('nav'); if (!nav) return;
   const h = location.hash || '#/';
-  nav.hidden = !(ME && MYP) || /^#\/(login|setup)/.test(h);
+  nav.hidden = !(ME && MYP) || /^#\/(login|setup|dm\/)/.test(h);
   if (!nav.hidden) {
     const mine = h.startsWith('#/u/' + encodeURIComponent(MYP.handle)) || h.startsWith('#/u/' + MYP.handle) || h.startsWith('#/viewers') || h.startsWith('#/setup');
     const on = { feed: h === '#/' || h === '#' || h === '' || h.startsWith('#/p/'), people: h.startsWith('#/people'), post: /^#\/(post|new)/.test(h), alerts: h.startsWith('#/alerts'), me: mine };
@@ -158,6 +158,8 @@ async function route() {
     if (parts[0] === 'people') return await peoplePage();
     if (parts[0] === 'viewers') return await viewersPage();
     if (parts[0] === 'alerts') return await alertsPage();
+    if (parts[0] === 'inbox') return await inboxPage();
+    if (parts[0] === 'dm' && parts[1]) return await dmPage(decodeURIComponent(parts[1]));
     V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`;
   } catch (e) {
     console.error(e);
@@ -428,6 +430,55 @@ function bindInstall() {
   bindPush();
   const x = document.getElementById('instx'); if (x) x.onclick = () => { try { localStorage.setItem('jm.inst.x', '1'); } catch (e) { /* private */ } x.closest('.inst').remove(); };
   const b = document.getElementById('inst'); if (b) b.onclick = async () => { if (DEFER_PROMPT) { DEFER_PROMPT.prompt(); DEFER_PROMPT = null; } else toast('Open your browser menu (⋮) and tap Add to Home screen.'); };
+}
+
+// ---------------- Direct messages
+let DM_T = null;
+window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#/dm/')) { clearInterval(DM_T); DM_T = null; } });
+async function inboxPage() {
+  if (!ME) return needLogin('#/inbox');
+  const list = await dms.inbox().catch(err => { V.innerHTML = `<div class="err">${esc(err.message)}</div>`; return null; });
+  if (!list) return;
+  await storage.prep(list.map(r => r.other.avatar).filter(Boolean));
+  V.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center"><h1 style="margin:0">Messages</h1><button class="btn s" id="newdm">New message</button></div>
+    <div id="pick" hidden style="margin-top:12px"><input class="t" id="dq" type="search" placeholder="Search name or @handle" autocapitalize="off" autocorrect="off" spellcheck="false"><div id="dres"></div></div>
+    <div style="margin-top:10px">${list.length ? list.map(r => `<a class="nrow ${r.unread ? 'new' : ''}" href="#/dm/${encodeURIComponent(r.other.handle)}">${avatar(r.other, 52)}<span style="flex:1;min-width:0"><b>${esc(r.other.name)}</b><br><span class="mu dmprev">${r.last_from_me ? 'You: ' : ''}${esc(r.last_body)}</span></span><span class="mu" style="font-size:12px;text-align:right">${ago(r.last_at)}${r.unread ? `<br><i class="udot"></i>` : ''}</span></a>`).join('')
+      : `<p class="mu">No messages yet. Tap <b>New message</b>, or open someone's profile and tap <b>Message</b>.</p>`}</div>`;
+  const pick = V.querySelector('#pick'), dq = V.querySelector('#dq'), dres = V.querySelector('#dres'); let t = null;
+  V.querySelector('#newdm').onclick = () => { pick.hidden = !pick.hidden; if (!pick.hidden) dq.focus(); };
+  dq.oninput = () => { clearTimeout(t); t = setTimeout(async () => { const ps = (await follows.people(dq.value).catch(() => [])).filter(p => p.id !== ME.id).slice(0, 12); await storage.prep(ps.map(p => p.avatar).filter(Boolean)); dres.innerHTML = ps.map(p => `<a class="nrow" href="#/dm/${encodeURIComponent(p.handle)}">${avatar(p, 40)}<span><b>${esc(p.name)}</b><br><span class="mu">@${esc(p.handle)}</span></span></a>`).join('') || '<p class="mu">No one found.</p>'; }, 250); };
+}
+async function dmPage(handle) {
+  if (!ME) return needLogin('#/dm/' + encodeURIComponent(handle));
+  const other = await profiles.byHandle(handle);
+  if (!other) { V.innerHTML = `<h1>Not found</h1><a href="#/inbox">Back to messages</a>`; return; }
+  if (other.id === ME.id) return go('#/inbox');
+  await storage.prep([other.avatar].filter(Boolean));
+  let blocked = await blocks.has(ME.id, other.id).catch(() => false);
+  V.innerHTML = `<div class="dmh"><a href="#/inbox" class="dmb" aria-label="Back">‹</a><a href="#/u/${esc(other.handle)}" class="dmu">${avatar(other, 36)}<span><b>${esc(other.name)}</b><br><span class="mu" style="font-size:12px">@${esc(other.handle)}</span></span></a><button class="lnkb" id="dmm" aria-label="Options">⋯</button></div>
+    <div id="dmopt" class="card" hidden></div>
+    <div id="msgs" class="msgs"><p class="mu">Loading…</p></div>
+    <form class="dmf" id="dmf"><input class="t" id="dmi" maxlength="2000" placeholder="Message…" autocomplete="off" aria-label="Message"><button class="btn s">Send</button></form>`;
+  const box = V.querySelector('#msgs'); let last = '', first = true;
+  const draw = async () => {
+    const list = await dms.thread(ME.id, other.id).catch(() => null); if (!list) return;
+    const sig = list.map(m => m.id + (m.read_at ? 1 : 0)).join(); if (sig === last) return; last = sig;
+    const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
+    box.innerHTML = list.length ? list.map((m, i) => { const mine = m.sender_id === ME.id, prev = list[i - 1]; const gap = !prev || new Date(m.created_at) - new Date(prev.created_at) > 3600e3; return `${gap ? `<div class="dmt">${new Date(m.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>` : ''}<div class="bub ${mine ? 'me' : ''}">${nl(m.body)}</div>`; }).join('') + (list.length && list[list.length - 1].sender_id === ME.id && list[list.length - 1].read_at ? '<div class="seen">Seen</div>' : '')
+      : `<div class="dmempty">${avatar(other, 72)}<b>${esc(other.name)}</b><span class="mu">Say what's up. Set up a run, talk about the game.</span></div>`;
+    if (atBottom || first) window.scrollTo(0, document.body.scrollHeight); first = false;
+    if (list.some(m => m.recipient_id === ME.id && !m.read_at)) { await dms.markRead(ME.id, other.id).catch(() => {}); refreshBadge(); }
+  };
+  await draw();
+  clearInterval(DM_T); DM_T = setInterval(draw, 4000);
+  const f = V.querySelector('#dmf'), inp = V.querySelector('#dmi');
+  f.onsubmit = async e => {
+    e.preventDefault(); const v = inp.value.trim(); if (!v) return;
+    inp.value = ''; try { await dms.send(other.id, v); last = ''; await draw(); window.scrollTo(0, document.body.scrollHeight); } catch (err) { inp.value = v; toast(err.message); }
+  };
+  const opt = V.querySelector('#dmopt');
+  const drawOpt = () => { opt.innerHTML = `<button class="btn s g" id="blk">${blocked ? 'Unblock' : 'Block'} ${esc(other.name.split(' ')[0])}</button><p class="mu" style="margin:8px 0 0;font-size:13px">Blocked people can't message you. They aren't told.</p>`; opt.querySelector('#blk').onclick = async () => { try { blocked = !blocked; await blocks.set(ME.id, other.id, blocked); toast(blocked ? 'Blocked.' : 'Unblocked.'); drawOpt(); } catch (err) { toast(err.message); } }; };
+  V.querySelector('#dmm').onclick = () => { opt.hidden = !opt.hidden; if (!opt.hidden) drawOpt(); };
 }
 
 // ---------------- Post composer: text, photo, video, YouTube link
@@ -991,7 +1042,7 @@ async function profilePage(handle) {
       <div class="ph-stats"><span><b>${mine.length}</b>posts</span><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b>followers</a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b>following</a></div></div></div>
     <div class="ph-bio">${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}${p.bio ? `<br>${nl(p.bio)}` : me ? `<br><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}" class="mu">+ Add a bio</a>` : ''}</div>
     ${me && !LOCAL ? `<a class="dash" href="#/viewers"><b>Your dashboard</b><span class="mu">${pv.length} profile view${pv.length === 1 ? '' : 's'} in the last 30 days${plays ? ` · ${plays} play${plays === 1 ? '' : 's'} · ${totalViews} video view${totalViews === 1 ? '' : 's'}` : ''}</span></a>` : ''}
-    <div class="ph-btns">${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share profile</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div></div>
+    <div class="ph-btns">${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button><a class="btn s g" href="#/dm/${encodeURIComponent(p.handle)}">Message</a>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share profile</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div></div>
     <div class="ptabs" role="tablist"><button data-pt2="posts" class="on" aria-label="Posts">${ICON.grid}</button><button data-pt2="plays" aria-label="Game highlights">${ICON.play}</button><button data-pt2="games" aria-label="Games filmed">${ICON.ball}</button></div>
     <div id="pgrid"></div>
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;

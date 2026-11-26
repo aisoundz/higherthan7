@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126m';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126n';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -263,6 +263,37 @@ export const pushSubs = {
     if (!sb) return; const r = await sb.from('push_subs').insert(row); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message);
   },
   async remove(endpoint) { if (sb) await sb.from('push_subs').delete().eq('endpoint', endpoint); },
+};
+
+export const dms = {
+  async inbox() {
+    let rows;
+    if (sb) rows = chk(await sb.rpc('dm_inbox'));
+    else { const me = M.session.id, all = Object.values(M.msgs || {}).filter(m => [m.sender_id, m.recipient_id].includes(me)).sort((a, b) => a.created_at < b.created_at ? 1 : -1); const seen = {}; rows = [];
+      for (const m of all) { const o = m.sender_id === me ? m.recipient_id : m.sender_id; if (seen[o]) continue; seen[o] = 1; rows.push({ other_id: o, last_body: m.body, last_at: m.created_at, last_from_me: m.sender_id === me, unread: all.filter(x => x.recipient_id === me && x.sender_id === o && !x.read_at).length }); } }
+    if (!rows.length) return [];
+    const ids = rows.map(r => r.other_id);
+    const ps = sb ? chk(await sb.from('profiles').select(PROF).in('id', ids)) : ids.map(i => M.profiles[i]).filter(Boolean);
+    return rows.map(r => ({ ...r, other: ps.find(p => p.id === r.other_id) })).filter(r => r.other);
+  },
+  async thread(me, other) {
+    if (sb) return chk(await sb.from('messages').select('id,sender_id,recipient_id,body,created_at,read_at').or(`and(sender_id.eq.${me},recipient_id.eq.${other}),and(sender_id.eq.${other},recipient_id.eq.${me})`).order('created_at', { ascending: false }).limit(200)).reverse();
+    return Object.values(M.msgs || {}).filter(m => (m.sender_id === me && m.recipient_id === other) || (m.sender_id === other && m.recipient_id === me)).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+  },
+  async send(to, body) {
+    if (sb) return chk(await sb.from('messages').insert({ recipient_id: to, body }).select().single());
+    if ((M.blocks || {})[to + ':' + M.session.id]) throw new Error("You can't message this person.");
+    M.msgs = M.msgs || {}; const r = { id: uid(), sender_id: M.session.id, recipient_id: to, body, created_at: now(), read_at: null }; M.msgs[r.id] = r; await save(); return r;
+  },
+  async markRead(me, other) { if (sb) { await sb.from('messages').update({ read_at: new Date().toISOString() }).eq('recipient_id', me).eq('sender_id', other).is('read_at', null); return; } Object.values(M.msgs || {}).forEach(m => { if (m.recipient_id === me && m.sender_id === other && !m.read_at) m.read_at = now(); }); await save(); },
+  async unread(me) { if (!me) return 0; if (sb) { const r = await sb.from('messages').select('*', { count: 'exact', head: true }).eq('recipient_id', me).is('read_at', null); return r.count || 0; } return Object.values(M.msgs || {}).filter(m => m.recipient_id === me && !m.read_at).length; },
+};
+export const blocks = {
+  async has(me, other) { if (sb) return chk(await sb.from('blocks').select('blocked_id').eq('blocker_id', me).eq('blocked_id', other)).length > 0; return !!(M.blocks || {})[me + ':' + other]; },
+  async set(me, other, on) {
+    if (sb) { if (on) { const r = await sb.from('blocks').insert({ blocked_id: other }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); } else chk(await sb.from('blocks').delete().eq('blocker_id', me).eq('blocked_id', other)); return; }
+    M.blocks = M.blocks || {}; if (on) M.blocks[me + ':' + other] = 1; else delete M.blocks[me + ':' + other]; await save();
+  },
 };
 
 export const notes = {
