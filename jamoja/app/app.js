@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126za';
-import * as R from './rec.js?v=20261126za';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126za';
+import * as E from './engine.js?v=20261126zb';
+import * as R from './rec.js?v=20261126zb';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zb';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126za';
+const APP_V = '20261126zb';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -160,6 +160,7 @@ async function route() {
     if (parts[0] === 'g' && parts[1]) return await gamePage(parts[1]);
     if (parts[0] === 'u' && parts[1] && (parts[2] === 'followers' || parts[2] === 'following')) return await followPage(decodeURIComponent(parts[1]), parts[2]);
     if (parts[0] === 'u' && parts[1]) return await profilePage(decodeURIComponent(parts[1]));
+    if (parts[0] === 'court' && parts[1]) return await courtPage(decodeURIComponent(parts[1]));
     if (parts[0] === 'people') return await peoplePage();
     if (parts[0] === 'viewers') return await viewersPage();
     if (parts[0] === 'alerts') return await alertsPage();
@@ -261,7 +262,7 @@ async function renderItems(box, items, opt = {}) {
   const whoName = h => h.player ? (h.player.user ? '@' + h.player.user.handle : h.player.label) : '';
   const hCard = h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
     <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-cm="h:${h.id}" aria-label="Comments"><span>💬</span><b>${cch[h.id] || 0}</b></button><button class="fire" data-share="${h.id}" aria-label="Share"><span>↗</span><b>Share</b></button><button class="fire" data-more="h:${h.id}" aria-label="More"><span>⋯</span><b></b></button></div>
-    <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · ' + esc(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`;
+    <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · 📍 ' + courtLink(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`;
   const media = x => x.kind === 'photo' ? `<img class="pm" src="${esc(storage.url(x.media))}" alt="" loading="lazy">`
     : x.kind === 'video' ? `<video class="pm" data-pv="1" src="${esc(storage.url(x.media))}" poster="${esc(storage.url(x.poster))}" playsinline muted loop preload="none"></video>`
     : x.kind === 'youtube' ? `<button class="yt" data-yt="${esc(x.youtube_id)}" aria-label="Play YouTube video"><img src="https://i.ytimg.com/vi/${esc(x.youtube_id)}/hqdefault.jpg" alt="" loading="lazy"><span>▶</span></button>` : '';
@@ -569,7 +570,7 @@ async function runBox(g, own) {
   await storage.prep(going.map(p => p.avatar).filter(Boolean));
   const imIn = ME && going.some(p => p.id === ME.id);
   const map = g.place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(g.place)}` : '';
-  return `<div class="card runbox">${g.starts_at ? `<div class="rb-when">🕒 ${esc(whenLabel(g.starts_at))}</div>` : ''}${g.place ? `<a class="rb-where" href="${map}" target="_blank" rel="noopener">📍 ${esc(g.place)} <span class="mu">· Map</span></a>` : ''}${g.notes ? `<p style="margin:6px 0 0">${nl(g.notes)}</p>` : ''}
+  return `<div class="card runbox">${g.starts_at ? `<div class="rb-when">🕒 ${esc(whenLabel(g.starts_at))}</div>` : ''}${g.place ? `<div class="rb-where">📍 <a href="${courtUrl(g.place)}">${esc(g.place)}</a> <a class="mu" href="${g.lat != null ? `https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lng}` : map}" target="_blank" rel="noopener">· Map</a></div>` : own ? `<button class="btn s g" id="setspot" style="margin-top:6px">📍 Add this court (use my location)</button>` : ''}${g.notes ? `<p style="margin:6px 0 0">${nl(g.notes)}</p>` : ''}
     <div class="rb-going">${g.owner ? avatar(g.owner, 30) : ''}${going.slice(0, 8).map(p => avatar(p, 30)).join('')}<span class="mu">${going.length + 1} in</span></div>
     ${own ? '' : ME ? `<button class="btn w ${imIn ? 'g' : ''}" id="rsvp" style="margin-top:10px">${imIn ? "✓ You're in" : "I'm in"}</button>` : `<a class="btn w" href="#/login?mode=up&next=${encodeURIComponent('#/g/' + g.id)}" style="margin-top:10px">I'm in (sign up free)</a>`}</div>`;
 }
@@ -590,6 +591,7 @@ async function liveBox(g) {
 // Broadcaster: records 6-second chunks and uploads each one as it finishes.
 async function goLive(g) {
   if (!R.supported()) return toast('Live is not supported in this browser. Open Jamoja in Safari or Chrome.');
+  if (ME && g.owner_id === ME.id && g.lat == null) stampSpot(g);
   const session = 'live-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   let chain = Promise.resolve(), failed = 0, sent = 0;
   const up = (p, seq, last) => { chain = chain.then(async () => {
@@ -658,6 +660,85 @@ async function watchSession(box, gameId, session, isLive) {
 }
 
 // ---------------- Post composer: text, photo, video, YouTube link
+// ---------- Courts: where the game is
+const courtUrl = place => '#/court/' + encodeURIComponent(place);
+const courtLink = place => place ? `<a href="${courtUrl(place)}">${esc(place)}</a>` : '';
+let SPOT_LL = null; // lat/lng picked on the new-game form
+// Ask the phone where we are, reuse a court name someone already set nearby, otherwise look up the place name.
+async function spotHere(timeoutMs = 9000) {
+  if (!navigator.geolocation) return null;
+  const pos = await new Promise(res => { const t = setTimeout(() => res(null), timeoutMs); navigator.geolocation.getCurrentPosition(p => { clearTimeout(t); res(p); }, () => { clearTimeout(t); res(null); }, { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 300000 }); });
+  if (!pos) return null;
+  const lat = +pos.coords.latitude.toFixed(6), lng = +pos.coords.longitude.toFixed(6);
+  let place = await games.near(lat, lng).catch(() => null);
+  if (!place) {
+    try {
+      const r = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=${lat}&lon=${lng}`, { headers: { 'Accept-Language': 'en' } })).json();
+      const a = r.address || {};
+      const name = r.name || a.leisure || a.amenity || a.building || a.road || '';
+      const area = a.neighbourhood || a.suburb || a.city_district || a.city || a.town || '';
+      place = [name, area].filter((x, i, arr) => x && arr.indexOf(x) === i).join(', ').slice(0, 80);
+    } catch (e) { place = ''; }
+  }
+  return { lat, lng, place: place || '' };
+}
+// Stamp a run with where it is (only fills what is missing).
+async function stampSpot(g) {
+  if (!g || (g.lat != null && g.place)) return g;
+  const sp = await spotHere(); if (!sp) return g;
+  const patch = { lat: sp.lat, lng: sp.lng }; if (!g.place && sp.place) patch.place = sp.place;
+  try { await games.setSpot(g.id, patch); Object.assign(g, patch); } catch (e) { /* not the owner or offline */ }
+  return g;
+}
+async function courtPage(place) {
+  const [runs, hs] = await Promise.all([games.atCourt(place).catch(() => []), highlights.atCourt(place).catch(() => [])]);
+  const liveNow = await live.now().catch(() => []);
+  const liveIds = new Set((liveNow || []).map(x => x.game_id));
+  const now = Date.now();
+  const soonRuns = runs.filter(g => g.starts_at && new Date(g.starts_at).getTime() > now - 4 * 3600e3).sort((a, b) => a.starts_at < b.starts_at ? -1 : 1);
+  const past = runs.filter(g => !soonRuns.includes(g));
+  // King of the Court: most highlights, fires break ties.
+  const kings = {};
+  for (const h of hs) { const u = h.player && h.player.user; if (!u) continue; const k = kings[u.handle] || (kings[u.handle] = { u, n: 0, f: 0 }); k.n++; k.f += h.fire || 0; }
+  const board = Object.values(kings).sort((a, b) => b.n - a.n || b.f - a.f).slice(0, 5);
+  const regs = {}; for (const g of runs) if (g.owner) { const r = regs[g.owner.handle] || (regs[g.owner.handle] = { u: g.owner, n: 0 }); r.n++; }
+  const regulars = Object.values(regs).sort((a, b) => b.n - a.n).slice(0, 8);
+  await storage.prep([...hs.flatMap(h => [h.path, h.poster]), ...board.map(k => k.u.avatar), ...regulars.map(r => r.u.avatar)].filter(Boolean));
+  const ll = runs.find(g => g.lat != null);
+  const map = ll ? `https://www.google.com/maps/search/?api=1&query=${ll.lat},${ll.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+  V.innerHTML = `<div class="court-h"><span class="mu">COURT</span><h1>${esc(place)}</h1><p class="mu">${runs.length} run${runs.length === 1 ? '' : 's'} · ${hs.length} highlight${hs.length === 1 ? '' : 's'} · <a href="${map}" target="_blank" rel="noopener">Map</a></p></div>
+    ${runs.some(g => liveIds.has(g.id)) ? `<a class="card livebar" href="#/g/${runs.find(g => liveIds.has(g.id)).id}"><span class="lvdot"></span><b>Live here right now</b><span class="mu">Tap to watch</span></a>` : ''}
+    <a class="btn w" href="#/new?place=${encodeURIComponent(place)}" style="margin:12px 0">+ Post a run here</a>
+    <h2>Next runs here</h2>${soonRuns.length ? gameList(soonRuns) : `<p class="mu">Nothing posted. Post one and your crew will see it.</p>`}
+    <h2>👑 King of the Court</h2>${board.length ? `<div class="list">${board.map((k, i) => `<a href="#/u/${esc(k.u.handle)}"><span class="row" style="gap:10px;flex-wrap:nowrap"><b style="width:18px">${i + 1}</b>${avatar(k.u, 34)}<span><b>${esc(k.u.name)}</b><br><span class="mu">${k.n} highlight${k.n === 1 ? '' : 's'} · 🔥 ${k.f}</span></span></span></a>`).join('')}</div>` : `<p class="mu">No crown yet. Claim your plays from a game filmed here to get on the board.</p>`}
+    ${regulars.length ? `<h2>Regulars</h2><div class="row">${regulars.map(r => `<a href="#/u/${esc(r.u.handle)}" title="${esc(r.u.name)}">${avatar(r.u, 40)}</a>`).join('')}</div>` : ''}
+    <h2>Best plays here</h2>${hs.length ? `<div class="tiles">${[...hs].sort((a, b) => (b.fire || 0) - (a.fire || 0)).slice(0, 12).map(h => `<a class="tile" href="#/g/${h.game_id}"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span>🔥 ${h.fire || 0}</span></a>`).join('')}</div>` : `<p class="mu">No highlights from this court yet.</p>`}
+    ${past.length ? `<h2>Past games</h2>${gameList(past.slice(0, 10))}` : ''}`;
+}
+// "I got next": the line for the next game on this court.
+async function nextBox(g, own) {
+  if (!g.starts_at) return '';
+  const line = await nextUp.list(g.id).catch(() => []);
+  await storage.prep(line.map(p => p.avatar).filter(Boolean));
+  const mine = ME && line.some(p => p.id === ME.id);
+  return `<div class="card nextbox"><div class="row" style="justify-content:space-between"><b>Next up</b><span class="mu">${line.length ? line.length + ' waiting' : 'No line yet'}</span></div>
+    ${line.length ? `<ol class="nq">${line.map((p, i) => `<li>${avatar(p, 26)}<span>${esc(p.name)}${i < 5 ? '' : ''}</span>${own || (ME && p.id === ME.id) ? `<button class="btn s g" data-nx="${p.id}">${own && p.id !== (ME && ME.id) ? 'On court' : 'Leave'}</button>` : ''}</li>`).join('')}</ol>` : ''}
+    ${ME ? (mine ? '' : `<button class="btn w" id="gotnext" style="margin-top:8px">✋ I got next</button>`) : `<a class="btn w" href="#/login?mode=up&next=${encodeURIComponent('#/g/' + g.id)}" style="margin-top:8px">✋ I got next (sign up free)</a>`}
+    <p class="mu" style="margin:6px 0 0;font-size:13px">First 5 in line run the next game. No arguing.</p></div>`;
+}
+// Run Report: the game in one card, built from what was filmed.
+function runReport(g, ps, hs) {
+  if (!hs.length) return '';
+  const top = [...hs].sort((a, b) => (b.fire || 0) - (a.fire || 0) || (b.views || 0) - (a.views || 0)).slice(0, 3);
+  const types = {}; hs.forEach(h => { if (h.play_type) types[h.play_type] = (types[h.play_type] || 0) + 1; });
+  const tline = Object.entries(types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${n} ${esc(t)}${n > 1 && !/s$/.test(t) ? 's' : ''}`).join(' · ');
+  const when = g.starts_at ? new Date(g.starts_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : (g.played_on || '');
+  return `<div class="card report"><span class="mu" style="letter-spacing:.12em;font-size:12px">RUN REPORT</span>
+    <div class="rp-h"><b>${esc(g.title)}</b><span class="mu">${g.place ? '📍 ' + courtLink(g.place) + ' · ' : ''}${esc(when)}</span></div>
+    <div class="rp-s"><div><b>${hs.length}</b><span>plays</span></div><div><b>${ps.length || '·'}</b><span>players</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>views</span></div></div>
+    ${tline ? `<p class="mu" style="margin:8px 0 0">${tline}</p>` : ''}
+    <p style="margin:10px 0 4px"><b>Top plays</b></p><div class="tiles rp-t">${top.map(h => `<span class="tile"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span>${esc(h.play_type || h.label)}</span></span>`).join('')}</div></div>`;
+}
 // One tap to go live: reuse your run from today, or start a new one, then open its Game day card.
 async function quickLive() {
   const q = document.getElementById('qlive'); if (q) q.disabled = true;
@@ -669,6 +750,7 @@ async function quickLive() {
       const at = new Date();
       g = await games.create({ owner_id: ME.id, title: 'Run ' + at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), sport: (MYP && MYP.sport) || 'Basketball', place: '', played_on: today, starts_at: at.toISOString(), notes: null });
     }
+    if (!g.place || g.lat == null) { if (q) q.innerHTML = '📍 Finding your court…'; await stampSpot(g); }
     location.hash = '#/g/' + g.id + '?live=1';
   } catch (e) { toast(e.message || 'Could not start live. Try again.'); if (q) q.disabled = false; }
 }
@@ -1004,7 +1086,7 @@ async function newGame() {
   V.innerHTML = `${inAppCard()}<h1>${existing ? 'Film or add clips' : 'New game'}</h1>
     ${existing ? `<p class="mu">Adding to <b>${esc(existing.title)}</b></p>` : `<div class="card"><label class="f" for="gt" style="margin-top:0">Game name</label><input class="t" id="gt" value="Saturday Run">
       <label class="f" for="gs">Sport</label><select class="t" id="gs">${SPORTS.map(s => `<option ${MYP.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
-      <label class="f" for="gp">Where</label><input class="t" id="gp" value="${esc(MYP.city || '')}" placeholder="Court or field, city">
+      <label class="f" for="gp">Where</label><div class="row" style="flex-wrap:nowrap;gap:8px"><input class="t" id="gp" value="${esc(qs().get('place') || '')}" placeholder="Court or field, city" style="flex:1"><button class="btn s g" id="gloc" type="button" aria-label="Use my location">📍 Here</button></div>
       <label class="f" for="gw">When</label><input class="t" id="gw" type="datetime-local" value="${nextHour()}">
       <label class="f" for="gn">Notes (optional)</label><input class="t" id="gn" maxlength="300" placeholder="Full court. Bring a dark and a light shirt.">
       <button class="btn w" id="sv" style="margin-top:14px;min-height:52px">Post this run</button><p class="mu" style="margin:6px 0 0;font-size:13px">It shows on everyone's Home under Runs so your crew can meet you. When you get there, open it to go live or film.</p></div>`}
@@ -1075,13 +1157,20 @@ async function newGame() {
   async function useParts(parts) {
     for (const p of parts) { recParts.add(p.id); await addSource(new File([p.blob], p.name, { type: p.type }), p); }
   }
+  SPOT_LL = null;
+  const gloc = document.getElementById('gloc');
+  if (gloc) {
+    const fill = async (quiet) => { gloc.disabled = true; gloc.textContent = '…'; const sp = await spotHere(); gloc.disabled = false; gloc.textContent = '📍 Here'; if (!sp) { if (!quiet) toast('Could not get your location. Type the court instead.'); return; } SPOT_LL = { lat: sp.lat, lng: sp.lng }; const gp = document.getElementById('gp'); if (gp && (!quiet || !gp.value.trim()) && sp.place) gp.value = sp.place; };
+    gloc.onclick = () => fill(false);
+    if (!qs().get('place') && navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then(r => { if (r.state === 'granted') fill(true); }).catch(() => {});
+  }
   const film = document.getElementById('film');
   const sv = document.getElementById('sv');
   if (sv) sv.onclick = async () => {
     sv.disabled = true; sv.textContent = 'Saving…';
     try {
       const w = document.getElementById('gw').value; const at = w ? new Date(w) : new Date();
-      const g = await games.create({ owner_id: ME.id, title: document.getElementById('gt').value.trim() || 'Saturday Run', sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
+      const g = await games.create({ owner_id: ME.id, title: document.getElementById('gt').value.trim() || 'Saturday Run', sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), ...(SPOT_LL || {}), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
       toast('Run posted. Share it so people meet you there.'); go('#/g/' + g.id);
     } catch (err) { sv.disabled = false; sv.textContent = 'Post this run'; toast(err.message); }
   };
@@ -1122,7 +1211,7 @@ async function newGame() {
       if (!game) {
         const title = document.getElementById('gt').value.trim() || 'Saturday Run';
         const w = document.getElementById('gw').value; const at = w ? new Date(w) : new Date();
-        game = await games.create({ owner_id: ME.id, title, sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
+        game = await games.create({ owner_id: ME.id, title, sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), ...(SPOT_LL || {}), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
       }
       const already = existing ? (await highlights.list(game.id)).length : 0;
       for (let k = 0; k < jobs.length; k++) {
@@ -1170,8 +1259,8 @@ async function gamePage(id) {
         ${hs.length ? `<button class="btn w" id="sa">${canFiles ? 'Send all ' + hs.length + ' clips' : 'Save all clips'}</button>` : ''}</div>`
     : `<div class="card"><b>Share this game</b><div class="lnk"><input readonly value="${esc(link)}" aria-label="Game link" id="lk"><button class="btn s" id="cp">Copy</button></div>
       ${navigator.share ? `<button class="btn g w" id="sh" style="margin-top:8px">Send to the group chat</button>` : ''}</div>`;
-  const [rbox, lbox] = await Promise.all([runBox(g, own), liveBox(g)]);
-  V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place && !g.starts_at ? ' · ' + esc(g.place) : ''}${g.played_on && !g.starts_at ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>${rbox}${lbox}
+  const [rbox, lbox, nbox] = await Promise.all([runBox(g, own), liveBox(g), nextBox(g, own)]);
+  V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place && !g.starts_at ? ' · ' + esc(g.place) : ''}${g.played_on && !g.starts_at ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>${rbox}${nbox}${lbox}${runReport(g, ps, hs)}
     ${own && qs().get('fresh') ? `<div class="card" style="border-color:var(--o)"><b>${LOCAL ? 'Next: tag your crew, then send the clips.' : 'Next: tag your crew, then send the link.'}</b><p class="mu" style="margin:4px 0 0">Add each player below, then pick who is in each highlight and what the play was. Tagged plays get shared way more.</p></div>` : ''}
     ${shareCard}
     <h2>Players</h2>
@@ -1219,6 +1308,9 @@ async function gamePage(id) {
   };
   const rb = document.getElementById('rsvp');
   if (rb) rb.onclick = async () => { const on = !rb.classList.contains('g'); rb.disabled = true; try { await rsvps.set(g.id, ME.id, on); toast(on ? "You're in. See you there." : 'Removed.'); gamePage(id); } catch (err) { rb.disabled = false; toast(err.message); } };
+  const gn = document.getElementById('gotnext'); if (gn) gn.onclick = async () => { gn.disabled = true; try { await nextUp.join(g.id); toast("You got next."); gamePage(id); } catch (err) { gn.disabled = false; toast(err.message); } };
+  V.querySelectorAll('[data-nx]').forEach(b => b.onclick = async ev => { ev.stopPropagation(); b.disabled = true; try { await nextUp.leave(g.id, b.dataset.nx); gamePage(id); } catch (err) { b.disabled = false; toast(err.message); } });
+  const ss = document.getElementById('setspot'); if (ss) ss.onclick = async () => { ss.disabled = true; ss.textContent = '📍 Finding your court…'; await stampSpot(g); if (g.place) { toast('Court added: ' + g.place); gamePage(id); } else { ss.disabled = false; ss.textContent = '📍 Add this court (use my location)'; toast('Could not get your location. Check location permission for your browser.'); } };
   const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
   if (gl && qs().get('live')) { gl.scrollIntoView({ block: 'center' }); gl.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: 700, iterations: 3 }); toast('Tap Go live when you\'re ready. Camera opens first, nothing streams until you tap.'); }
   V.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { watchSession(V.querySelector('#player'), g.id, b.dataset.watch, !!b.dataset.live); V.querySelector('#player').scrollIntoView({ behavior: 'smooth', block: 'center' }); });

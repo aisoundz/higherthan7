@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126za';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zb';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -97,6 +97,20 @@ export const games = {
   },
   async mine(userId) { if (sb) return chk(await sb.from('games').select('*').eq('owner_id', userId).order('created_at', { ascending: false })); return Object.values(M.games).filter(g => g.owner_id === userId).reverse(); },
   async recent() { if (sb) return chk(await sb.from('games').select('*, owner:profiles!games_owner_id_fkey(name,handle)').order('created_at', { ascending: false }).limit(20)); return Object.values(M.games).reverse().slice(0, 20).map(g => ({ ...g, owner: M.profiles[g.owner_id] })); },
+  async setSpot(id, spot) { if (sb) { chk(await sb.from('games').update(spot).eq('id', id)); return; } Object.assign(M.games[id], spot); await save(); },
+  // A court someone already named within about 150 m, so everyone at the same court lands on the same page.
+  async near(lat, lng) {
+    const d = 0.0015;
+    let list;
+    if (sb) list = chk(await sb.from('games').select('place,lat,lng').gte('lat', lat - d).lte('lat', lat + d).gte('lng', lng - d).lte('lng', lng + d).neq('place', '').not('place', 'is', null).limit(50));
+    else list = Object.values(M.games).filter(g => g.place && g.lat != null && Math.abs(g.lat - lat) < d && Math.abs(g.lng - lng) < d);
+    const n = {}; for (const g of list) n[g.place] = (n[g.place] || 0) + 1;
+    return Object.entries(n).sort((a, b) => b[1] - a[1]).map(x => x[0])[0] || null;
+  },
+  async atCourt(place) {
+    if (sb) return chk(await sb.from('games').select('id,title,sport,place,starts_at,played_on,lat,lng,owner_id, owner:profiles!games_owner_id_fkey(id,name,handle,avatar)').ilike('place', place).order('starts_at', { ascending: false, nullsFirst: false }).limit(60));
+    return Object.values(M.games).filter(g => (g.place || '').toLowerCase() === place.toLowerCase()).map(g => ({ ...g, owner: M.profiles[g.owner_id] })).reverse();
+  },
   async remove(id) {
     if (sb) { chk(await sb.from('games').delete().eq('id', id)); return; }
     delete M.games[id];
@@ -158,6 +172,10 @@ export const highlights = {
       const g = M.games[h.game_id] || {}; const o = M.profiles[g.owner_id]; const p = M.players[h.player_id];
       return { ...h, game: { ...g, owner: o ? { name: o.name, handle: o.handle } : null }, player: p ? { label: p.label, user: p.user_id ? M.profiles[p.user_id] : null } : null, fire: Object.values(M.fires || {}).filter(f => f.highlight_id === h.id).length };
     }).filter(h => !h.hidden && (!sport || h.game.sport === sport) && (!ids || ids.includes(h.created_by) || (h.player_id && M.players[h.player_id] && ids.includes(M.players[h.player_id].user_id)))).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
+  },
+  async atCourt(place, limit = 40) {
+    if (sb) return chk(await sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).ilike('game.place', place).order('created_at', { ascending: false }).limit(limit)).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
+    return (await this.feed(null, 200)).filter(h => (h.game.place || '').toLowerCase() === place.toLowerCase()).slice(0, limit);
   },
   async add(h) { if (sb) return chk(await sb.from('highlights').insert(h).select().single()); const r = { id: uid(), created_at: now(), player_id: null, ...h }; M.highlights[r.id] = r; await save(); return r; },
   async view(id) { if (sb) { await sb.rpc('add_view', { p_highlight: id }); return; } if (M.highlights[id]) { M.highlights[id].views = (M.highlights[id].views || 0) + 1; await save(); } },
@@ -384,3 +402,13 @@ export const storage = {
   },
 };
 export { uid };
+
+// "I got next": the line to get on the court.
+export const nextUp = {
+  async list(gameId) {
+    if (sb) { const rows = chk(await sb.from('next_up').select('user_id,created_at').eq('game_id', gameId).order('created_at')); if (!rows.length) return []; const ps = chk(await sb.from('profiles').select(PROF).in('id', rows.map(r => r.user_id))); return rows.map(r => ps.find(p => p.id === r.user_id)).filter(Boolean); }
+    return Object.values(M.next || {}).filter(r => r.game_id === gameId).sort((a, b) => a.created_at < b.created_at ? -1 : 1).map(r => M.profiles[r.user_id]).filter(Boolean);
+  },
+  async join(gameId) { if (sb) { const r = await sb.from('next_up').insert({ game_id: gameId }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); return; } M.next = M.next || {}; M.next[gameId + ':' + M.session.id] = { game_id: gameId, user_id: M.session.id, created_at: now() }; await save(); },
+  async leave(gameId, userId) { if (sb) { chk(await sb.from('next_up').delete().eq('game_id', gameId).eq('user_id', userId)); return; } delete (M.next || {})[gameId + ':' + userId]; await save(); },
+};
