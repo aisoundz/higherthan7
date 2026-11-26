@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126b';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126c';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -207,6 +207,21 @@ export const follows = {
   async toggle(me, them, on) {
     if (sb) { if (on) { const r = await sb.from('follows').insert({ followee_id: them }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); } else chk(await sb.from('follows').delete().eq('follower_id', me).eq('followee_id', them)); return; }
     M.follows = M.follows || {}; const k = me + ':' + them; if (on) M.follows[k] = { follower_id: me, followee_id: them }; else delete M.follows[k]; await save();
+  },
+  async list(userId, dir) {
+    const [mine, other] = dir === 'followers' ? ['followee_id', 'follower_id'] : ['follower_id', 'followee_id'];
+    if (sb) { const ids = chk(await sb.from('follows').select(other).eq(mine, userId).order('created_at', { ascending: false })).map(r => r[other]); if (!ids.length) return []; const ps = chk(await sb.from('profiles').select(PROF + ',city,position').in('id', ids)); return ids.map(i => ps.find(p => p.id === i)).filter(Boolean); }
+    return Object.values(M.follows || {}).filter(f => f[mine] === userId).map(f => M.profiles[f[other]]).filter(Boolean);
+  },
+  async people(q = '', sport = '', limit = 60) {
+    if (sb) {
+      let r = sb.from('profiles').select(PROF + ',city,position,created_at').order('created_at', { ascending: false }).limit(limit);
+      if (sport) r = r.eq('sport', sport);
+      const t = q.replace(/[%,()*]/g, '').trim(); if (t) r = r.or(`name.ilike.%${t}%,handle.ilike.%${t}%,city.ilike.%${t}%`);
+      return chk(await r);
+    }
+    const t = q.toLowerCase();
+    return Object.values(M.profiles).filter(p => (!sport || p.sport === sport) && (!t || [p.name, p.handle, p.city].some(x => (x || '').toLowerCase().includes(t))));
   },
   async suggested(me, limit = 8) {
     if (sb) { const r = chk(await sb.from('profiles').select(PROF).neq('id', me || '00000000-0000-0000-0000-000000000000').order('created_at', { ascending: false }).limit(limit + 20)); return r; }

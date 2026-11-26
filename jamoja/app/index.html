@@ -151,13 +151,18 @@ textarea.ta{width:100%;height:auto;min-height:90px;padding:10px 12px;line-height
 .chips{flex-wrap:wrap;gap:6px}.chips .chip{min-height:36px}
 .trim input[type=range]{width:100%}
 .chk{display:flex;gap:10px;align-items:center;font-weight:600}.chk input{width:22px;height:22px;accent-color:var(--o)}
+.stats>a{flex:1;text-align:center;padding:12px 4px;display:flex;flex-direction:column;text-decoration:none;color:inherit}.stats>*+*{border-left:1px solid var(--ln)}.stats b{font:600 26px/1 var(--num)}.stats span{font-size:12px;color:var(--mu);margin-top:4px}.stats>a span{text-decoration:underline;text-underline-offset:3px}
+.prow{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--ln)}.prow>a{display:flex;gap:12px;align-items:center;text-decoration:none;flex:1;min-width:0}.prow .mu{font-size:14px}
+.tabs a{flex:1;text-align:center;padding:10px 0;font-weight:700;color:var(--mu);border-bottom:3px solid transparent;text-decoration:none}.tabs a.on{color:var(--ink);border-color:var(--o)}
+nav.bn a{min-width:58px}
+input[type=search].t{-webkit-appearance:none;appearance:none}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261126b"></script>
-<script type="module" src="app.js?v=20261126b"></script>
+<script src="vendor/supabase.js?v=20261126c"></script>
+<script type="module" src="app.js?v=20261126c"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126b';
-import * as R from './rec.js?v=20261126b';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261126b';
+import * as E from './engine.js?v=20261126c';
+import * as R from './rec.js?v=20261126c';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, storage, mode, ready } from './db.js?v=20261126c';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -112,7 +112,7 @@ function topbar() {
   const nav = document.getElementById('nav'); if (!nav) return;
   const h = location.hash || '#/';
   nav.hidden = !(ME && MYP) || /^#\/(login|setup)/.test(h);
-  if (!nav.hidden) nav.innerHTML = `<a href="#/" class="${h === '#/' || h === '#' ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Feed</a><a href="#/post" class="film"><span>+</span>Post</a><a href="#/u/${esc(MYP.handle)}" class="${h.startsWith('#/u/') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Me</a>`;
+  if (!nav.hidden) nav.innerHTML = `<a href="#/" class="${h === '#/' || h === '#' ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Feed</a><a href="#/people" class="${h.startsWith('#/people') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M16 14.6c2.8-.3 4.9 1.4 5.5 4.4"/></svg>People</a><a href="#/post" class="film"><span>+</span>Post</a><a href="#/u/${esc(MYP.handle)}" class="${h.startsWith('#/u/') ? 'on' : ''}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Me</a>`;
 }
 function needLogin(next) { go(LOCAL ? '#/setup?next=' + encodeURIComponent(next || '#/') : '#/login?next=' + encodeURIComponent(next || location.hash)); }
 
@@ -137,7 +137,9 @@ async function route() {
     if (parts[0] === 'post') return await composer();
     if (parts[0] === 'p' && parts[1]) return await postPage(parts[1]);
     if (parts[0] === 'g' && parts[1]) return await gamePage(parts[1]);
+    if (parts[0] === 'u' && parts[1] && (parts[2] === 'followers' || parts[2] === 'following')) return await followPage(decodeURIComponent(parts[1]), parts[2]);
     if (parts[0] === 'u' && parts[1]) return await profilePage(decodeURIComponent(parts[1]));
+    if (parts[0] === 'people') return await peoplePage();
     V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`;
   } catch (e) {
     console.error(e);
@@ -290,6 +292,43 @@ async function postPage(id) {
   const one = V.querySelector('#one');
   await renderItems(one, [{ t: 'p', x }], { fol }); bindFollow(V, fol);
   openComments(one.querySelector('article'), 'post', id, one.querySelector('[data-cm] b'));
+}
+
+// ---------------- People: everyone on Jamoja, followers and following lists
+function personRow(p, fol) {
+  const me = ME && ME.id === p.id, on = fol.includes(p.id);
+  return `<div class="prow"><a href="#/u/${esc(p.handle)}">${avatar(p, 48)}<span><b>${esc(p.name)}</b> ${lvBadge(p)}<br><span class="mu">@${esc(p.handle)}${p.sport ? ' · ' + esc(p.sport) : ''}${p.city ? ' · ' + esc(p.city) : ''}</span></span></a>${ME && !me ? `<button class="btn s ${on ? 'g' : ''}" data-follow="${p.id}">${on ? 'Following' : 'Follow'}</button>` : ''}</div>`;
+}
+let PEOPLE_SPORT = '';
+async function peoplePage() {
+  const fol = ME ? await follows.ids(ME.id).catch(() => []) : [];
+  V.innerHTML = `<h1>People</h1><p class="mu" style="margin-top:0">Everyone on Jamoja, newest first. Follow your crew.</p>
+    <input class="t" id="pq" type="search" placeholder="Search name, @handle or city" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="row sports" id="psp" style="margin-top:10px">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === PEOPLE_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div id="pl"><p class="mu">Loading…</p></div>${ME ? `<div class="card" style="margin-top:16px"><b>Bring your crew</b><p class="mu" style="margin:4px 0 10px">Send friends the invite link.</p><button class="btn s" id="inv2">Invite friends</button></div>` : ''}`;
+  const pl = V.querySelector('#pl'), pq = V.querySelector('#pq');
+  let t = null;
+  const load = async () => {
+    const list = await follows.people(pq.value, PEOPLE_SPORT).catch(err => { pl.innerHTML = `<div class="err">${esc(err.message)}</div>`; return null; });
+    if (!list) return;
+    await storage.prep(list.map(p => p.avatar).filter(Boolean));
+    pl.innerHTML = list.length ? `<p class="mu">${list.length} ${list.length === 1 ? 'athlete' : 'athletes'}</p>` + list.map(p => personRow(p, fol)).join('') : `<p class="mu">No one found.</p>`;
+  };
+  pq.oninput = () => { clearTimeout(t); t = setTimeout(load, 250); };
+  V.querySelector('#psp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; PEOPLE_SPORT = b.dataset.sp; V.querySelectorAll('#psp .chip').forEach(x => x.classList.toggle('on', x === b)); load(); };
+  const inv = V.querySelector('#inv2'); if (inv) inv.onclick = () => { const url = 'https://biz.higherthan7.com/jamoja/join/'; const text = `I'm on Jamoja, the new app for athletes. Join and follow me: `; if (navigator.share) navigator.share({ title: 'Join me on Jamoja', text, url }).catch(() => {}); else navigator.clipboard.writeText(text + url).then(() => toast('Invite copied.'), () => toast(url)); };
+  bindFollow(V, fol);
+  await load();
+}
+async function followPage(handle, dir) {
+  const p = await profiles.byHandle(handle);
+  if (!p) { V.innerHTML = `<h1>Player not found</h1>`; return; }
+  const [list, fol] = await Promise.all([follows.list(p.id, dir), ME ? follows.ids(ME.id).catch(() => []) : []]);
+  await storage.prep(list.map(x => x.avatar).filter(Boolean));
+  V.innerHTML = `<a class="mu" href="#/u/${esc(p.handle)}">← ${esc(p.name)}</a><h1>${dir === 'followers' ? 'Followers' : 'Following'}</h1>
+    <div class="tabs"><a href="#/u/${esc(p.handle)}/followers" class="${dir === 'followers' ? 'on' : ''}">Followers</a><a href="#/u/${esc(p.handle)}/following" class="${dir === 'following' ? 'on' : ''}">Following</a></div>
+    ${list.length ? list.map(x => personRow(x, fol)).join('') : `<p class="mu">${dir === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'} <a href="#/people">Find people</a></p>`}`;
+  bindFollow(V, fol);
 }
 
 // ---------------- Post composer: text, photo, video, YouTube link
@@ -826,7 +865,7 @@ async function profilePage(handle) {
   const following = fol.includes(p.id);
   V.innerHTML = `<div class="row" style="gap:14px;flex-wrap:nowrap">${avatar(p, 84)}<div><h1 style="margin:0">${esc(p.name)}</h1><p class="mu" style="margin:0">@${esc(p.handle)} ${lvBadge(p)}<br>${esc(p.sport || '')}${p.position ? ' · ' + esc(p.position) : ''}${p.city ? ' · ' + esc(p.city) : ''}</p></div></div>
     ${p.bio ? `<p style="margin:12px 0 0">${nl(p.bio)}</p>` : me ? `<p class="mu" style="margin:12px 0 0"><a href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Add a bio and photo</a> so people know who you are.</p>` : ''}
-    <div class="row stats"><div><b>${cnt.followers}</b><span>Followers</span></div><div><b>${cnt.following}</b><span>Following</span></div><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div></div>
+    <div class="row stats"><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b><span>Followers</span></a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b><span>Following</span></a><div><b>${hs.length}</b><span>Plays</span></div><div><b>${hs.reduce((a, h) => a + (h.views || 0), 0)}</b><span>Views</span></div></div>
     <div class="row" style="margin-top:14px">${!me && !LOCAL ? `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button>` : ''}${LOCAL ? '' : `<button class="btn s g" id="cp">Copy profile link</button>`}${me ? `<a class="btn s g" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit profile</a>${LOCAL ? '' : `<button class="btn s g" id="so">Sign out</button>`}` : ''}</div>
     <h2>Plays</h2>${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b>${h.views ? `<span class="mu">${views(h.views)}</span>` : ''}<a class="mu" href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Game')}</a></div></div>`).join('')}</div>` : `<p class="mu">${me ? 'In a game, tap "I\'m …" on your name and your plays show up here.' : 'No plays yet.'}</p>`}
     <h2>Posts</h2><div id="pp"></div>
