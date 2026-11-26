@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126zd';
-import * as R from './rec.js?v=20261126zd';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zd';
+import * as E from './engine.js?v=20261126ze';
+import * as R from './rec.js?v=20261126ze';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126ze';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126zd';
+const APP_V = '20261126ze';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1165,6 +1165,7 @@ async function newGame() {
     if (!qs().get('place') && navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then(r => { if (r.state === 'granted') fill(true); }).catch(() => {});
   }
   const film = document.getElementById('film');
+  let madeGame = null; // a retry after a failed cut reuses this run instead of making a new one
   const sv = document.getElementById('sv');
   if (sv) sv.onclick = async () => {
     sv.disabled = true; sv.textContent = 'Saving…';
@@ -1207,11 +1208,11 @@ async function newGame() {
     const pb = document.getElementById('pb'), pt = document.getElementById('pt');
     busy = true; R.keepAwake(true);
     try {
-      let game = existing;
+      let game = existing || madeGame;
       if (!game) {
         const title = document.getElementById('gt').value.trim() || 'Saturday Run';
         const w = document.getElementById('gw').value; const at = w ? new Date(w) : new Date();
-        game = await games.create({ owner_id: ME.id, title, sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), ...(SPOT_LL || {}), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
+        game = await games.create({ owner_id: ME.id, title, sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), ...(SPOT_LL || {}), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null }); madeGame = game;
       }
       const already = existing ? (await highlights.list(game.id)).length : 0;
       for (let k = 0; k < jobs.length; k++) {
@@ -1341,6 +1342,13 @@ async function profilePage(handle) {
   const following = fol.includes(p.id);
   if (!me && !LOCAL) { const k = 'jm.pv.' + p.id; try { if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); profileViews.record(p.id).catch(() => {}); } } catch (e) { profileViews.record(p.id).catch(() => {}); } }
   const pv = me && !LOCAL ? await profileViews.list(p.id).catch(() => []) : [];
+  // Courts: where this athlete plays. Home court = the one they play at most.
+  const cc = {}; for (const g of [...made, ...tags.map(t => t.game).filter(Boolean)]) if (g.place && !/^(philippines|philadelphia)$/i.test(g.place)) { const k = g.place; cc[k] = (cc[k] || 0) + 1; }
+  const courts = Object.entries(cc).sort((a, b) => b[1] - a[1]);
+  const home = courts.length ? courts[0][0] : null;
+  let crown = null;
+  if (home) { const hsc = await highlights.atCourt(home).catch(() => []); const k = {}; for (const h of hsc) { const u = h.player && h.player.user; if (u) k[u.handle] = (k[u.handle] || 0) + 1; } const top = Object.entries(k).sort((a, b) => b[1] - a[1])[0]; if (top && top[0] === p.handle) crown = home; }
+  const nextRun = made.filter(g => g.starts_at && new Date(g.starts_at).getTime() > Date.now() - 3 * 3600e3).sort((a, b) => a.starts_at < b.starts_at ? -1 : 1)[0];
   const ICON = {
     grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>',
     play: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M10 8.5v7l6-3.5z"/></svg>',
@@ -1351,12 +1359,14 @@ async function profilePage(handle) {
   const SPORT_ICON = { Basketball: '🏀', Football: '🏈', Soccer: '⚽', Baseball: '⚾', Softball: '🥎', Volleyball: '🏐', 'Flag football': '🏈', Track: '🏃', Running: '🏃', Tennis: '🎾', Boxing: '🥊', Weightlifting: '🏋️', CrossFit: '🏋️', Training: '💪', Other: '⭐' };
   V.innerHTML = `<div class="pcard">
       <div class="pc-top"><span class="pc-chip">${SPORT_ICON[p.sport] || '⭐'} ${esc(p.sport || 'Athlete')}</span>${p.level ? `<span class="pc-chip lvl">${esc(LV[p.level] || p.level)}</span>` : ''}<span class="pc-brand">JAM<i></i>JA</span></div>
-      <div class="pc-main">${avatar(p, 104)}<div class="pc-id"><div class="pc-name">${esc(p.name)}</div><div class="pc-sub">@${esc(p.handle)}</div><div class="pc-pos">${[p.position, p.city].filter(Boolean).map(esc).join(' · ')}</div></div></div>
+      <div class="pc-main">${avatar(p, 104)}<div class="pc-id"><div class="pc-name">${esc(p.name)}</div><div class="pc-sub">@${esc(p.handle)}</div><div class="pc-pos">${[p.position, p.city].filter(Boolean).map(esc).join(' · ')}</div>${home ? `<a class="pc-home" href="${courtUrl(home)}">📍 Home court: <b>${esc(home)}</b></a>` : ''}${crown ? `<div class="pc-crown">👑 King of the Court</div>` : ''}</div></div>
       ${p.bio ? `<div class="pc-bio">${nl(p.bio)}</div>` : me ? `<a class="pc-bio mu" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">+ Add a bio so scouts and teammates know your game</a>` : ''}
       <div class="pc-stats"><div><b>${plays}</b><span>Plays</span></div><div><b>${totalViews}</b><span>Views</span></div><div><b>${fireTotal}</b><span>🔥</span></div><a href="#/u/${esc(p.handle)}/followers"><b>${cnt.followers}</b><span>Followers</span></a><a href="#/u/${esc(p.handle)}/following"><b>${cnt.following}</b><span>Following</span></a></div>
     </div>
     <div class="ph-btns">${me ? `<a class="btn s" href="#/setup?next=${encodeURIComponent('#/u/' + p.handle)}">Edit card</a>` : LOCAL ? '' : `<button class="btn s ${following ? 'g' : ''}" data-follow="${p.id}">${following ? 'Following' : 'Follow'}</button><a class="btn s g" href="#/dm/${encodeURIComponent(p.handle)}">Message</a>`}${LOCAL ? '' : `<button class="btn s g" id="cp">Share</button>`}${me && !LOCAL ? `<a class="btn s g sq" href="#/people" aria-label="Find people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6"/></svg></a>` : ''}</div>
     ${me && !LOCAL ? `<a class="scout" href="#/viewers"><span class="sc-n">${pv.length}</span><span><b>Who's watching</b><br><span class="mu">profile view${pv.length === 1 ? '' : 's'} in the last 30 days · see who →</span></span></a>` : ''}
+    ${nextRun ? `<a class="card pnext" href="#/g/${nextRun.id}"><span class="mu" style="font-size:12px;letter-spacing:.1em">NEXT RUN</span><b>${esc(nextRun.title)}</b><span class="mu">${esc(whenLabel(nextRun.starts_at))}${nextRun.place ? ' · ' + esc(nextRun.place) : ''}</span><span class="pn-go">${me ? 'Open · go live' : "I'm in →"}</span></a>` : ''}
+    ${courts.length ? `<div class="pcourts">${courts.slice(0, 6).map(([c, n]) => `<a href="${courtUrl(c)}">📍 ${esc(c)} <span>${n}</span></a>`).join('')}</div>` : me ? `<a class="pcourts-empty mu" href="#/post">📍 Tap + then Go live at your court to add it to your card</a>` : ''}
     <div class="ptabs" role="tablist"><button data-pt2="posts" class="on">Posts <span>${mine.length}</span></button><button data-pt2="plays">Highlights <span>${plays}</span></button><button data-pt2="games">Games <span>${made.length}</span></button></div>
     <div id="pgrid"></div>
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;

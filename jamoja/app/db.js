@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126zd';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126ze';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -395,7 +395,7 @@ export const storage = {
     if (PERSIST) { const r = await local.get('files', path); return r ? r.blob : null; }
     return FILES[path] ? (await fetch(FILES[path])).blob() : null;
   },
-  url(path) { if (!path) return ''; if (sb) return sb.storage.from('clips').getPublicUrl(path).data.publicUrl; return FILES[path] || ''; },
+  url(path) { if (!path) return ''; if (/^(https?:)?\/\//.test(path) || path.startsWith('/')) return path; if (sb) return sb.storage.from('clips').getPublicUrl(path).data.publicUrl; return FILES[path] || ''; },
   async remove(paths) {
     if (sb) { await sb.storage.from('clips').remove(paths); return; }
     for (const p of paths) { if (PERSIST) await local.del('files', p); if (FILES[p]) URL.revokeObjectURL(FILES[p]); delete FILES[p]; }
