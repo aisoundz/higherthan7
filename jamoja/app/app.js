@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126zj';
-import * as R from './rec.js?v=20261126zj';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zj';
+import * as E from './engine.js?v=20261126zm';
+import * as R from './rec.js?v=20261126zm';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261126zm';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261126zj';
+const APP_V = '20261126zm';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -739,6 +739,39 @@ function runReport(g, ps, hs) {
     ${tline ? `<p class="mu" style="margin:8px 0 0">${tline}</p>` : ''}
     <p style="margin:10px 0 4px"><b>Top plays</b></p><div class="tiles rp-t">${top.map(h => `<span class="tile"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span>${esc(h.play_type || h.label)}</span></span>`).join('')}</div></div>`;
 }
+// Play the video fast in the background and watch the net. A make jerks the net; the backboard staying still means the camera did not move.
+async function scanRim(url, rim, dur, onProgress, host) {
+  const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.src = url;
+  v.className = 'rimvid'; (host || document.body).append(v); // visible: browsers don't play frames of hidden videos
+  await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error('this video format')); setTimeout(res, 8000); });
+  const W = 160, H = 90, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d', { willReadFrequently: true });
+  const X = rim.x * W, Y = rim.y * H;
+  const bx = (x0, y0, w, h) => ({ x0: Math.max(0, Math.round(x0)), y0: Math.max(0, Math.round(y0)), x1: Math.min(W, Math.round(x0 + w)), y1: Math.min(H, Math.round(y0 + h)) });
+  const NET = bx(X - 6, Y - 1, 12, 11), BOARD = bx(X - 12, Y - 14, 24, 11);
+  const diff = (a, b, q) => { let t = 0, n = 0; for (let y = q.y0; y < q.y1; y++) for (let x = q.x0; x < q.x1; x++) { const i = y * W + x; t += Math.abs(a[i] - b[i]); n++; } return n ? t / n : 0; };
+  const hits = []; let prev = null, prevT = -1, last = -1e9;
+  const total = dur || v.duration || 1;
+  const sample = () => {
+    cx.drawImage(v, 0, 0, W, H); const d = cx.getImageData(0, 0, W, H).data, g = new Uint8Array(W * H);
+    for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+    const t = v.currentTime;
+    if (prev && t - prevT < 0.35) {
+      const sc = diff(g, prev, NET) - 1.5 * diff(g, prev, BOARD);
+      if (sc > 14 && t - last > 6) { last = t; hits.push(+t.toFixed(2)); }
+    }
+    prev = g; prevT = t; onProgress && onProgress(Math.min(1, t / total), hits.length);
+  };
+  try {
+    v.playbackRate = 4;
+    await v.play();
+    await new Promise(res => {
+      v.onended = res;
+      if (v.requestVideoFrameCallback) { const tick = () => { if (v.ended) return; sample(); v.requestVideoFrameCallback(tick); }; v.requestVideoFrameCallback(tick); }
+      else { const iv = setInterval(() => { if (v.ended || v.paused) { clearInterval(iv); res(); return; } sample(); }, 30); }
+    });
+  } finally { v.pause(); v.remove(); }
+  return hits;
+}
 // One tap to go live: reuse your run from today, or start a new one, then open its Game day card.
 async function quickLive() {
   const q = document.getElementById('qlive'); if (q) q.disabled = true;
@@ -812,7 +845,9 @@ async function composer() {
       att.dur = d; att.start = att.start ?? 0; att.end = att.end ?? Math.min(d, 60); att.cover = att.cover ?? Math.min(att.end, 1);
       for (const r of [st, en]) r.max = d.toFixed(1);
       st.value = att.start; en.value = att.end; label();
-      V.querySelector('#tr2').hidden = false; V.querySelector('#tw').textContent = d > 60 ? 'Long video: pick the best 60 seconds.' : '';
+      V.querySelector('#tr2').hidden = false; const tw = V.querySelector('#tw');
+      if (d > 90 && att.file) { tw.innerHTML = `<span class="card" style="display:block;border-color:var(--o);margin:0"><b>This looks like a full game (${mmss(d)}).</b><br><span class="mu">Posts are 60 seconds max. Let Jamoja find every bucket and cut them for you. Only the clips upload, the full video stays on your phone.</span><button class="btn w" id="fullg" type="button" style="margin-top:10px">🎯 Find my highlights</button><span class="mu" style="display:block;margin-top:6px;font-size:13px">Or pick your best 60 seconds below and post it.</span></span>`; tw.querySelector('#fullg').onclick = () => { window.PENDING_FILE = att.file; go('#/new'); }; }
+      else tw.textContent = d > 60 ? 'Long video: pick the best 60 seconds.' : '';
       drawCover = true; seek(att.cover);
     };
     v.addEventListener('loadedmetadata', ready); if (v.readyState >= 1) ready();
@@ -1136,8 +1171,10 @@ async function newGame() {
     card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(s.file.name)}</b><span class="mu">${mmss(s.dur)} <button class="lnkb" data-rmsrc type="button">Remove</button></span></div>
       <video class="pv" src="${s.url}" playsinline controls preload="metadata"></video>
       <p class="mu" style="margin:0 0 4px">${msg}</p>
-      <div class="moms">${s.moments.map((m, i) => `<div class="mom"><input type="checkbox" data-i="${i}" ${m.on ? 'checked' : ''} aria-label="Use moment ${i + 1}"><span><span class="tm">${mmss(m.start)} to ${mmss(m.end)}</span>${m.src === 'tap' ? ' <span class="chip" style="padding:2px 8px;font-size:12px">tap</span>' : ''}<br><button class="btn s g" data-pv="${i}" type="button">Preview</button></span><span class="row"><button class="btn s g" data-sh="${i}" data-d="-2" type="button" aria-label="Earlier">−2s</button><button class="btn s g" data-sh="${i}" data-d="2" type="button" aria-label="Later">+2s</button></span></div>`).join('')}</div>
-      <button class="btn s g" data-add type="button" style="margin-top:10px">+ Add a play at the current spot</button>`;
+      <div class="moms">${s.moments.map((m, i) => `<div class="mom"><input type="checkbox" data-i="${i}" ${m.on ? 'checked' : ''} aria-label="Use moment ${i + 1}"><span><span class="tm">${mmss(m.start)} to ${mmss(m.end)}</span>${m.src === 'rim' ? ' <span class="chip ok" style="padding:2px 8px;font-size:12px">bucket</span>' : ''}${m.src === 'tap' ? ' <span class="chip" style="padding:2px 8px;font-size:12px">tap</span>' : ''}<br><button class="btn s g" data-pv="${i}" type="button">Preview</button></span><span class="row"><button class="btn s g" data-sh="${i}" data-d="-2" type="button" aria-label="Earlier">−2s</button><button class="btn s g" data-sh="${i}" data-d="2" type="button" aria-label="Later">+2s</button></span></div>`).join('')}</div>
+      <button class="btn s g" data-add type="button" style="margin-top:10px">+ Add a play at the current spot</button>
+      ${s.dur > 60 && !s.rimDone ? `<div class="rimcta"><b>🎯 Find every bucket</b><p class="mu" style="margin:4px 0 8px">Best for full games. Pause the video where you can see the hoop, tap the button, then tap the rim. Jamoja watches the net and marks every make.</p><button class="btn w" data-rim type="button">Tap the rim</button></div>` : ''}
+      <div class="rimscan" hidden><div class="rimhost"></div><div class="bar"><b class="rsb"></b></div><p class="mu rst">Watching the net…</p></div>`;
     const vid = card.querySelector('video');
     let stopAt = 0; vid.ontimeupdate = () => { if (stopAt && vid.currentTime >= stopAt) { vid.pause(); stopAt = 0; } };
     card.onclick = ev => {
@@ -1147,12 +1184,37 @@ async function newGame() {
         if (s.partId) { R.clearParts([s.partId]); recParts.delete(s.partId); }
         card.remove(); showGo(); toast('Video removed.'); return;
       }
+      if (ev.target.closest('[data-rim]')) { pickRim(card, s, vid); return; }
       const b = ev.target.closest('[data-pv],[data-sh],[data-add]'); if (!b) return;
       if (b.dataset.pv) { const m = s.moments[+b.dataset.pv]; vid.currentTime = m.start; stopAt = m.end; vid.play().catch(() => {}); }
       else if (b.dataset.sh) { const m = s.moments[+b.dataset.sh], d = +b.dataset.d; const len = m.end - m.start; m.start = Math.max(0, Math.min(Math.max(0, (s.dur || m.end) - len), m.start + d)); m.end = m.start + len; drawSrc(card, s); }
       else { const t = vid.currentTime; s.moments.push({ start: Math.max(0, t - 6), end: Math.min(s.dur || t + 2, t + 2), on: true, src: 'tap' }); s.moments.sort((a, b2) => a.start - b2.start); drawSrc(card, s); showGo(); }
     };
     card.onchange = ev => { const i = ev.target.dataset.i; if (i !== undefined) { s.moments[+i].on = ev.target.checked; showGo(); } };
+  }
+  // Show the paused frame, let them tap the rim, then scan the whole video for makes.
+  function pickRim(card, s, vid) {
+    vid.pause();
+    const w = vid.clientWidth, h = vid.clientHeight; if (!vid.videoWidth) return toast('Wait for the video to load, then try again.');
+    const ov = document.createElement('canvas'); ov.className = 'rimpick'; ov.width = vid.videoWidth; ov.height = vid.videoHeight;
+    ov.getContext('2d').drawImage(vid, 0, 0, ov.width, ov.height);
+    const wrap = document.createElement('div'); wrap.className = 'rimwrap'; wrap.innerHTML = `<p class="rimtip">Tap the rim</p>`; wrap.prepend(ov);
+    vid.after(wrap); vid.hidden = true; wrap.scrollIntoView({ block: 'center' });
+    ov.onclick = async e => {
+      const r = ov.getBoundingClientRect(); const rim = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+      wrap.remove(); vid.hidden = false;
+      const cta = card.querySelector('.rimcta'); if (cta) cta.hidden = true;
+      const box = card.querySelector('.rimscan'); box.hidden = false;
+      try {
+        const hits = await scanRim(s.url, rim, s.dur, (p, n) => { box.querySelector('.rsb').style.width = (p * 100) + '%'; box.querySelector('.rst').textContent = `Watching the net… ${Math.round(p * 100)}% · ${n} bucket${n === 1 ? '' : 's'} so far. Keep this screen open.`; }, box.querySelector('.rimhost'));
+        s.rimDone = true;
+        if (!hits.length) { box.querySelector('.rst').textContent = 'No makes found at that rim. Try tapping the rim again on a clearer frame, or add plays by hand.'; s.rimDone = false; return; }
+        for (const m of s.moments) m.on = false;
+        s.moments = [...hits.map(t => ({ start: Math.max(0, t - 6), end: Math.min(s.dur || t + 1.5, t + 1.5), on: true, src: 'rim' })), ...s.moments.filter(m => hits.every(t => Math.abs(m.start - (t - 6)) > 5))].sort((a, b2) => a.start - b2.start);
+        drawSrc(card, s); showGo();
+        toast(`Found ${hits.length} bucket${hits.length > 1 ? 's' : ''}. Uncheck warmups or anything you don't want.`);
+      } catch (err) { box.querySelector('.rst').textContent = 'Could not scan this video: ' + (err.message || err); }
+    };
   }
   async function useParts(parts) {
     for (const p of parts) { recParts.add(p.id); await addSource(new File([p.blob], p.name, { type: p.type }), p); }
@@ -1198,6 +1260,7 @@ async function newGame() {
   const rdel = document.getElementById('rdel');
   if (rdel) rdel.onclick = async () => { if (!confirmIn(rdel)) return; await R.clearParts(saved.map(p => p.id)); document.getElementById('recov').remove(); toast('Recording deleted.'); };
   document.getElementById('fi').onchange = async e => { const files = [...e.target.files]; e.target.value = ''; for (const f of files) await addSource(f); };
+  if (window.PENDING_FILE) { const pf = window.PENDING_FILE; window.PENDING_FILE = null; await addSource(pf); const c = document.querySelector('[data-rim]'); if (c) c.scrollIntoView({ block: 'center' }); }
   if (window.PENDING_SRC && existing) { const pend = window.PENDING_SRC; window.PENDING_SRC = null; for (const p of pend) await addSource(new File([p.blob], p.name, { type: p.type }), p); autoMake(); }
 
   document.getElementById('mk').onclick = async () => {
