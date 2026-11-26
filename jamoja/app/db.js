@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126p';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126q';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -86,9 +86,14 @@ export const profiles = {
 export const games = {
   async create(g) { if (sb) return chk(await sb.from('games').insert(g).select().single()); const r = { id: uid(), created_at: now(), ...g }; M.games[r.id] = r; await save(); return r; },
   async get(id) {
-    if (sb) return chk(await sb.from('games').select('*, owner:profiles(id,name,handle)').eq('id', id).maybeSingle());
+    if (sb) return chk(await sb.from('games').select('*, owner:profiles(id,name,handle,avatar)').eq('id', id).maybeSingle());
     const g = M.games[id]; if (!g) return null; const o = M.profiles[g.owner_id];
     return { ...g, owner: o ? { id: o.id, name: o.name, handle: o.handle } : null };
+  },
+  async upcoming() {
+    const from = new Date(Date.now() - 4 * 3600e3).toISOString(), to = new Date(Date.now() + 8 * 864e5).toISOString();
+    if (sb) return chk(await sb.from('games').select('id,title,sport,place,starts_at,notes,owner_id, owner:profiles(id,name,handle,avatar), rsvps(count)').gte('starts_at', from).lte('starts_at', to).order('starts_at').limit(20)).map(g => ({ ...g, going: (g.rsvps && g.rsvps[0] && g.rsvps[0].count) || 0 }));
+    return Object.values(M.games).filter(g => g.starts_at && g.starts_at >= from && g.starts_at <= to).sort((a, b) => a.starts_at < b.starts_at ? -1 : 1).map(g => ({ ...g, owner: M.profiles[g.owner_id], going: Object.values(M.rsvps || {}).filter(r => r.game_id === g.id).length }));
   },
   async mine(userId) { if (sb) return chk(await sb.from('games').select('*').eq('owner_id', userId).order('created_at', { ascending: false })); return Object.values(M.games).filter(g => g.owner_id === userId).reverse(); },
   async recent() { if (sb) return chk(await sb.from('games').select('*, owner:profiles(name,handle)').order('created_at', { ascending: false }).limit(20)); return Object.values(M.games).reverse().slice(0, 20).map(g => ({ ...g, owner: M.profiles[g.owner_id] })); },
@@ -293,6 +298,31 @@ export const blocks = {
   async set(me, other, on) {
     if (sb) { if (on) { const r = await sb.from('blocks').insert({ blocked_id: other }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); } else chk(await sb.from('blocks').delete().eq('blocker_id', me).eq('blocked_id', other)); return; }
     M.blocks = M.blocks || {}; if (on) M.blocks[me + ':' + other] = 1; else delete M.blocks[me + ':' + other]; await save();
+  },
+};
+
+export const rsvps = {
+  async list(gameId) {
+    if (sb) { const ids = chk(await sb.from('rsvps').select('user_id').eq('game_id', gameId).order('created_at')).map(r => r.user_id); if (!ids.length) return []; const ps = chk(await sb.from('profiles').select(PROF).in('id', ids)); return ids.map(i => ps.find(p => p.id === i)).filter(Boolean); }
+    return Object.values(M.rsvps || {}).filter(r => r.game_id === gameId).map(r => M.profiles[r.user_id]).filter(Boolean);
+  },
+  async set(gameId, me, on) {
+    if (sb) { if (on) { const r = await sb.from('rsvps').insert({ game_id: gameId }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); } else chk(await sb.from('rsvps').delete().eq('game_id', gameId).eq('user_id', me)); return; }
+    M.rsvps = M.rsvps || {}; const k = gameId + ':' + me; if (on) M.rsvps[k] = { game_id: gameId, user_id: me }; else delete M.rsvps[k]; await save();
+  },
+};
+export const live = {
+  async add(row) { if (sb) { chk(await sb.from('live_segments').insert(row)); return; } M.live = M.live || []; M.live.push({ id: uid(), user_id: M.session.id, created_at: now(), ...row }); await save(); },
+  async segments(gameId, session, afterSeq = -1) {
+    if (sb) return chk(await sb.from('live_segments').select('seq,path,type,dur,marks,ended,created_at').eq('game_id', gameId).eq('session', session).gt('seq', afterSeq).order('seq').limit(200));
+    return (M.live || []).filter(r => r.game_id === gameId && r.session === session && r.seq > afterSeq).sort((a, b) => a.seq - b.seq);
+  },
+  async sessions(gameId) {
+    const rows = sb ? chk(await sb.from('live_segments').select(`session,user_id,seq,ended,created_at, user:profiles(${PROF})`).eq('game_id', gameId).order('created_at', { ascending: false }).limit(500))
+      : (M.live || []).filter(r => r.game_id === gameId).map(r => ({ ...r, user: M.profiles[r.user_id] })).reverse();
+    const by = {};
+    for (const r of rows) { const x = by[r.session] || (by[r.session] = { session: r.session, user: r.user, last: r.created_at, first: r.created_at, count: 0, ended: false }); x.count++; if (r.ended) x.ended = true; if (r.created_at > x.last) x.last = r.created_at; if (r.created_at < x.first) x.first = r.created_at; }
+    return Object.values(by).map(x => ({ ...x, isLive: !x.ended && Date.now() - new Date(x.last) < 30000 })).sort((a, b) => (b.isLive - a.isLive) || (a.last < b.last ? 1 : -1));
   },
 };
 

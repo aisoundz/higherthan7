@@ -228,13 +228,26 @@ nav.bn .me .avi{width:26px!important;height:26px!important}
 .ph-btns .btn:not(.g){background:var(--o);border-color:var(--o);color:#0a0a0b}
 .scout{display:flex;gap:14px;align-items:center;margin-top:12px;padding:12px 14px;border-radius:14px;background:#151517;border:1px dashed #ff5a1f66;text-decoration:none;color:var(--ink)}.sc-n{font:36px/1 var(--hd);color:var(--o);min-width:40px;text-align:center}
 .ptabs button{font:20px/1 var(--hd);letter-spacing:.6px;text-transform:uppercase;padding:14px 4px 11px}.ptabs button.on{border-color:var(--o)}.ptabs button span{font:13px Inter;margin-left:4px}
+.runs{margin:4px 0 12px}.runs-h{display:flex;justify-content:space-between;align-items:baseline}.runs-h b{font:24px var(--hd);letter-spacing:.5px}.runs-h a{color:var(--o);font-weight:700;font-size:14px;text-decoration:none}
+.rail{display:flex;gap:10px;overflow-x:auto;margin:6px -16px 0;padding:0 16px 4px;scrollbar-width:none}.rail::-webkit-scrollbar{display:none}
+.runc{flex:none;width:200px;background:#151517;border:1px solid var(--ln);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--ink)}.runc.now{border-color:var(--o);background:#1d120c}.runc.empty{width:260px;border-style:dashed}
+.runc .rt{font:16px var(--hd);letter-spacing:.5px;color:var(--o)}.runc b{font-size:15px}.runc .mu{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rg{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:700}
+.runbox .rb-when{font:24px var(--hd);letter-spacing:.5px;color:var(--o)}.rb-where{display:block;font-weight:600;text-decoration:none;margin-top:2px}
+.rb-going{display:flex;align-items:center;margin-top:10px}.rb-going .avi{margin-right:-8px;border:2px solid #151517}.rb-going .mu{margin-left:14px;font-weight:700}
+.lb-h{display:flex;justify-content:space-between;align-items:center}.lb-h b{font:22px var(--hd);letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.lvdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff3040;animation:blink 1s infinite}
+.lb-list{margin-top:8px}.lb-s{display:flex;gap:10px;align-items:center;width:100%;background:none;border:0;border-top:1px solid var(--ln);padding:10px 0;color:var(--ink);text-align:left}.lb-s>span:nth-child(2){flex:1}
+.lp{position:relative;margin-top:10px;border-radius:14px;overflow:hidden;background:#000}.lp video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#000}
+.lp-badge{position:absolute;top:10px;left:10px;background:#000a;color:#fff;font:15px var(--hd);letter-spacing:.5px;padding:4px 8px 2px;border-radius:6px;display:flex;align-items:center;gap:6px}
+.lp-msg{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:13px;color:#fff;text-shadow:0 1px 3px #000}
+.rlive{position:absolute;top:calc(16px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:#ff3040;color:#fff;font:18px var(--hd);letter-spacing:1px;padding:4px 12px 2px;border-radius:6px;z-index:3}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261126p"></script>
-<script type="module" src="app.js?v=20261126p"></script>
+<script src="vendor/supabase.js?v=20261126q"></script>
+<script type="module" src="app.js?v=20261126q"></script>
 </body>
 </html>

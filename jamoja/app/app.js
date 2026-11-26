@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126p';
-import * as R from './rec.js?v=20261126p';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, storage, mode, ready } from './db.js?v=20261126p';
+import * as E from './engine.js?v=20261126q';
+import * as R from './rec.js?v=20261126q';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126q';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -180,11 +180,13 @@ async function home() {
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<a class="card" href="#/new" style="display:block;text-decoration:none;border-color:var(--o)"><b>You have an unfinished recording</b><br><span class="mu">${parts.length} part${parts.length > 1 ? 's' : ''} saved on this phone. Tap to make highlights from it.</span></a>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
-  V.innerHTML = `${top}${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
+  V.innerHTML = `${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
     <div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
     <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
+  const railEl = V.querySelector('#rail');
+  runsRail().then(h => { if (railEl.isConnected) railEl.innerHTML = h; }).catch(() => {});
   const tabsEl = V.querySelector('.tabs');
   if (ME && tabsEl && FEED_TAB === 'all' && !FEED_SPORT) {
     const extra = (await recapCard().catch(() => '')) + installCard();
@@ -382,6 +384,7 @@ const NOTE_TEXT = {
   tagged: n => `tagged you in a play${n.game ? ' from ' + n.game.title : ''}`,
   claimed: n => `claimed their plays${n.game ? ' in ' + n.game.title : ''}`,
   view: () => 'viewed your profile',
+  rsvp: n => `is in for ${n.game ? n.game.title : 'your run'}`,
 };
 const noteLink = n => n.type === 'follow' || n.type === 'view' ? `#/u/${n.actor ? n.actor.handle : ''}` : n.post_id ? `#/p/${n.post_id}` : n.game_id ? `#/g/${n.game_id}` : '#/';
 async function alertsPage() {
@@ -484,6 +487,84 @@ async function dmPage(handle) {
   const opt = V.querySelector('#dmopt');
   const drawOpt = () => { opt.innerHTML = `<button class="btn s g" id="blk">${blocked ? 'Unblock' : 'Block'} ${esc(other.name.split(' ')[0])}</button><p class="mu" style="margin:8px 0 0;font-size:13px">Blocked people can't message you. They aren't told.</p>`; opt.querySelector('#blk').onclick = async () => { try { blocked = !blocked; await blocks.set(ME.id, other.id, blocked); toast(blocked ? 'Blocked.' : 'Unblocked.'); drawOpt(); } catch (err) { toast(err.message); } }; };
   V.querySelector('#dmm').onclick = () => { opt.hidden = !opt.hidden; if (!opt.hidden) drawOpt(); };
+}
+
+// ---------------- Runs and live
+const whenLabel = t => { const d = new Date(t), n = new Date(); const same = d.toDateString() === n.toDateString(); const tm = new Date(n.getTime() + 864e5).toDateString() === d.toDateString(); const hm = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); return same ? 'Today ' + hm : tm ? 'Tomorrow ' + hm : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + hm; };
+const nextHour = () => { const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0); const p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`; };
+async function runsRail() {
+  if (LOCAL) return '';
+  const list = await games.upcoming().catch(() => []);
+  await storage.prep(list.map(g => g.owner && g.owner.avatar).filter(Boolean));
+  const soon = g => Math.abs(new Date(g.starts_at) - Date.now()) < 3 * 3600e3 && new Date(g.starts_at) <= Date.now() + 15 * 60e3;
+  return `<div class="runs"><div class="runs-h"><b>Runs</b><a href="#/new">+ Post a run</a></div><div class="rail">${list.length ? list.map(g => `<a class="runc ${soon(g) ? 'now' : ''}" href="#/g/${g.id}"><span class="rt">${soon(g) ? '● ON NOW' : esc(whenLabel(g.starts_at))}</span><b>${esc(g.title)}</b><span class="mu">${esc(g.place || g.sport)}</span><span class="rg">${g.owner ? avatar(g.owner, 22) : ''}<span>${g.going + 1} in</span></span></a>`).join('')
+    : `<a class="runc empty" href="#/new"><b>No runs posted yet</b><span class="mu">Post where and when you're playing so your crew can meet you.</span><span class="rt">+ Post a run</span></a>`}</div></div>`;
+}
+async function runBox(g, own) {
+  if (!g.starts_at && !own) return '';
+  const going = await rsvps.list(g.id).catch(() => []);
+  await storage.prep(going.map(p => p.avatar).filter(Boolean));
+  const imIn = ME && going.some(p => p.id === ME.id);
+  const map = g.place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(g.place)}` : '';
+  return `<div class="card runbox">${g.starts_at ? `<div class="rb-when">🕒 ${esc(whenLabel(g.starts_at))}</div>` : ''}${g.place ? `<a class="rb-where" href="${map}" target="_blank" rel="noopener">📍 ${esc(g.place)} <span class="mu">· Map</span></a>` : ''}${g.notes ? `<p style="margin:6px 0 0">${nl(g.notes)}</p>` : ''}
+    <div class="rb-going">${g.owner ? avatar(g.owner, 30) : ''}${going.slice(0, 8).map(p => avatar(p, 30)).join('')}<span class="mu">${going.length + 1} in</span></div>
+    ${own ? '' : ME ? `<button class="btn w ${imIn ? 'g' : ''}" id="rsvp" style="margin-top:10px">${imIn ? "✓ You're in" : "I'm in"}</button>` : `<a class="btn w" href="#/login?mode=up&next=${encodeURIComponent('#/g/' + g.id)}" style="margin-top:10px">I'm in (sign up free)</a>`}</div>`;
+}
+async function liveBox(g) {
+  if (LOCAL) return '';
+  const ss = await live.sessions(g.id).catch(() => []);
+  await storage.prep(ss.map(x => x.user && x.user.avatar).filter(Boolean));
+  const mins = x => Math.max(1, Math.round((new Date(x.last) - new Date(x.first)) / 60000));
+  return `<div class="card livebox"><div class="lb-h"><b>${ss.some(x => x.isLive) ? '<span class="lvdot"></span> Live now' : 'Watch'}</b>${ME ? `<button class="btn s" id="golive">● Go live</button>` : ''}</div>
+    ${ss.length ? `<div class="lb-list">${ss.map(x => `<button class="lb-s" data-watch="${esc(x.session)}" data-live="${x.isLive ? 1 : ''}">${avatar(x.user, 28)}<span><b>${esc(x.user ? x.user.name : 'Someone')}</b><br><span class="mu">${x.isLive ? '🔴 Live now' : `Replay · ${mins(x)} min`}</span></span><span class="btn s g">${x.isLive ? 'Watch' : 'Play'}</span></button>`).join('')}</div>` : `<p class="mu" style="margin:6px 0 0">${ME ? 'At the run? Tap Go live and anyone can watch from here, about 10 seconds behind. Players or fans can stream.' : 'When someone goes live at this run, you can watch it here.'}</p>`}
+    <div id="player"></div></div>`;
+}
+// Broadcaster: records 6-second chunks and uploads each one as it finishes.
+async function goLive(g) {
+  if (!R.supported()) return toast('Live is not supported in this browser. Open Jamoja in Safari or Chrome.');
+  const session = 'live-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  let chain = Promise.resolve(), failed = 0, sent = 0;
+  const up = (p, seq, last) => { chain = chain.then(async () => {
+    const ext = p.name.split('.').pop(), path = `${ME.id}/live/${g.id}/${session}-${String(seq).padStart(4, '0')}.${ext}`;
+    for (let i = 0; i < 3; i++) { try { await storage.upload(path, p.blob, p.type.split(';')[0]); await live.add({ game_id: g.id, session, seq, path, type: p.type.split(';')[0], dur: +p.dur.toFixed(2), marks: p.marks, ended: !!last }); sent++; return; } catch (e) { await new Promise(r => setTimeout(r, 1200)); } }
+    failed++;
+  }); };
+  const r = await R.record({ live: true, title: g.title, onPart: up });
+  if (r && r.parts.length) { toast('Finishing the upload…'); await chain; if (r.parts.length && sent) { const lastSeq = r.parts.length - 1; } toast(failed ? `Stream saved with ${failed} missing piece${failed > 1 ? 's' : ''} (weak signal).` : 'Stream saved. People can watch the replay.'); }
+  gamePage(g.id);
+}
+// Viewer: plays chunks back to back. Live: starts near the newest chunk and keeps checking for more.
+let WATCH = null;
+window.addEventListener('hashchange', () => { if (WATCH) { WATCH.stop(); WATCH = null; } });
+async function watchSession(box, gameId, session, isLive) {
+  if (WATCH) WATCH.stop();
+  box.innerHTML = `<div class="lp"><video playsinline class="lv a"></video><video playsinline class="lv b" hidden></video><div class="lp-badge">${isLive ? '<span class="lvdot"></span> LIVE' : 'REPLAY'}</div><div class="lp-msg mu" id="lpm">Loading…</div></div>`;
+  const vids = [...box.querySelectorAll('video')]; let cur = 0, queue = [], lastSeq = -1, stopped = false, playing = false, poll = null;
+  const msg = t => { const m = box.querySelector('#lpm'); if (m) { m.textContent = t || ''; m.hidden = !t; } };
+  const fetchMore = async () => {
+    const segs = await live.segments(gameId, session, lastSeq).catch(() => []);
+    if (!segs.length) return false;
+    if (lastSeq < 0 && isLive && segs.length > 2) segs.splice(0, segs.length - 2);
+    await storage.prep(segs.map(s2 => s2.path));
+    for (const s2 of segs) { queue.push(s2); lastSeq = s2.seq; if (s2.ended) isLive = false; }
+    return true;
+  };
+  const load = (v, s2) => { v.src = storage.url(s2.path); v.load(); };
+  const next = async () => {
+    if (stopped) return;
+    if (!queue.length) { await fetchMore(); }
+    if (!queue.length) { playing = false; msg(isLive ? 'Waiting for the next few seconds…' : 'End of stream.'); return; }
+    const s2 = queue.shift(), v = vids[cur], other = vids[1 - cur];
+    if (v.dataset.path !== s2.path) { load(v, s2); v.dataset.path = s2.path; }
+    v.hidden = false; other.hidden = true; msg('');
+    try { await v.play(); playing = true; } catch (e) { v.muted = true; try { await v.play(); playing = true; msg('Tap the video for sound'); } catch (e2) { msg('Tap to play'); } }
+    if (queue[0]) { load(other, queue[0]); other.dataset.path = queue[0].path; }
+    v.onended = () => { cur = 1 - cur; vids[cur].muted = v.muted; next(); };
+  };
+  box.querySelector('.lp').onclick = () => { vids.forEach(v => { v.muted = false; }); const v = vids[cur]; if (v.paused) v.play().catch(() => {}); msg(''); };
+  await fetchMore(); next();
+  if (isLive) poll = setInterval(async () => { if (stopped) return; const got = await fetchMore(); if (got && !playing) next(); if (!isLive) { clearInterval(poll); } }, 3000);
+  WATCH = { stop: () => { stopped = true; clearInterval(poll); vids.forEach(v => { v.pause(); v.removeAttribute('src'); }); } };
 }
 
 // ---------------- Post composer: text, photo, video, YouTube link
@@ -816,8 +897,9 @@ async function newGame() {
     ${existing ? `<p class="mu">Adding to <b>${esc(existing.title)}</b></p>` : `<div class="card"><label class="f" for="gt" style="margin-top:0">Game name</label><input class="t" id="gt" value="Saturday Run">
       <label class="f" for="gs">Sport</label><select class="t" id="gs">${SPORTS.map(s => `<option ${MYP.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       <label class="f" for="gp">Where</label><input class="t" id="gp" value="${esc(MYP.city || '')}" placeholder="Court or field, city">
-      <label class="f" for="gd">Date</label><input class="t" id="gd" type="date" value="${today()}">
-      <button class="btn w g" id="sv" style="margin-top:14px">Save game, film later</button><p class="mu" style="margin:6px 0 0;font-size:13px">Set it up now. When the game starts, open it and tap Film this game.</p></div>`}
+      <label class="f" for="gw">When</label><input class="t" id="gw" type="datetime-local" value="${nextHour()}">
+      <label class="f" for="gn">Notes (optional)</label><input class="t" id="gn" maxlength="300" placeholder="Full court. Bring a dark and a light shirt.">
+      <button class="btn w" id="sv" style="margin-top:14px;min-height:52px">Post this run</button><p class="mu" style="margin:6px 0 0;font-size:13px">It shows on everyone's Home under Runs so your crew can meet you. When you get there, open it to go live or film.</p></div>`}
     ${saved.length ? `<div class="card" style="border-color:var(--o)" id="recov"><b>Unfinished recording found</b><p class="mu" style="margin:4px 0 10px">${saved.length} part${saved.length > 1 ? 's' : ''} (${mmss(saved.reduce((a, p) => a + p.dur, 0))}) saved on this phone, with ${(n => n + (n === 1 ? ' play' : ' plays'))(saved.reduce((a, p) => a + p.marks.length, 0))} marked.</p><div class="row"><button class="btn s" id="rcv">Use it</button><button class="btn s g" id="rdel">Delete it</button></div></div>` : ''}
     <div class="card"><b>Add your game</b><p class="mu" style="margin:4px 0 12px">Film right here and tap BUCKET after big plays, or upload clips you already shot.</p>
       ${R.supported() ? `<button class="btn w" id="film" style="min-height:56px;font-size:18px">● Film in Jamoja</button>` : ''}
@@ -890,9 +972,10 @@ async function newGame() {
   if (sv) sv.onclick = async () => {
     sv.disabled = true; sv.textContent = 'Saving…';
     try {
-      const g = await games.create({ owner_id: ME.id, title: document.getElementById('gt').value.trim() || 'Saturday Run', sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: document.getElementById('gd').value || today() });
-      toast('Game saved. Open it when it is time to film.'); go('#/g/' + g.id);
-    } catch (err) { sv.disabled = false; sv.textContent = 'Save game, film later'; toast(err.message); }
+      const w = document.getElementById('gw').value; const at = w ? new Date(w) : new Date();
+      const g = await games.create({ owner_id: ME.id, title: document.getElementById('gt').value.trim() || 'Saturday Run', sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
+      toast('Run posted. Share it so people meet you there.'); go('#/g/' + g.id);
+    } catch (err) { sv.disabled = false; sv.textContent = 'Post this run'; toast(err.message); }
   };
   if (film) film.onclick = async () => {
     const r = await R.record({ title: existing ? existing.title : (document.getElementById('gt') || {}).value });
@@ -918,7 +1001,8 @@ async function newGame() {
       let game = existing;
       if (!game) {
         const title = document.getElementById('gt').value.trim() || 'Saturday Run';
-        game = await games.create({ owner_id: ME.id, title, sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: document.getElementById('gd').value || today() });
+        const w = document.getElementById('gw').value; const at = w ? new Date(w) : new Date();
+        game = await games.create({ owner_id: ME.id, title, sport: document.getElementById('gs').value, place: document.getElementById('gp').value.trim(), played_on: at.toISOString().slice(0, 10), starts_at: at.toISOString(), notes: document.getElementById('gn').value.trim() || null });
       }
       const already = existing ? (await highlights.list(game.id)).length : 0;
       for (let k = 0; k < jobs.length; k++) {
@@ -966,7 +1050,8 @@ async function gamePage(id) {
         ${hs.length ? `<button class="btn w" id="sa">${canFiles ? 'Send all ' + hs.length + ' clips' : 'Save all clips'}</button>` : ''}</div>`
     : `<div class="card"><b>Share this game</b><div class="lnk"><input readonly value="${esc(link)}" aria-label="Game link" id="lk"><button class="btn s" id="cp">Copy</button></div>
       ${navigator.share ? `<button class="btn g w" id="sh" style="margin-top:8px">Send to the group chat</button>` : ''}</div>`;
-  V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place ? ' · ' + esc(g.place) : ''}${g.played_on ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>
+  const [rbox, lbox] = await Promise.all([runBox(g, own), liveBox(g)]);
+  V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place && !g.starts_at ? ' · ' + esc(g.place) : ''}${g.played_on && !g.starts_at ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>${rbox}${lbox}
     ${own && qs().get('fresh') ? `<div class="card" style="border-color:var(--o)"><b>${LOCAL ? 'Next: tag your crew, then send the clips.' : 'Next: tag your crew, then send the link.'}</b><p class="mu" style="margin:4px 0 0">Add each player below, then pick who is in each highlight and what the play was. Tagged plays get shared way more.</p></div>` : ''}
     ${shareCard}
     <h2>Players</h2>
@@ -1012,6 +1097,11 @@ async function gamePage(id) {
       else if (b.id === 'dg') { if (!confirmIn(b)) return; await storage.remove(hs.flatMap(h => [h.path, h.poster])); await games.remove(id); toast('Game deleted.'); go('#/'); }
     } catch (err) { toast(err.message); }
   };
+  const rb = document.getElementById('rsvp');
+  if (rb) rb.onclick = async () => { const on = !rb.classList.contains('g'); rb.disabled = true; try { await rsvps.set(g.id, ME.id, on); toast(on ? "You're in. See you there." : 'Removed.'); gamePage(id); } catch (err) { rb.disabled = false; toast(err.message); } };
+  const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
+  V.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { watchSession(V.querySelector('#player'), g.id, b.dataset.watch, !!b.dataset.live); V.querySelector('#player').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  const autoLive = V.querySelector('[data-watch][data-live="1"]'); if (autoLive && !own) autoLive.click();
   countViews(V);
   V.onchange = async ev => {
     const s = ev.target.closest('[data-hp]'), t = ev.target.closest('[data-pt]');

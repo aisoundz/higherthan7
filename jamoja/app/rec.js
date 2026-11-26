@@ -1,7 +1,7 @@
 // Film in Jamoja: full-screen camera with a Bucket button.
 // Records in parts (a new part every few minutes) and saves each part on the phone as soon as it ends,
 // so a long run never becomes one giant file and nothing is lost if the browser closes.
-import { local } from './db.js?v=20261126p';
+import { local } from './db.js?v=20261126q';
 
 const PART_SECONDS = 120;
 const CHECKPOINT_SECONDS = 20;
@@ -32,12 +32,12 @@ export function record(opts = {}) {
     el.innerHTML = `<video playsinline muted autoplay></video>
       <button class="rx" id="rx" aria-label="Exit">✕</button>
       <div class="rtop"><span class="rdot" id="rdot"></span><b id="rt">0:00</b><span id="rst" class="mu">Ready</span></div>
-      ${opts.title ? `<div class="rtitle">${opts.title.replace(/[<>&]/g, '')}</div>` : ''}
+      ${opts.live ? `<div class="rlive" id="rlive" hidden>● LIVE</div>` : ''}${opts.title ? `<div class="rtitle">${opts.title.replace(/[<>&]/g, '')}</div>` : ''}
       <div class="rhint" id="rh">Prop the phone where it sees the court. Press Start when the game starts. Tap BUCKET right after a big play.</div>
       <div class="rflash" id="rf">Play saved</div>
       <div class="rsheet" id="rsh" hidden></div>
       <div class="rbot">
-        <button class="bucket start" id="rgo" disabled>START</button>
+        <button class="bucket start" id="rgo" disabled>${opts.live ? 'GO LIVE' : 'START'}</button>
         <button class="bucket" id="bk" hidden>BUCKET!</button>
         <div class="row" style="justify-content:space-between;width:100%;gap:8px"><button class="btn g s" id="pz" hidden>❚❚ Pause</button><span id="rm" class="mu">0 plays marked</span><button class="btn g s" id="rs" hidden>End game</button></div>
       </div>`;
@@ -47,7 +47,7 @@ export function record(opts = {}) {
     const close = () => { el.remove(); document.documentElement.style.overflow = ''; };
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: opts.live ? 960 : 1280 }, height: { ideal: opts.live ? 540 : 720 }, frameRate: { ideal: 30 } }, audio: true });
     } catch (e) {
       el.querySelector('.rbot').innerHTML = `<div class="err">Jamoja could not open the camera. Allow camera and microphone for this site in your browser settings, then try again.</div><button class="btn w" id="rback">Back</button>`;
       const done = () => { close(); resolve(null); };
@@ -63,9 +63,10 @@ export function record(opts = {}) {
     keepAwake(true);
     const recording = () => rec && rec.state === 'recording';
     const setUI = st => {
-      $('rst').textContent = st === 'rec' ? (part ? ` · part ${part + 1}` : ' · recording') : st === 'paused' ? ' · paused' : ' · ready';
+      $('rst').textContent = st === 'rec' ? (opts.live ? ' · streaming' : part ? ` · part ${part + 1}` : ' · recording') : st === 'paused' ? ' · paused' : ' · ready';
+      if (opts.live && $('rlive')) $('rlive').hidden = st !== 'rec';
       $('rdot').classList.toggle('off', st !== 'rec');
-      $('rgo').hidden = st === 'rec'; $('rgo').textContent = st === 'paused' ? 'RESUME' : 'START';
+      $('rgo').hidden = st === 'rec'; $('rgo').textContent = st === 'paused' ? 'RESUME' : opts.live ? 'GO LIVE' : 'START';
       $('bk').hidden = st !== 'rec'; $('pz').hidden = st !== 'rec';
       $('rs').hidden = !(st === 'rec' || parts.length || st === 'paused');
     };
@@ -73,14 +74,16 @@ export function record(opts = {}) {
     let partId = '', lastCheck = 0;
     function startPart() {
       buf = []; marks = []; partId = session + '-' + String(part).padStart(3, '0'); lastCheck = performance.now(); after = 'next';
-      rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 2500000 } : { videoBitsPerSecond: 2500000 });
+      const bps = opts.live ? 1200000 : 2500000;
+      rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: bps } : { videoBitsPerSecond: bps });
       rec.ondataavailable = e => { if (e.data && e.data.size) buf.push(e.data); };
       rec.onstop = async () => {
         const dur = (performance.now() - partStart) / 1000;
         if (buf.length) {
           const p = { id: partId, name: `part${part + 1}.${ext}`, type: rec.mimeType || type || 'video/webm', blob: new Blob(buf, { type: rec.mimeType || type || 'video/webm' }), dur, marks: marks.slice(), created: Date.now() };
           parts.push(p);
-          try { await local.put('chunks', p); } catch (e) { console.warn('could not save part', e); }
+          if (opts.onPart) { try { opts.onPart(p, part, after === 'finish' || after === 'discard'); } catch (e) { console.warn(e); } }
+          if (!opts.live) { try { await local.put('chunks', p); } catch (e) { console.warn('could not save part', e); } }
           part++;
         }
         if (after === 'finish') finish(); else if (after === 'discard') discard(); else if (after === 'pause') setUI('paused'); else startPart();
@@ -108,8 +111,8 @@ export function record(opts = {}) {
       if (recording()) total += (nowT - lastTick) / 1000;
       lastTick = nowT;
       $('rt').textContent = Math.floor(total / 60) + ':' + String(Math.floor(total % 60)).padStart(2, '0');
-      if (recording() && (nowT - partStart) / 1000 >= PART_SECONDS) rec.stop();
-      else if (recording() && buf.length && (nowT - lastCheck) / 1000 >= CHECKPOINT_SECONDS) {
+      if (recording() && (nowT - partStart) / 1000 >= (opts.live ? 6 : PART_SECONDS)) rec.stop();
+      else if (!opts.live && recording() && buf.length && (nowT - lastCheck) / 1000 >= CHECKPOINT_SECONDS) {
         // Safety net: save what has been filmed so far in this part, so a crash or a closed tab loses at most a few seconds.
         lastCheck = nowT;
         const ty = rec.mimeType || type || 'video/webm';
