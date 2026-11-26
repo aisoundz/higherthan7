@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127d';
-import * as R from './rec.js?v=20261127d';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127d';
+import * as E from './engine.js?v=20261127e';
+import * as R from './rec.js?v=20261127e';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127e';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127d';
+const APP_V = '20261127e';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -787,7 +787,7 @@ function reviewPlays(g, list, ps, own, gameId) {
     const who = h.player_id ? (ps.find(p => p.id === h.player_id) || {}) : null;
     const cur = h.play_type || '';
     el.innerHTML = `<div class="rv-top"><b>Play ${i + 1} of ${list.length}</b><button class="rv-x" data-x aria-label="Close">✕</button></div>
-      <video class="rv-v" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline autoplay loop muted></video>
+      <div class="rv-vw"><video class="rv-v" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline autoplay loop muted></video><button class="rv-fs" data-fs aria-label="Full screen">⤢</button><span class="rv-hint">Tap to zoom</span></div>
       <div class="rv-p">
         ${own ? `<div class="rv-l">What was it?${cur ? '' : ' <span class="mu">(pick one)</span>'}</div>
         <div class="rv-c">${types.map(t => `<button class="chip ${cur === t ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}<select data-more aria-label="More play types"><option value="">More…</option>${more.map(t => `<option ${cur === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}<option value="Warmup">Warmup (hide it)</option></select></div>` : `<div class="rv-l">${cur ? esc(cur) : 'Play'}</div>`}
@@ -803,12 +803,19 @@ function reviewPlays(g, list, ps, own, gameId) {
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return; const h = list[i];
     if (b.dataset.x !== undefined) return close();
+    if (b.dataset.fs !== undefined) { const v = el.querySelector('.rv-v'); v.muted = false; try { if (v.webkitEnterFullscreen) v.webkitEnterFullscreen(); else if (v.requestFullscreen) await v.requestFullscreen(); } catch (err) { /* not allowed */ } v.play().catch(() => {}); return; }
     if (b.dataset.next !== undefined) { if (i === list.length - 1) { toast('All set.'); return close(); } return go2(1); }
     if (b.dataset.prev !== undefined) return go2(-1);
     if (b.dataset.t) { await save1({ play_type: b.dataset.t }); draw(); setTimeout(() => { if (i < list.length - 1) go2(1); }, 250); return; }
     if (b.dataset.me !== undefined) { try { const pid = await highlights.claimMine(h.id); h.player_id = pid; if (!ps.find(p => p.id === pid)) ps.push({ id: pid, user_id: ME.id, label: (MYP && MYP.name) || 'Me' }); changed = true; draw(); } catch (err) { toast(err.message); } return; }
     if (b.dataset.notme !== undefined) { try { await highlights.unclaimMine(h.id); h.player_id = null; changed = true; draw(); } catch (err) { toast(err.message); } return; }
     if (b.dataset.del !== undefined) { if (!confirmIn(b)) return; try { await highlights.remove(h.id); list.splice(i, 1); changed = true; if (!list.length) return close(); i = Math.min(i, list.length - 1); draw(); } catch (err) { toast(err.message); } }
+  });
+  el.addEventListener('click', e => {
+    const v = e.target.closest('.rv-v'); if (!v) return;
+    const r = v.getBoundingClientRect(); const z = v.classList.toggle('zoom');
+    v.style.transformOrigin = `${((e.clientX - r.left) / r.width * 100).toFixed(0)}% ${((e.clientY - r.top) / r.height * 100).toFixed(0)}%`;
+    const hint = el.querySelector('.rv-hint'); if (hint) hint.textContent = z ? 'Tap to zoom out' : 'Tap to zoom';
   });
   el.addEventListener('change', async e => {
     if (e.target.dataset.more !== undefined && e.target.value) { await save1({ play_type: e.target.value }); draw(); }
