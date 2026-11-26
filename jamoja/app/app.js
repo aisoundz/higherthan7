@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126r';
-import * as R from './rec.js?v=20261126r';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126r';
+import * as E from './engine.js?v=20261126s';
+import * as R from './rec.js?v=20261126s';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, storage, mode, ready } from './db.js?v=20261126s';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -186,7 +186,8 @@ async function home() {
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
   const railEl = V.querySelector('#rail');
-  runsRail().then(h => { if (railEl.isConnected) railEl.innerHTML = h; }).catch(() => {});
+  const fillRail = () => runsRail().then(h => { if (railEl.isConnected) railEl.innerHTML = h; }).catch(() => {});
+  fillRail(); clearInterval(window.RAIL_T); window.RAIL_T = setInterval(() => { if (railEl.isConnected) fillRail(); else clearInterval(window.RAIL_T); }, 20000);
   const tabsEl = V.querySelector('.tabs');
   if (ME && tabsEl && FEED_TAB === 'all' && !FEED_SPORT) {
     const extra = (await recapCard().catch(() => '')) + installCard();
@@ -385,6 +386,7 @@ const NOTE_TEXT = {
   claimed: n => `claimed their plays${n.game ? ' in ' + n.game.title : ''}`,
   view: () => 'viewed your profile',
   rsvp: n => `is in for ${n.game ? n.game.title : 'your run'}`,
+  live: n => `went live 🔴 at ${n.game ? n.game.title : 'a run'}. Tap to watch`,
 };
 const noteLink = n => n.type === 'follow' || n.type === 'view' ? `#/u/${n.actor ? n.actor.handle : ''}` : n.post_id ? `#/p/${n.post_id}` : n.game_id ? `#/g/${n.game_id}` : '#/';
 async function alertsPage() {
@@ -494,10 +496,13 @@ const whenLabel = t => { const d = new Date(t), n = new Date(); const same = d.t
 const nextHour = () => { const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0); const p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`; };
 async function runsRail() {
   if (LOCAL) return '';
-  const list = await games.upcoming().catch(() => []);
+  const [list, onAir] = await Promise.all([games.upcoming().catch(() => []), live.now().catch(() => [])]);
+  await storage.prep(onAir.map(x => x.user && x.user.avatar).filter(Boolean));
+  const liveIds = new Set(onAir.map(x => x.game_id));
+  const banner = onAir.map(x => `<a class="livebar" href="#/g/${x.game_id}">${avatar(x.user, 40)}<span><b><span class="lvdot"></span> LIVE NOW</b><br>${esc(x.user ? x.user.name : 'Someone')} at ${esc(x.game ? x.game.title : 'a run')}</span><span class="btn s">Watch</span></a>`).join('');
   await storage.prep(list.map(g => g.owner && g.owner.avatar).filter(Boolean));
   const soon = g => Math.abs(new Date(g.starts_at) - Date.now()) < 3 * 3600e3 && new Date(g.starts_at) <= Date.now() + 15 * 60e3;
-  return `<div class="runs"><div class="runs-h"><b>Runs</b><a href="#/new">+ Post a run</a></div><div class="rail">${list.length ? list.map(g => `<a class="runc ${soon(g) ? 'now' : ''}" href="#/g/${g.id}"><span class="rt">${soon(g) ? '● ON NOW' : esc(whenLabel(g.starts_at))}</span><b>${esc(g.title)}</b><span class="mu">${esc(g.place || g.sport)}</span><span class="rg">${g.owner ? avatar(g.owner, 22) : ''}<span>${g.going + 1} in</span></span></a>`).join('')
+  return banner + `<div class="runs"><div class="runs-h"><b>Runs</b><a href="#/new">+ Post a run</a></div><div class="rail">${list.length ? list.map(g => `<a class="runc ${liveIds.has(g.id) ? 'onair' : soon(g) ? 'now' : ''}" href="#/g/${g.id}"><span class="rt">${liveIds.has(g.id) ? '🔴 LIVE' : soon(g) ? '● ON NOW' : esc(whenLabel(g.starts_at))}</span><b>${esc(g.title)}</b><span class="mu">${esc(g.place || g.sport)}</span><span class="rg">${g.owner ? avatar(g.owner, 22) : ''}<span>${g.going + 1} in</span></span></a>`).join('')
     : `<a class="runc empty" href="#/new"><b>No runs posted yet</b><span class="mu">Post where and when you're playing so your crew can meet you.</span><span class="rt">+ Post a run</span></a>`}</div></div>`;
 }
 async function runBox(g, own) {
@@ -1094,7 +1099,7 @@ async function gamePage(id) {
       }
       else if (b.dataset.release) { await players.release(b.dataset.release); toast('Removed from your profile.'); gamePage(id); }
       else if (b.dataset.hd) { if (!confirmIn(b)) return; const h = hs.find(x => x.id === b.dataset.hd); await highlights.remove(h.id); await storage.remove([h.path, h.poster]); gamePage(id); }
-      else if (b.id === 'dg') { if (!confirmIn(b)) return; await storage.remove(hs.flatMap(h => [h.path, h.poster])); await games.remove(id); toast('Game deleted.'); go('#/'); }
+      else if (b.id === 'dg') { if (!confirmIn(b)) return; const lsess = await live.sessions(id).catch(() => []); const lfiles = []; for (const x of lsess) { (await live.segments(id, x.session).catch(() => [])).forEach(z => lfiles.push(z.path)); } const files = [...hs.flatMap(h => [h.path, h.poster]), ...lfiles]; if (files.length) await storage.remove(files).catch(() => {}); await games.remove(id); toast('Game deleted.'); go('#/'); }
     } catch (err) { toast(err.message); }
   };
   const rb = document.getElementById('rsvp');
@@ -1102,6 +1107,8 @@ async function gamePage(id) {
   const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
   V.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { watchSession(V.querySelector('#player'), g.id, b.dataset.watch, !!b.dataset.live); V.querySelector('#player').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
   const autoLive = V.querySelector('[data-watch][data-live="1"]'); if (autoLive && !own) autoLive.click();
+  clearInterval(window.LB_T);
+  if (!autoLive) window.LB_T = setInterval(async () => { if (!location.hash.startsWith('#/g/' + id)) { clearInterval(window.LB_T); return; } const ss = await live.sessions(g.id).catch(() => []); if (ss.some(x => x.isLive)) { clearInterval(window.LB_T); gamePage(id); } }, 10000);
   countViews(V);
   V.onchange = async ev => {
     const s = ev.target.closest('[data-hp]'), t = ev.target.closest('[data-pt]');

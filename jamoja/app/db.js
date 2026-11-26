@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126r';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126s';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -316,6 +316,13 @@ export const live = {
   async segments(gameId, session, afterSeq = -1) {
     if (sb) return chk(await sb.from('live_segments').select('seq,path,type,dur,marks,ended,created_at').eq('game_id', gameId).eq('session', session).gt('seq', afterSeq).order('seq').limit(200));
     return (M.live || []).filter(r => r.game_id === gameId && r.session === session && r.seq > afterSeq).sort((a, b) => a.seq - b.seq);
+  },
+  async now() {
+    const since = new Date(Date.now() - 30000).toISOString();
+    const rows = sb ? chk(await sb.from('live_segments').select(`game_id,session,user_id,ended,created_at, user:profiles(${PROF}), game:games(id,title,place)`).gte('created_at', since).order('created_at', { ascending: false }).limit(50))
+      : (M.live || []).filter(r => r.created_at >= since).map(r => ({ ...r, user: M.profiles[r.user_id], game: M.games[r.game_id] }));
+    const by = {}; for (const r of rows) { if (r.ended) { by[r.session] = null; continue; } if (!(r.session in by)) by[r.session] = r; }
+    return Object.values(by).filter(Boolean);
   },
   async sessions(gameId) {
     const rows = sb ? chk(await sb.from('live_segments').select(`session,user_id,seq,ended,created_at, user:profiles(${PROF})`).eq('game_id', gameId).order('created_at', { ascending: false }).limit(500))
