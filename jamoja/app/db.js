@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126q';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126r';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -86,17 +86,17 @@ export const profiles = {
 export const games = {
   async create(g) { if (sb) return chk(await sb.from('games').insert(g).select().single()); const r = { id: uid(), created_at: now(), ...g }; M.games[r.id] = r; await save(); return r; },
   async get(id) {
-    if (sb) return chk(await sb.from('games').select('*, owner:profiles(id,name,handle,avatar)').eq('id', id).maybeSingle());
+    if (sb) return chk(await sb.from('games').select('*, owner:profiles!games_owner_id_fkey(id,name,handle,avatar)').eq('id', id).maybeSingle());
     const g = M.games[id]; if (!g) return null; const o = M.profiles[g.owner_id];
     return { ...g, owner: o ? { id: o.id, name: o.name, handle: o.handle } : null };
   },
   async upcoming() {
     const from = new Date(Date.now() - 4 * 3600e3).toISOString(), to = new Date(Date.now() + 8 * 864e5).toISOString();
-    if (sb) return chk(await sb.from('games').select('id,title,sport,place,starts_at,notes,owner_id, owner:profiles(id,name,handle,avatar), rsvps(count)').gte('starts_at', from).lte('starts_at', to).order('starts_at').limit(20)).map(g => ({ ...g, going: (g.rsvps && g.rsvps[0] && g.rsvps[0].count) || 0 }));
+    if (sb) return chk(await sb.from('games').select('id,title,sport,place,starts_at,notes,owner_id, owner:profiles!games_owner_id_fkey(id,name,handle,avatar), rsvps(count)').gte('starts_at', from).lte('starts_at', to).order('starts_at').limit(20)).map(g => ({ ...g, going: (g.rsvps && g.rsvps[0] && g.rsvps[0].count) || 0 }));
     return Object.values(M.games).filter(g => g.starts_at && g.starts_at >= from && g.starts_at <= to).sort((a, b) => a.starts_at < b.starts_at ? -1 : 1).map(g => ({ ...g, owner: M.profiles[g.owner_id], going: Object.values(M.rsvps || {}).filter(r => r.game_id === g.id).length }));
   },
   async mine(userId) { if (sb) return chk(await sb.from('games').select('*').eq('owner_id', userId).order('created_at', { ascending: false })); return Object.values(M.games).filter(g => g.owner_id === userId).reverse(); },
-  async recent() { if (sb) return chk(await sb.from('games').select('*, owner:profiles(name,handle)').order('created_at', { ascending: false }).limit(20)); return Object.values(M.games).reverse().slice(0, 20).map(g => ({ ...g, owner: M.profiles[g.owner_id] })); },
+  async recent() { if (sb) return chk(await sb.from('games').select('*, owner:profiles!games_owner_id_fkey(name,handle)').order('created_at', { ascending: false }).limit(20)); return Object.values(M.games).reverse().slice(0, 20).map(g => ({ ...g, owner: M.profiles[g.owner_id] })); },
   async remove(id) {
     if (sb) { chk(await sb.from('games').delete().eq('id', id)); return; }
     delete M.games[id];
@@ -149,7 +149,7 @@ export const highlights = {
     if (sb) {
       let pids = null;
       if (ids) pids = chk(await sb.from('players').select('id').in('user_id', ids)).map(r => r.id);
-      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
+      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
       if (sport) q = q.eq('game.sport', sport);
       if (ids) q = q.or(`created_by.in.(${ids.join(',')})` + (pids.length ? `,player_id.in.(${pids.join(',')})` : ''));
       return chk(await q).map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
