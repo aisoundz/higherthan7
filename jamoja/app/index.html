@@ -14,6 +14,11 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://biz.higherthan7.com/jamoja/join/card3.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jamoja">
 <meta name="theme-color" content="#0a0a0b">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
@@ -157,13 +162,19 @@ textarea.ta{width:100%;height:auto;min-height:90px;padding:10px 12px;line-height
 nav.bn a{min-width:58px}
 input[type=search].t{-webkit-appearance:none;appearance:none}
 .pvc{display:flex;gap:14px;align-items:center;text-decoration:none;margin-top:14px}.pvn{font:600 40px/1 var(--num);color:var(--o);min-width:48px;text-align:center}
+.bell{position:relative;display:grid;place-items:center;width:40px;height:40px;color:var(--ink)}.bell svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2}
+.bdg{position:absolute;top:2px;right:0;min-width:18px;height:18px;border-radius:9px;background:var(--o);color:#0a0a0b;font:700 11px/18px Inter;text-align:center;padding:0 4px}
+.nrow{display:flex;gap:12px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--ln);text-decoration:none;border-radius:10px}.nrow.new{background:#ff5a1f14}
+.recap .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}.recap .rgrid a{display:flex;flex-direction:column;align-items:center;text-decoration:none;background:var(--p2);border-radius:12px;padding:10px 4px;text-align:center}.recap .rgrid b{font:600 24px/1 var(--num);color:var(--o)}.recap .rgrid span{font-size:11px;color:var(--mu);margin-top:4px}
+.inst{position:relative}.inst .x{position:absolute;top:8px;right:8px;text-decoration:none;font-size:16px}.shr{display:inline-block;border:1px solid var(--mu);border-radius:4px;padding:0 3px;font-size:12px}
+.tr{display:flex;gap:8px;align-items:center}
 </style>
 </head>
 <body>
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script src="vendor/supabase.js?v=20261126d"></script>
-<script type="module" src="app.js?v=20261126d"></script>
+<script src="vendor/supabase.js?v=20261126e"></script>
+<script type="module" src="app.js?v=20261126e"></script>
 </body>
 </html>

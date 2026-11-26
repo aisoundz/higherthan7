@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126d';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261126e';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -253,6 +253,20 @@ export const profileViews = {
     const since = new Date(Date.now() - days * 864e5).toISOString();
     if (sb) return chk(await sb.from('profile_views').select(`viewer_id, viewed_at, viewer:profiles!profile_views_viewer_id_fkey(${PROF},city)`).eq('profile_id', me).gte('viewed_at', since).order('viewed_at', { ascending: false }).limit(300));
     return (M.pviews || []).filter(v => v.profile_id === me && v.viewed_at >= since).map(v => ({ ...v, viewer: v.viewer_id ? M.profiles[v.viewer_id] : null })).reverse();
+  },
+};
+
+export const notes = {
+  async unread(me) { if (!me) return 0; if (sb) { const r = await sb.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', me).is('read_at', null); return r.count || 0; } return (M.notes || []).filter(n => n.user_id === me && !n.read_at).length; },
+  async list(me, limit = 60) {
+    if (sb) return chk(await sb.from('notifications').select(`id,type,created_at,read_at,post_id,highlight_id,game_id, actor:profiles!notifications_actor_id_fkey(${PROF}), game:games(title), highlight:highlights(play_type,label)`).eq('user_id', me).order('created_at', { ascending: false }).limit(limit));
+    return (M.notes || []).filter(n => n.user_id === me).map(n => ({ ...n, actor: M.profiles[n.actor_id] })).reverse();
+  },
+  async readAll(me) { if (sb) { await sb.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', me).is('read_at', null); return; } (M.notes || []).forEach(n => { if (n.user_id === me) n.read_at = now(); }); await save(); },
+  async week(me) {
+    const since = new Date(Date.now() - 7 * 864e5).toISOString();
+    const rows = sb ? chk(await sb.from('notifications').select('type').eq('user_id', me).gte('created_at', since).limit(1000)) : (M.notes || []).filter(n => n.user_id === me && n.created_at >= since);
+    const c = {}; for (const r of rows) c[r.type] = (c[r.type] || 0) + 1; return c;
   },
 };
 

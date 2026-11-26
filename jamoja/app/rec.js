@@ -1,7 +1,7 @@
 // Film in Jamoja: full-screen camera with a Bucket button.
 // Records in parts (a new part every few minutes) and saves each part on the phone as soon as it ends,
 // so a long run never becomes one giant file and nothing is lost if the browser closes.
-import { local } from './db.js?v=20261126d';
+import { local } from './db.js?v=20261126e';
 
 const PART_SECONDS = 120;
 const CHECKPOINT_SECONDS = 20;

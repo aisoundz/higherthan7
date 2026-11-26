@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261126d';
-import * as R from './rec.js?v=20261126d';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, storage, mode, ready } from './db.js?v=20261126d';
+import * as E from './engine.js?v=20261126e';
+import * as R from './rec.js?v=20261126e';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, storage, mode, ready } from './db.js?v=20261126e';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -105,9 +105,15 @@ let busy = false; // true while cutting highlights: warn before leaving
 window.addEventListener('beforeunload', e => { if (busy) { e.preventDefault(); e.returnValue = ''; } });
 
 async function refreshMe() { ME = await auth.user(); MYP = ME ? await profiles.byId(ME.id) : null; }
+let BDG_T = null;
+async function refreshBadge() {
+  const b = document.getElementById('bdg'); if (!b || !ME || LOCAL) return;
+  try { const n = await notes.unread(ME.id); b.hidden = !n; b.textContent = n > 9 ? '9+' : n; document.title = (n ? `(${n}) ` : '') + 'Jamoja'; } catch (e) { /* offline */ }
+}
 function topbar() {
+  clearInterval(BDG_T); if (ME && !LOCAL) { setTimeout(refreshBadge, 50); BDG_T = setInterval(refreshBadge, 60000); }
   TR.innerHTML = ME
-    ? (MYP ? `<a class="btn s" href="#/post">+ Post</a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
+    ? (MYP ? `<a class="bell" href="#/alerts" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="bdg" id="bdg" hidden></span></a><a class="btn s" href="#/post">+ Post</a><a href="#/u/${esc(MYP.handle)}" aria-label="My profile" style="display:flex">${avatar(MYP, 38)}</a>` : '')
     : LOCAL ? '' : `<a class="btn s g" href="#/login">Sign in</a>`;
   const nav = document.getElementById('nav'); if (!nav) return;
   const h = location.hash || '#/';
@@ -141,6 +147,7 @@ async function route() {
     if (parts[0] === 'u' && parts[1]) return await profilePage(decodeURIComponent(parts[1]));
     if (parts[0] === 'people') return await peoplePage();
     if (parts[0] === 'viewers') return await viewersPage();
+    if (parts[0] === 'alerts') return await alertsPage();
     V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`;
   } catch (e) {
     console.error(e);
@@ -166,6 +173,7 @@ async function home() {
     <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
+  if (ME && FEED_TAB === 'all' && !FEED_SPORT) { const extra = (await recapCard()) + installCard(); if (extra) { V.querySelector('.tabs').insertAdjacentHTML('beforebegin', extra); bindInstall(); } }
   const tabs = V.querySelector('.tabs'); if (tabs) tabs.onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; FEED_TAB = b.dataset.tab; home(); };
   await drawFeed();
   if (ME && !LOCAL) drawMine();
@@ -346,6 +354,50 @@ async function viewersPage() {
     ${anon ? `<p class="mu">${anon} visit${anon === 1 ? '' : 's'} from people who were not signed in. They are counted but we can't show who.</p>` : ''}
     <p class="foot">When you're signed in and view someone's profile, they can see it was you.</p>`;
   bindFollow(V, fol);
+}
+
+// ---------------- Notifications
+const NOTE_TEXT = {
+  follow: () => 'started following you',
+  fire_post: () => 'gave your post 🔥',
+  fire_play: n => `gave ${n.highlight && n.highlight.play_type ? 'your ' + n.highlight.play_type.toLowerCase() : 'your play'} 🔥`,
+  comment: n => n.post_id ? 'commented on your post' : 'commented on your play',
+  tagged: n => `tagged you in a play${n.game ? ' from ' + n.game.title : ''}`,
+  claimed: n => `claimed their plays${n.game ? ' in ' + n.game.title : ''}`,
+  view: () => 'viewed your profile',
+};
+const noteLink = n => n.type === 'follow' || n.type === 'view' ? `#/u/${n.actor ? n.actor.handle : ''}` : n.post_id ? `#/p/${n.post_id}` : n.game_id ? `#/g/${n.game_id}` : '#/';
+async function alertsPage() {
+  if (!ME) return needLogin('#/alerts');
+  const list = await notes.list(ME.id).catch(err => { V.innerHTML = `<div class="err">${esc(err.message)}</div>`; return null; });
+  if (!list) return;
+  await storage.prep(list.map(n => n.actor && n.actor.avatar).filter(Boolean));
+  V.innerHTML = `<h1>Notifications</h1>${installCard()}${list.length ? list.map(n => `<a class="nrow ${n.read_at ? '' : 'new'}" href="${noteLink(n)}">${avatar(n.actor, 44)}<span><b>${esc(n.actor ? n.actor.name : 'Someone')}</b> ${esc((NOTE_TEXT[n.type] || (() => ''))(n))}<br><span class="mu">${ago(n.created_at)}</span></span></a>`).join('')
+    : `<p class="mu">Nothing yet. Post, film a run and follow your crew. When people 🔥, comment, follow or view your profile, it shows up here.</p>`}`;
+  bindInstall();
+  if (list.some(n => !n.read_at)) { await notes.readAll(ME.id).catch(() => {}); refreshBadge(); }
+}
+// Weekly recap card for the feed
+async function recapCard() {
+  if (!ME || LOCAL) return '';
+  const c = await notes.week(ME.id).catch(() => ({}));
+  const fire = (c.fire_post || 0) + (c.fire_play || 0), items = [[c.view || 0, 'profile views', '#/viewers'], [c.follow || 0, 'new followers', `#/u/${MYP.handle}/followers`], [fire, '🔥 on your posts', `#/u/${MYP.handle}`], [c.comment || 0, 'comments', '#/alerts']];
+  if (!items.some(i => i[0])) return '';
+  return `<div class="card recap"><b>Your week on Jamoja</b><div class="rgrid">${items.map(([n, l, h]) => `<a href="${h}"><b>${n}</b><span>${l}</span></a>`).join('')}</div></div>`;
+}
+// Add to Home Screen: needed for notifications on iPhone and feels like an app.
+let DEFER_PROMPT = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); DEFER_PROMPT = e; });
+const STANDALONE = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function installCard() {
+  if (STANDALONE() || IN_APP) return '';
+  try { if (localStorage.getItem('jm.inst.x')) return ''; } catch (e) { /* private */ }
+  const ios = /iPhone|iPad|iPod/i.test(UA);
+  return `<div class="card inst"><button class="lnkb x" id="instx" aria-label="Dismiss">✕</button><b>Add Jamoja to your Home Screen</b><p class="mu" style="margin:4px 0 ${ios ? 0 : 10}px">${ios ? 'Opens like an app and lets Jamoja notify you. In Safari tap the Share button <span class="shr">⬆︎</span>, then <b>Add to Home Screen</b>.' : 'Opens like an app and lets Jamoja notify you.'}</p>${ios ? '' : `<button class="btn s" id="inst">Add to Home Screen</button>`}</div>`;
+}
+function bindInstall() {
+  const x = document.getElementById('instx'); if (x) x.onclick = () => { try { localStorage.setItem('jm.inst.x', '1'); } catch (e) { /* private */ } x.closest('.inst').remove(); };
+  const b = document.getElementById('inst'); if (b) b.onclick = async () => { if (DEFER_PROMPT) { DEFER_PROMPT.prompt(); DEFER_PROMPT = null; } else toast('Open your browser menu (⋮) and tap Add to Home screen.'); };
 }
 
 // ---------------- Post composer: text, photo, video, YouTube link
@@ -898,3 +950,6 @@ async function profilePage(handle) {
 }
 
 route();
+
+// Service worker: makes Jamoja installable and receives push notifications. It caches nothing.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
