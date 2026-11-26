@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127b';
-import * as R from './rec.js?v=20261127b';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127b';
+import * as E from './engine.js?v=20261127d';
+import * as R from './rec.js?v=20261127d';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127d';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127b';
+const APP_V = '20261127d';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -772,6 +772,52 @@ async function scanRim(url, rim, dur, onProgress, host) {
   } finally { v.pause(); v.remove(); }
   return hits;
 }
+// ---------- Review plays: one clip at a time, big buttons. A right guess costs one tap (Next).
+const QUICK = { Basketball: ['Bucket', 'Three', 'Layup', 'Rebound', 'Block', 'Steal', 'Dime', 'Miss'] };
+function reviewPlays(g, list, ps, own, gameId) {
+  if (!list.length) return;
+  const types = QUICK[g.sport] || playsFor(g.sport).slice(0, 8);
+  const more = [...new Set([...playsFor(g.sport), 'Miss'])].filter(t => !types.includes(t));
+  const myPid = () => { const p = ps.find(x => ME && x.user_id === ME.id); return p && p.id; };
+  let i = 0, changed = false;
+  const el = document.createElement('div'); el.className = 'rv'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
+  const close = () => { el.remove(); document.documentElement.style.overflow = ''; if (/review=/.test(location.hash)) history.replaceState(null, '', '#/g/' + gameId); if (changed) gamePage(gameId); };
+  const draw = () => {
+    const h = list[i]; const mine = h.player_id && h.player_id === myPid();
+    const who = h.player_id ? (ps.find(p => p.id === h.player_id) || {}) : null;
+    const cur = h.play_type || '';
+    el.innerHTML = `<div class="rv-top"><b>Play ${i + 1} of ${list.length}</b><button class="rv-x" data-x aria-label="Close">✕</button></div>
+      <video class="rv-v" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline autoplay loop muted></video>
+      <div class="rv-p">
+        ${own ? `<div class="rv-l">What was it?${cur ? '' : ' <span class="mu">(pick one)</span>'}</div>
+        <div class="rv-c">${types.map(t => `<button class="chip ${cur === t ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}<select data-more aria-label="More play types"><option value="">More…</option>${more.map(t => `<option ${cur === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}<option value="Warmup">Warmup (hide it)</option></select></div>` : `<div class="rv-l">${cur ? esc(cur) : 'Play'}</div>`}
+        <div class="rv-l" style="margin-top:12px">Who?</div>
+        <div class="rv-c">${mine ? `<span class="chip on">✓ You</span><button class="chip" data-notme>Not me</button>`
+          : who && who.user_id ? `<span class="chip on">${esc(who.label || 'Tagged')}</span>`
+          : `<button class="chip me" data-me>🙋 That's me</button>${own ? `<select data-who aria-label="Someone else"><option value="">Someone else…</option>${ps.filter(p => !p.user_id || p.id !== myPid()).map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>` : ''}`}</div>
+      </div>
+      <div class="rv-nav"><button class="btn g" data-prev ${i ? '' : 'disabled'}>‹ Back</button>${own ? `<button class="btn g" data-del>🗑</button>` : ''}<button class="btn" data-next>${i === list.length - 1 ? 'Done ✓' : 'Next ›'}</button></div>`;
+  };
+  const go2 = d => { i = Math.max(0, Math.min(list.length - 1, i + d)); draw(); };
+  const save1 = async (patch) => { try { await highlights.update(list[i].id, patch); Object.assign(list[i], patch); changed = true; } catch (e) { toast(e.message); } };
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return; const h = list[i];
+    if (b.dataset.x !== undefined) return close();
+    if (b.dataset.next !== undefined) { if (i === list.length - 1) { toast('All set.'); return close(); } return go2(1); }
+    if (b.dataset.prev !== undefined) return go2(-1);
+    if (b.dataset.t) { await save1({ play_type: b.dataset.t }); draw(); setTimeout(() => { if (i < list.length - 1) go2(1); }, 250); return; }
+    if (b.dataset.me !== undefined) { try { const pid = await highlights.claimMine(h.id); h.player_id = pid; if (!ps.find(p => p.id === pid)) ps.push({ id: pid, user_id: ME.id, label: (MYP && MYP.name) || 'Me' }); changed = true; draw(); } catch (err) { toast(err.message); } return; }
+    if (b.dataset.notme !== undefined) { try { await highlights.unclaimMine(h.id); h.player_id = null; changed = true; draw(); } catch (err) { toast(err.message); } return; }
+    if (b.dataset.del !== undefined) { if (!confirmIn(b)) return; try { await highlights.remove(h.id); list.splice(i, 1); changed = true; if (!list.length) return close(); i = Math.min(i, list.length - 1); draw(); } catch (err) { toast(err.message); } }
+  });
+  el.addEventListener('change', async e => {
+    if (e.target.dataset.more !== undefined && e.target.value) { await save1({ play_type: e.target.value }); draw(); }
+    if (e.target.dataset.who !== undefined) { await save1({ player_id: e.target.value || null }); draw(); }
+  });
+  let sx = 0; el.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+  el.addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 60 && !e.target.closest('select')) go2(dx < 0 ? 1 : -1); });
+  draw();
+}
 // One tap to go live: reuse your run from today, or start a new one, then open its Game day card.
 async function quickLive() {
   const q = document.getElementById('qlive'); if (q) q.disabled = true;
@@ -1287,7 +1333,7 @@ async function newGame() {
         const key = `${ME.id}/${game.id}/${Date.now()}-${k}`;
         await storage.upload(key + '.mp4', c.video, 'video/mp4');
         await storage.upload(key + '.jpg', c.poster, 'image/jpeg');
-        await highlights.add({ game_id: game.id, created_by: ME.id, label: 'Play ' + (already + k + 1), path: key + '.mp4', poster: key + '.jpg', dur_s: +c.dur.toFixed(2), start_s: +m.start.toFixed(2) });
+        await highlights.add({ game_id: game.id, created_by: ME.id, label: 'Play ' + (already + k + 1), path: key + '.mp4', poster: key + '.jpg', dur_s: +c.dur.toFixed(2), start_s: +m.start.toFixed(2), ...(m.src === 'rim' ? { play_type: 'Bucket' } : {}) });
         m.done = true;
         pb.style.width = ((k + 1) / jobs.length * 100) + '%';
       }
@@ -1295,7 +1341,7 @@ async function newGame() {
       await R.clearParts([...recParts]);
       busy = false; R.keepAwake(false);
       toast(`${jobs.length} highlight${jobs.length > 1 ? 's' : ''} ready.`);
-      go('#/g/' + game.id + '?fresh=1');
+      go('#/g/' + game.id + '?review=1');
     } catch (err) {
       console.error(err); busy = false; R.keepAwake(false);
       const done = jobs.filter(j => j.m.done).length;
@@ -1338,6 +1384,7 @@ async function gamePage(id) {
     ${own ? `<form id="af" class="row" style="margin-top:10px"><input class="t" id="an" placeholder="Name or shirt, like Jay or white shirt" style="flex:1"><button class="btn s">Add</button></form>` : ''}
     ${!myClaim && ps.some(p => !p.user_id) ? `<div class="card" style="margin-top:12px"><b>${LOCAL ? 'Which one is you?' : 'Are you in this game?'}</b><p class="mu" style="margin:4px 0 10px">Tap your name to put these plays on your profile.</p><div class="row">${ps.filter(p => !p.user_id).map(p => `<button class="btn s" data-claim="${p.id}">I'm ${esc(p.label)}</button>`).join('')}</div></div>` : ''}
     ${myClaim ? `<p class="mu" style="margin-top:10px">You are <b>${esc(myClaim.label)}</b> in this game. <button class="btn s g" data-release="${myClaim.id}">Not me</button></p>` : ''}
+    ${hs.length && ME ? `<button class="btn w" id="rvgo" style="margin:14px 0 4px">⚡ Review plays (${hs.length})</button><p class="mu" style="margin:0 0 8px;font-size:13px">Swipe through. Fix the play type, tap "That's me" on yours. Right guesses take one tap.</p>` : ''}
     <h2>Highlights</h2>${warm && own ? `<p class="mu" style="margin-top:-6px">${warm} warmup clip${warm > 1 ? 's' : ''} left out of the game.</p>` : ''}
     ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}${h.views ? ' · ' + views(h.views) : ''}</span>
       ${own ? `<select data-hp="${h.id}" aria-label="Player in ${esc(h.label)}"><option value="">Who is this?</option>${ps.map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
@@ -1381,6 +1428,8 @@ async function gamePage(id) {
   const gn = document.getElementById('gotnext'); if (gn) gn.onclick = async () => { gn.disabled = true; try { await nextUp.join(g.id); toast("You got next."); gamePage(id); } catch (err) { gn.disabled = false; toast(err.message); } };
   V.querySelectorAll('[data-nx]').forEach(b => b.onclick = async ev => { ev.stopPropagation(); b.disabled = true; try { await nextUp.leave(g.id, b.dataset.nx); gamePage(id); } catch (err) { b.disabled = false; toast(err.message); } });
   const ss = document.getElementById('setspot'); if (ss) ss.onclick = async () => { ss.disabled = true; ss.textContent = '📍 Finding your court…'; await stampSpot(g); if (g.place) { toast('Court added: ' + g.place); gamePage(id); } else { ss.disabled = false; ss.textContent = '📍 Add this court (use my location)'; toast('Could not get your location. Check location permission for your browser.'); } };
+  const rv = document.getElementById('rvgo'); if (rv) rv.onclick = () => reviewPlays(g, hs, ps, own, id);
+  if (rv && qs().get('review')) setTimeout(() => reviewPlays(g, hs, ps, own, id), 300);
   const gl = document.getElementById('golive'); if (gl) gl.onclick = () => goLive(g);
   if (gl && qs().get('live')) { gl.scrollIntoView({ block: 'center' }); gl.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: 700, iterations: 3 }); toast('Tap Go live when you\'re ready. Camera opens first, nothing streams until you tap.'); }
   V.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { watchSession(V.querySelector('#player'), g.id, b.dataset.watch, !!b.dataset.live); V.querySelector('#player').scrollIntoView({ behavior: 'smooth', block: 'center' }); });

@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127b';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127d';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -199,6 +199,18 @@ export const highlights = {
     if (sb) { const r = await sb.from('reports').insert({ highlight_id: id, reason }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); return; }
     M.reports = M.reports || {}; M.reports[id + ':' + (M.session && M.session.id)] = { id, reason };
     if (Object.keys(M.reports).filter(k => k.startsWith(id + ':')).length >= 2 && M.highlights[id]) M.highlights[id].hidden = true; await save();
+  },
+  // "That's me" / "Not me": any signed-in player can claim an untagged play or drop one tagged to them.
+  async claimMine(id) {
+    if (sb) { const r = await sb.rpc('claim_play', { p_hl: id }); if (r.error) throw new Error(r.error.message); return r.data; }
+    const h = M.highlights[id], g = h.game_id, me = M.session.id;
+    let p = Object.values(M.players).find(x => x.game_id === g && x.user_id === me);
+    if (!p) { p = { id: uid(), game_id: g, label: (M.profiles[me] || {}).name || 'Me', user_id: me, claimed_at: now(), created_at: now() }; M.players[p.id] = p; }
+    h.player_id = p.id; await save(); return p.id;
+  },
+  async unclaimMine(id) {
+    if (sb) { const r = await sb.rpc('unclaim_play', { p_hl: id }); if (r.error) throw new Error(r.error.message); return; }
+    const h = M.highlights[id]; const p = M.players[h.player_id]; if (p && p.user_id === M.session.id) { h.player_id = null; await save(); }
   },
   async update(id, patch) { if (sb) { chk(await sb.from('highlights').update(patch).eq('id', id)); return; } Object.assign(M.highlights[id], patch); await save(); },
   async remove(id) { if (sb) { chk(await sb.from('highlights').delete().eq('id', id)); return; } delete M.highlights[id]; await save(); },
