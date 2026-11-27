@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127t';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127u';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -297,6 +297,39 @@ export const comments = {
     M.comments = M.comments || {}; const r = { id: uid(), user_id: M.session.id, created_at: now(), post_id: null, highlight_id: null, ...row }; M.comments[r.id] = r; await save(); return r;
   },
   async remove(id) { if (sb) { chk(await sb.from('comments').delete().eq('id', id)); return; } delete M.comments[id]; await save(); },
+  // likes on comments: { counts: {commentId: n}, mine: Set }
+  async likes(ids, me) {
+    const out = { counts: {}, mine: new Set() }; if (!ids.length) return out;
+    const rows = sb ? chk(await sb.from('comment_likes').select('comment_id,user_id').in('comment_id', ids)) : Object.values(M.clikes || {}).filter(r => ids.includes(r.comment_id));
+    for (const r of rows) { out.counts[r.comment_id] = (out.counts[r.comment_id] || 0) + 1; if (r.user_id === me) out.mine.add(r.comment_id); }
+    return out;
+  },
+  async like(id, on) {
+    if (sb) { if (on) { const r = await sb.from('comment_likes').insert({ comment_id: id }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); } else chk(await sb.from('comment_likes').delete().eq('comment_id', id).eq('user_id', (await sb.auth.getUser()).data.user.id)); return; }
+    M.clikes = M.clikes || {}; const k = id + ':' + M.session.id; if (on) M.clikes[k] = { comment_id: id, user_id: M.session.id }; else delete M.clikes[k]; await save();
+  },
+};
+
+// Rate the play 1 to 10. Best rated plays of the week become Play of the Week.
+export const ratings = {
+  async get(hid, me) {
+    const rows = sb ? chk(await sb.from('play_ratings').select('score,user_id').eq('highlight_id', hid)) : Object.values(M.ratings || {}).filter(r => r.highlight_id === hid);
+    const n = rows.length; return { n, avg: n ? Math.round(rows.reduce((a, r) => a + r.score, 0) / n * 10) / 10 : 0, mine: (rows.find(r => r.user_id === me) || {}).score || 0 };
+  },
+  async set(hid, score) {
+    if (sb) { chk(await sb.from('play_ratings').upsert({ highlight_id: hid, score, user_id: (await sb.auth.getUser()).data.user.id })); return; }
+    M.ratings = M.ratings || {}; M.ratings[hid + ':' + M.session.id] = { highlight_id: hid, user_id: M.session.id, score, created_at: now() }; await save();
+  },
+  async top(days = 7, place = null, limit = 5) {
+    let rows;
+    if (sb) rows = chk(await sb.rpc('top_plays', { p_days: days, p_place: place, p_limit: limit }));
+    else { const by = {}; for (const r of Object.values(M.ratings || {})) (by[r.highlight_id] = by[r.highlight_id] || []).push(r.score); rows = Object.entries(by).map(([k, v]) => ({ highlight_id: k, avg_score: v.reduce((a, b) => a + b, 0) / v.length, n: v.length, rank_score: v.reduce((a, b) => a + b, 0) / v.length + 1.5 * Math.log(1 + v.length) })).sort((a, b) => b.rank_score - a.rank_score).slice(0, limit); }
+    if (!rows.length) return [];
+    const ids = rows.map(r => r.highlight_id);
+    const hs = sb ? chk(await sb.from('highlights').select('id,path,poster,play_type,label,game_id, game:games(id,title,place), player:players(label, user:profiles(name,handle,avatar))').in('id', ids))
+      : ids.map(id => M.highlights[id]).filter(Boolean).map(h => ({ ...h, game: M.games[h.game_id], player: M.players[h.player_id] ? { ...M.players[h.player_id], user: M.profiles[M.players[h.player_id].user_id] } : null }));
+    return rows.map(r => ({ ...r, h: hs.find(h => h.id === r.highlight_id) })).filter(r => r.h);
+  },
 };
 
 export const profileViews = {

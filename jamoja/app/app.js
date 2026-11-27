@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127t';
-import * as R from './rec.js?v=20261127t';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127t';
+import * as E from './engine.js?v=20261127u';
+import * as R from './rec.js?v=20261127u';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127u';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127t';
+const APP_V = '20261127u';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -194,13 +194,13 @@ async function home() {
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<div class="card" id="savedrec" style="border-color:var(--o)"><b>Your recording is saved</b><br><span class="mu">${mmss(parts.reduce((x, p) => x + (p.dur || 0), 0))} of video on this phone${parts.reduce((x, p) => x + (p.marks || []).length, 0) ? `, ${parts.reduce((x, p) => x + (p.marks || []).length, 0)} plays marked` : ''}. Turn it into highlights, or delete it.</span><div class="row" style="margin-top:10px"><a class="btn s" href="#/new?auto=1">Make highlights</a><button class="btn s g" id="delrec">Delete</button></div></div>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
-  V.innerHTML = `<div id="strail"></div>${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
+  V.innerHTML = `<div id="strail"></div><div id="potw"></div>${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
     <div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
     <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
   const dr = V.querySelector('#delrec'); if (dr) dr.onclick = async () => { if (!confirmIn(dr)) return; await R.clearParts(parts.map(p => p.id)); V.querySelector('#savedrec').remove(); toast('Recording deleted.'); };
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
-  storyRail(V.querySelector('#strail'));
+  storyRail(V.querySelector('#strail')); potw(V.querySelector('#potw'));
   const railEl = V.querySelector('#rail');
   const fillRail = () => runsRail().then(h => { if (railEl.isConnected) railEl.innerHTML = h; }).catch(() => {});
   fillRail(); clearInterval(window.RAIL_T); window.RAIL_T = setInterval(() => { if (railEl.isConnected) fillRail(); else clearInterval(window.RAIL_T); }, 20000);
@@ -242,7 +242,7 @@ async function drawFeed() {
   bindFollow(box, fol);
 }
 const IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 }) : null;
-function playWhenSeen(v) { if (IO) IO.observe(v); v.onclick = () => { const art = v.closest('article'); const capEl = art && art.querySelector('.meta, .pb'); openViewer({ video: v.currentSrc || v.src, poster: v.poster, hid: v.dataset.hid, start: v.currentTime, cap: capEl ? capEl.innerHTML : '' }); }; }
+function playWhenSeen(v) { if (IO) IO.observe(v); v.onclick = () => { const art = v.closest('article'); const capEl = art && art.querySelector('.meta, .pb'); openViewer({ video: v.currentSrc || v.src, poster: v.poster, hid: v.dataset.hid, start: v.currentTime, cap: capEl ? capEl.innerHTML : '', ck: v.dataset.hid ? 'highlight' : art && art.dataset.pid ? 'post' : '', cid: v.dataset.hid || (art && art.dataset.pid) }); }; }
 function bindFollow(root, fol) {
   if (root._fh) root.removeEventListener('click', root._fh);
   root.addEventListener('click', root._fh = async e => {
@@ -322,22 +322,37 @@ function growBox(ta) { const fit = () => { ta.style.height = 'auto'; ta.style.he
 // Hide the bottom menu while the keyboard is up, so it doesn't float over what you're typing.
 document.addEventListener('focusin', e => { if (e.target.matches('input:not([type=checkbox]):not([type=range]):not([type=file]),textarea')) document.body.classList.add('typing'); });
 document.addEventListener('focusout', () => setTimeout(() => { const a = document.activeElement; if (!a || !a.matches('input,textarea')) document.body.classList.remove('typing'); }, 50));
+// Comments list with likes. The most liked rise to the top (like TikTok), newest first after that.
+async function drawComments(cl, kind, id) {
+  const list = await comments.list(kind, id).catch(() => []);
+  const lk = await comments.likes(list.map(c => c.id), ME && ME.id).catch(() => ({ counts: {}, mine: new Set() }));
+  await storage.prep(list.map(c => c.user && c.user.avatar).filter(Boolean));
+  const sorted = [...list].sort((a, b) => (lk.counts[b.id] || 0) - (lk.counts[a.id] || 0) || (a.created_at < b.created_at ? 1 : -1));
+  cl.innerHTML = sorted.length ? sorted.map(c => { const n = lk.counts[c.id] || 0, on = lk.mine.has(c.id); return `<div class="cm1">${avatar(c.user, 30)}<div class="cmb"><a href="#/u/${esc(c.user ? c.user.handle : '')}"><b>${esc(c.user ? c.user.name : '')}</b></a> <span class="mu">${ago(c.created_at)}</span>${ME && c.user_id === ME.id ? ` <button class="lnkb" data-cdel="${c.id}">Delete</button>` : ''}<br>${nl(c.body)}</div><button class="clk ${on ? 'on' : ''}" data-clike="${c.id}" data-on="${on ? 1 : 0}" aria-label="Like comment">${on ? '❤️' : '🤍'}<span>${n || ''}</span></button></div>`; }).join('') : `<p class="mu">No comments yet. Say something.</p>`;
+  return list;
+}
+async function commentClick(e, redraw) {
+  const d = e.target.closest('[data-cdel]'); if (d) { try { await comments.remove(d.dataset.cdel); await redraw(); } catch (err) { toast(err.message); } return; }
+  const l = e.target.closest('[data-clike]'); if (!l) return;
+  if (!ME) return go('#/login?mode=up');
+  const on = l.dataset.on !== '1'; l.dataset.on = on ? '1' : '0'; l.classList.toggle('on', on);
+  const sp = l.querySelector('span'); const n = (+sp.textContent || 0) + (on ? 1 : -1); sp.textContent = n || ''; l.firstChild.textContent = on ? '❤️' : '🤍';
+  try { await comments.like(l.dataset.clike, on); if (on) track('comment_like'); } catch (err) { toast(err.message); }
+}
 async function openComments(art, kind, id, countEl) {
   const nx = art.nextElementSibling;
   if (nx && nx.classList.contains('cmt')) { nx.remove(); return; }
   art.insertAdjacentHTML('afterend', `<div class="card cmt"><div class="cl"><p class="mu">Loading…</p></div>${ME ? `<form class="cf"><textarea class="t" rows="1" maxlength="500" placeholder="Add a comment" aria-label="Comment"></textarea><button class="btn s">Send</button></form>` : `<a class="btn s g" href="#/login">Sign in to comment</a>`}</div>`);
   const panel = art.nextElementSibling, cl = panel.querySelector('.cl');
   const draw = async () => {
-    const list = await comments.list(kind, id).catch(() => []);
-    await storage.prep(list.map(c => c.user && c.user.avatar).filter(Boolean));
-    cl.innerHTML = list.length ? list.map(c => `<div class="cm1">${avatar(c.user, 30)}<div><a href="#/u/${esc(c.user ? c.user.handle : '')}"><b>${esc(c.user ? c.user.name : '')}</b></a> <span class="mu">${ago(c.created_at)}</span>${ME && c.user_id === ME.id ? ` <button class="lnkb" data-cdel="${c.id}">Delete</button>` : ''}<br>${nl(c.body)}</div></div>`).join('') : `<p class="mu">No comments yet. Say something.</p>`;
+    const list = await drawComments(cl, kind, id);
     if (countEl) countEl.textContent = list.length;
   };
   await draw();
   const cf = panel.querySelector('.cf');
   if (cf) { const ta = cf.querySelector('textarea'); growBox(ta); ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)) { e.preventDefault(); cf.requestSubmit(); } }); }
   if (cf) cf.onsubmit = async e => { e.preventDefault(); const inp = cf.querySelector('textarea'); const v = inp.value.trim(); if (!v) return; inp.value = ''; try { await comments.add(kind, id, v); await draw(); } catch (err) { toast(err.message); } };
-  panel.onclick = async e => { const d = e.target.closest('[data-cdel]'); if (!d) return; try { await comments.remove(d.dataset.cdel); await draw(); } catch (err) { toast(err.message); } };
+  panel.onclick = e => commentClick(e, draw);
 }
 async function postPage(id) {
   const x = await posts.get(id);
@@ -533,10 +548,46 @@ function openViewer(o) {
   const onPop = () => shut(true);
   window.addEventListener('popstate', onPop);
   ov.querySelector('.rx').onclick = () => shut(false);
+  viewerSocial(ov, o, v);
   ov.querySelectorAll('.vcap a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); const h = a.getAttribute('href'); shut(false); setTimeout(() => { location.hash = h; }, 50); }));
   let y0 = null; ov.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true }); ov.addEventListener('touchend', e => { if (y0 != null && e.changedTouches[0].clientY - y0 > 120) shut(false); y0 = null; }, { passive: true });
 }
 
+// TikTok-style: comments slide up over the video while it keeps playing; plays can be rated 1-10.
+function viewerSocial(ov, o, v) {
+  const ck = o.ck || (o.hid ? 'highlight' : ''), cid = o.cid || o.hid; if (!ck || !cid) return;
+  ov.insertAdjacentHTML('beforeend', `<div class="vrail">${o.hid ? `<button class="vbtn" data-rate><span>🔥</span><b class="vrt">Rate</b></button>` : ''}<button class="vbtn" data-cms><span>💬</span><b class="vcn">·</b></button></div>
+    <div class="vrate" hidden><p>How good was that play?</p><div>${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<button data-sc="${n}">${n}</button>`).join('')}</div></div>
+    <div class="vsheet" hidden><div class="vsh"><i></i><b>Comments</b><button data-csx aria-label="Close comments">✕</button></div><div class="cl"></div>${ME ? `<form class="cf"><textarea class="t" rows="1" maxlength="500" placeholder="Add a comment…" aria-label="Comment"></textarea><button class="btn">Send</button></form>` : `<a class="btn w" href="#/login?mode=up">Sign up free to comment</a>`}</div>`);
+  const sheet = ov.querySelector('.vsheet'), cl = sheet.querySelector('.cl'), vcn = ov.querySelector('.vcn');
+  comments.counts(ck, [cid]).then(m => { vcn.textContent = m[cid] || 0; }).catch(() => {});
+  const draw = async () => { const l = await drawComments(cl, ck, cid); vcn.textContent = l.length; };
+  const openSheet = async () => { sheet.hidden = false; ov.classList.add('withc'); if (v) v.play().catch(() => {}); track('comments_open', { where: 'viewer' }); await draw(); };
+  const closeSheet = () => { sheet.hidden = true; ov.classList.remove('withc'); };
+  const rate = ov.querySelector('.vrate'), vrt = ov.querySelector('.vrt');
+  const showRating = r => { if (!vrt) return; vrt.textContent = r.n ? r.avg.toFixed(1) : 'Rate'; rate.querySelectorAll('[data-sc]').forEach(b => b.classList.toggle('on', +b.dataset.sc === r.mine)); };
+  if (o.hid) ratings.get(o.hid, ME && ME.id).then(showRating).catch(() => {});
+  ov.addEventListener('click', async e => {
+    if (e.target.closest('[data-cms]')) return sheet.hidden ? openSheet() : closeSheet();
+    if (e.target.closest('[data-csx]')) return closeSheet();
+    if (e.target.closest('[data-rate]')) { if (!ME) return go('#/login?mode=up'); rate.hidden = !rate.hidden; return; }
+    const sc = e.target.closest('[data-sc]');
+    if (sc) { try { await ratings.set(o.hid, +sc.dataset.sc); track('play_rate', { s: +sc.dataset.sc }); const r = await ratings.get(o.hid, ME.id); showRating(r); toast(`You rated it ${sc.dataset.sc}. Average ${r.avg.toFixed(1)} from ${r.n}.`); setTimeout(() => { rate.hidden = true; }, 500); } catch (err) { toast(err.message); } return; }
+    if (e.target.closest('.vsheet')) commentClick(e, draw);
+  });
+  const cf = sheet.querySelector('.cf');
+  if (cf) { const ta = cf.querySelector('textarea'); growBox(ta); cf.onsubmit = async e => { e.preventDefault(); const t = ta.value.trim(); if (!t) return; ta.value = ''; ta.dispatchEvent(new Event('input')); try { await comments.add(ck, cid, t); track('comment', { where: 'viewer' }); await draw(); cl.scrollTop = 0; } catch (err) { toast(err.message); } }; }
+  // the swipe-down-to-close shouldn't fire while scrolling comments
+  sheet.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); sheet.addEventListener('touchend', e => e.stopPropagation(), { passive: true });
+}
+// Play of the Week: the best rated play in the last 7 days (at a court, or everywhere).
+async function potw(host, place) {
+  if (!host) return;
+  const top = await ratings.top(7, place || null, 1).catch(() => []); if (!top.length || !host.isConnected) return;
+  const r = top[0], h = r.h, who = h.player && h.player.user ? h.player.user.name : h.player ? h.player.label : 'Unknown player';
+  host.innerHTML = `<button class="card potw" data-potw><img src="${esc(storage.url(h.poster))}" alt=""><span><span class="mu" style="font-size:12px;letter-spacing:.12em">🏆 PLAY OF THE WEEK${place ? ' · THIS COURT' : ''}</span><b>${esc(h.play_type || 'Play')} by ${esc(who)}</b><span class="mu">🔥 ${Number(r.avg_score).toFixed(1)} from ${r.n} rating${r.n > 1 ? 's' : ''}${h.game ? ' · ' + esc(h.game.place || h.game.title) : ''}</span></span></button>`;
+  host.querySelector('[data-potw]').onclick = () => openViewer({ video: storage.url(h.path), poster: storage.url(h.poster), hid: h.id, cap: `<b>🏆 Play of the Week</b> <a href="#/g/${h.game_id}">${esc(h.game ? h.game.title : 'Open the game')} →</a>` });
+}
 // Grab the frame a <video> is showing at time t as a JPEG (what you see is what gets saved).
 async function grabFrame(v, t, max = 720) {
   await new Promise((ok, bad) => { const done = () => { v.removeEventListener('seeked', done); ok(); }; v.addEventListener('seeked', done); setTimeout(done, 3000); v.pause(); v.currentTime = Math.max(0, t); });
@@ -727,12 +778,13 @@ async function courtPage(place) {
   const map = ll ? `https://www.google.com/maps/search/?api=1&query=${ll.lat},${ll.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
   V.innerHTML = `<div class="court-h"><span class="mu">COURT</span><h1>${esc(place)}</h1><p class="mu">${runs.length} run${runs.length === 1 ? '' : 's'} · ${hs.length} highlight${hs.length === 1 ? '' : 's'} · <a href="${map}" target="_blank" rel="noopener">Map</a></p></div>
     ${runs.some(g => liveIds.has(g.id)) ? `<a class="card livebar" href="#/g/${runs.find(g => liveIds.has(g.id)).id}"><span class="lvdot"></span><b>Live here right now</b><span class="mu">Tap to watch</span></a>` : ''}
-    <a class="btn w" href="#/new?place=${encodeURIComponent(place)}" style="margin:12px 0">+ Post a run here</a>
+    <div id="cpotw"></div><a class="btn w" href="#/new?place=${encodeURIComponent(place)}" style="margin:12px 0">+ Post a run here</a>
     <h2>Next runs here</h2>${soonRuns.length ? gameList(soonRuns) : `<p class="mu">Nothing posted. Post one and your crew will see it.</p>`}
     <h2>👑 King of the Court</h2>${board.length ? `<div class="list">${board.map((k, i) => `<a href="#/u/${esc(k.u.handle)}"><span class="row" style="gap:10px;flex-wrap:nowrap"><b style="width:18px">${i + 1}</b>${avatar(k.u, 34)}<span><b>${esc(k.u.name)}</b><br><span class="mu">${k.n} highlight${k.n === 1 ? '' : 's'} · 🔥 ${k.f}</span></span></span></a>`).join('')}</div>` : `<p class="mu">No crown yet. Claim your plays from a game filmed here to get on the board.</p>`}
     ${regulars.length ? `<h2>Regulars</h2><div class="row">${regulars.map(r => `<a href="#/u/${esc(r.u.handle)}" title="${esc(r.u.name)}">${avatar(r.u, 40)}</a>`).join('')}</div>` : ''}
     <h2>Best plays here</h2>${hs.length ? `<div class="tiles">${[...hs].sort((a, b) => (b.fire || 0) - (a.fire || 0)).slice(0, 12).map(h => `<a class="tile" href="#/g/${h.game_id}"><img src="${esc(storage.url(h.poster))}" alt="" loading="lazy"><span class="tlab">🔥 ${h.fire || 0}</span></a>`).join('')}</div>` : `<p class="mu">No highlights from this court yet.</p>`}
     ${past.length ? `<h2>Past games</h2>${gameList(past.slice(0, 10))}` : ''}`;
+  potw(V.querySelector('#cpotw'), place);
 }
 // "I got next": the line for the next game on this court.
 async function nextBox(g, own) {
