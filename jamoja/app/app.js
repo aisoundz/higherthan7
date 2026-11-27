@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127p';
-import * as R from './rec.js?v=20261127p';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127p';
+import * as E from './engine.js?v=20261127q';
+import * as R from './rec.js?v=20261127q';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127q';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127p';
+const APP_V = '20261127q';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -868,6 +868,9 @@ const STICKERS = [
   { v: '🏀', a: 'spin' }, { v: '🔥', a: 'pulse' }, { v: '💯', a: 'bounce' }, { v: '😤', a: 'shake' }, { v: '🙏🏾' }, { v: '👑', a: 'bounce' }, { v: '💪🏾', a: 'pulse' }, { v: '🎯' }, { v: '🪣', a: 'bounce' }, { v: '🧊' }, { v: '🥶', a: 'shake' }, { v: '👀' },
   { v: 'BUCKETS', k: 'tag', a: 'pulse' }, { v: 'LOCKED IN', k: 'tag' }, { v: 'GAME TIME', k: 'tag', a: 'bounce' }, { v: 'RUN IT BACK', k: 'tag' }, { v: 'COOKING', k: 'tag', a: 'shake' }, { v: 'W', k: 'tag big', a: 'pulse' }, { v: 'WHO GOT NEXT?', k: 'tag' }, { v: 'GET UP EARLY', k: 'tag' },
 ];
+// Jamoja Beats: original tracks made for Jamoja, so stories can have music with no license issues.
+const BEATS = [{ id: 'courtside', n: 'Courtside', m: 'Boom bap · 90' }, { id: 'clutch', n: 'Clutch', m: 'Trap · 140' }, { id: 'morning-run', n: 'Morning Run', m: 'Lo-fi · 82' }, { id: 'warmup', n: 'Warmup', m: 'House · 122' }, { id: 'next-up', n: 'Next Up', m: 'Drill · 142' }, { id: 'bounce', n: 'Bounce', m: 'West coast · 96' }];
+const beatUrl = id => `beats/${id}.m4a?v=1`;
 const seenStory = id => { try { return (localStorage.getItem('jm.ss') || '').includes(id); } catch (e) { return false; } };
 const markStory = id => { try { const v = (localStorage.getItem('jm.ss') || '').split(',').slice(-300); if (!v.includes(id)) v.push(id); localStorage.setItem('jm.ss', v.join(',')); } catch (e) { /* private */ } };
 async function storyRail(host) {
@@ -893,21 +896,33 @@ function storyEditor(file) {
   const isVid = file.type.startsWith('video');
   const url = URL.createObjectURL(file); const items = [];
   const el = document.createElement('div'); el.className = 'sted'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
-  el.innerHTML = `<div class="st-top"><button class="st-x" data-x>✕</button><button class="st-aa" data-text>Aa</button><button class="st-aa" data-stk>🙂 Stickers</button></div>
+  el.innerHTML = `<div class="st-top"><button class="st-x" data-x>✕</button><button class="st-aa" data-text>Aa</button><button class="st-aa" data-stk>🙂 Stickers</button><button class="st-aa" data-mus>♫ Music</button></div>
     <div class="st-stage">${isVid ? `<video src="${url}" autoplay loop muted playsinline></video>` : `<img src="${url}" alt="">`}<div class="st-ov"></div><div class="st-trash" hidden>🗑</div></div>
     <div class="st-tray" hidden><div class="st-grid">${STICKERS.map((x, k) => `<button data-s="${k}" class="${x.k ? 'st-tagb' : ''}">${esc(x.v)}${x.a ? '<sup>✨</sup>' : ''}</button>`).join('')}
       ${(window.LAST_COURT ? `<button data-court class="st-tagb">📍 ${esc(window.LAST_COURT)}</button>` : '')}</div><p class="mu" style="font-size:12px;margin:6px 0 0">✨ = animated. Drag stickers to move them, drag onto 🗑 to remove.</p></div>
+    <div class="st-mus" hidden>${BEATS.map(x => `<button data-beat="${x.id}"><b>♫ ${esc(x.n)}</b><span>${esc(x.m)}</span></button>`).join('')}<button data-beat=""><b>No music</b><span>${isVid ? 'Keep the video sound' : 'Silent'}</span></button><p class="mu" style="font-size:12px;margin:6px 2px 0">Jamoja Beats are made for Jamoja. Free to use anywhere you share.</p></div>
+    <div class="st-mchip" hidden></div>
     <form class="st-tin" hidden><input maxlength="60" placeholder="Say something…"><button class="btn">Add</button></form>
     <div class="st-bot"><span class="mu" id="stmsg"></span><button class="btn" data-post>Share to story</button></div>`;
-  const ov = el.querySelector('.st-ov'), trash = el.querySelector('.st-trash');
+  const ov = el.querySelector('.st-ov'), trash = el.querySelector('.st-trash'); let music = '', au = null;
   if (!window.LAST_COURT && ME) games.mine(ME.id).then(l => { const g = l.find(x => x.place); if (g && el.isConnected) { window.LAST_COURT = g.place; el.querySelector('.st-grid').insertAdjacentHTML('beforeend', `<button data-court class="st-tagb">📍 ${esc(g.place)}</button>`); } }).catch(() => {});
   const paint = () => { ov.innerHTML = items.map((it, k) => stickerHTML(it, k)).join(''); };
   const add = it => { items.push({ x: 0.5, y: 0.4, ...it }); paint(); el.querySelector('.st-tray').hidden = true; };
-  const close = () => { el.remove(); URL.revokeObjectURL(url); document.documentElement.style.overflow = ''; };
+  const close = () => { if (au) au.pause(); el.remove(); URL.revokeObjectURL(url); document.documentElement.style.overflow = ''; };
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.x !== undefined) return close();
-    if (b.dataset.stk !== undefined) { const t = el.querySelector('.st-tray'); t.hidden = !t.hidden; return; }
+    if (b.dataset.stk !== undefined) { const t = el.querySelector('.st-tray'); t.hidden = !t.hidden; el.querySelector('.st-mus').hidden = true; return; }
+    if (b.dataset.mus !== undefined) { const t = el.querySelector('.st-mus'); t.hidden = !t.hidden; el.querySelector('.st-tray').hidden = true; return; }
+    if (b.dataset.beat !== undefined) {
+      music = b.dataset.beat; if (au) au.pause();
+      const v = el.querySelector('.st-stage video'); if (v) v.muted = true;
+      if (music) { au = new Audio(beatUrl(music)); au.loop = true; au.play().catch(() => {}); }
+      else if (v) { v.muted = false; }
+      el.querySelectorAll('[data-beat]').forEach(x => x.classList.toggle('on', x.dataset.beat === music));
+      const ch = el.querySelector('.st-mchip'); const bt = BEATS.find(x => x.id === music); ch.hidden = !bt; ch.textContent = bt ? '♫ ' + bt.n : '';
+      el.querySelector('.st-mus').hidden = true; return;
+    }
     if (b.dataset.text !== undefined) { const f = el.querySelector('.st-tin'); f.hidden = false; f.querySelector('input').focus(); return; }
     if (b.dataset.s !== undefined) { const x = STICKERS[+b.dataset.s]; return add({ t: x.k ? 'tag' : 'emoji', v: x.v, a: x.a || '', big: /big/.test(x.k || '') }); }
     if (b.dataset.court !== undefined) return add({ t: 'tag', v: '📍 ' + window.LAST_COURT });
@@ -921,7 +936,7 @@ function storyEditor(file) {
           const c = await E.cut(src, 0, end, pr => { msg.textContent = `Preparing video… ${Math.round(pr * 100)}%`; });
           E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; msg.textContent = 'Uploading…'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
         } else { msg.textContent = 'Uploading…'; const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
-        await stories.add({ kind, path, overlay: { items } }); track('story_post', { kind, stickers: items.length });
+        await stories.add({ kind, path, overlay: { items, music } }); track('story_post', { kind, stickers: items.length, music });
         toast('Shared to your story. It stays up for 24 hours.'); close(); if (location.hash === '' || location.hash === '#/') home(); else go('#/');
       } catch (err) { msg.textContent = 'Could not share: ' + (err.message || err); b.disabled = false; }
     }
@@ -938,23 +953,26 @@ function stickerHTML(it, k) {
   return `<div class="sk ${cls} ${it.a ? 'an-' + it.a : ''}" ${k != null ? `data-k="${k}"` : ''} style="left:${(it.x * 100).toFixed(1)}%;top:${(it.y * 100).toFixed(1)}%"><span>${esc(it.v)}</span></div>`;
 }
 function openStories(groups, gi, onClose) {
-  let g = gi, i = Math.max(0, groups[gi].list.findIndex(x => !seenStory(x.id))), timer = null;
+  let g = gi, i = Math.max(0, groups[gi].list.findIndex(x => !seenStory(x.id))), timer = null; const au = new Audio(); au.loop = true;
   const el = document.createElement('div'); el.className = 'stv'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
-  const close = () => { clearTimeout(timer); el.remove(); document.documentElement.style.overflow = ''; onClose && onClose(); };
+  const close = () => { clearTimeout(timer); au.pause(); el.remove(); document.documentElement.style.overflow = ''; onClose && onClose(); };
   const next = () => { if (i < groups[g].list.length - 1) i++; else if (g < groups.length - 1) { g++; i = 0; } else return close(); show(); };
   const prev = () => { if (i > 0) i--; else if (g > 0) { g--; i = groups[g].list.length - 1; } show(); };
   const show = async () => {
     clearTimeout(timer); const G = groups[g], st = G.list[i], mine = ME && G.u.id === ME.id;
     markStory(st.id); if (!mine && ME) stories.view(st.id);
     await storage.prep([st.path]);
+    const bt = BEATS.find(x => st.overlay && x.id === st.overlay.music);
+    if (bt) { if (!au.src.includes(bt.id)) { au.src = beatUrl(bt.id); } au.play().catch(() => {}); } else au.pause();
     const mins = Math.round((Date.now() - new Date(st.created_at)) / 60e3); const ago = mins < 1 ? 'now' : mins < 60 ? mins + 'm' : Math.round(mins / 60) + 'h';
     el.innerHTML = `<div class="stv-bars">${G.list.map((x, k) => `<i class="${k < i ? 'd' : ''}"><b class="${k === i ? 'run' : ''}"></b></i>`).join('')}</div>
-      <div class="stv-h"><a href="#/u/${esc(G.u.handle)}" data-x>${avatar(G.u, 34)}<b>${esc(G.u.name)}</b><span class="mu">${ago}</span></a><button data-x>✕</button></div>
+      <div class="stv-h"><a href="#/u/${esc(G.u.handle)}" data-x>${avatar(G.u, 34)}<span class="stv-who"><b>${esc(G.u.name)}</b> <span class="mu">${ago}</span>${bt ? `<br><span class="stv-mus">♫ ${esc(bt.n)} · Jamoja Beats</span>` : ''}</span></a><button data-x>✕</button></div>
       <div class="stv-m">${st.kind === 'video' ? `<video src="${esc(storage.url(st.path))}" autoplay playsinline></video>` : `<img src="${esc(storage.url(st.path))}" alt="">`}<div class="st-ov">${((st.overlay && st.overlay.items) || []).map(it => stickerHTML(it)).join('')}</div>
         <button class="stv-l" aria-label="Previous"></button><button class="stv-r" aria-label="Next"></button></div>
       ${mine ? `<div class="stv-f"><button class="btn g" data-seen>👁 Seen by…</button><button class="btn g" data-del>Delete</button><button class="btn" data-new>+ Add</button></div>` : ''}`;
     const v = el.querySelector('video'), bar = el.querySelector('.run');
     const dur = v ? null : 5000;
+    if (v && bt) v.muted = true;
     if (v) { v.onloadedmetadata = () => { bar.style.animationDuration = (v.duration || 6) + 's'; }; v.onended = next; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
     else { bar.style.animationDuration = dur / 1000 + 's'; timer = setTimeout(next, dur); }
   };
