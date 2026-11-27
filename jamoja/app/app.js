@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127s';
-import * as R from './rec.js?v=20261127s';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127s';
+import * as E from './engine.js?v=20261127t';
+import * as R from './rec.js?v=20261127t';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127t';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127s';
+const APP_V = '20261127t';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -871,6 +871,8 @@ const STICKERS = [
 // Jamoja Beats: original tracks made for Jamoja, so stories can have music with no license issues.
 const BEATS = [{ id: 'courtside', n: 'Courtside', m: 'Boom bap · 90' }, { id: 'clutch', n: 'Clutch', m: 'Trap · 140' }, { id: 'morning-run', n: 'Morning Run', m: 'Lo-fi · 82' }, { id: 'warmup', n: 'Warmup', m: 'House · 122' }, { id: 'next-up', n: 'Next Up', m: 'Drill · 142' }, { id: 'bounce', n: 'Bounce', m: 'West coast · 96' }];
 const beatUrl = id => `beats/${id}.m4a?v=1`;
+const GIFS = ['swish', 'onfire', 'buckets', 'andone', 'crown', 'plus2', 'plus3', 'cooking', 'icecold'];
+const gifUrl = n => `gifs/${n}.webp?v=1`;
 const seenStory = id => { try { return (localStorage.getItem('jm.ss') || '').includes(id); } catch (e) { return false; } };
 const markStory = id => { try { const v = (localStorage.getItem('jm.ss') || '').split(',').slice(-300); if (!v.includes(id)) v.push(id); localStorage.setItem('jm.ss', v.join(',')); } catch (e) { /* private */ } };
 async function storyRail(host) {
@@ -901,20 +903,25 @@ function storyEditor(file) {
   const el = document.createElement('div'); el.className = 'sted'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
   el.innerHTML = `<div class="st-top"><button class="st-x" data-x aria-label="Close">✕</button><div class="st-tools"><button class="st-aa" data-text>Aa</button><button class="st-aa" data-stk>🙂 Stickers</button><button class="st-aa" data-mus>♫ Music</button></div></div>
     <div class="st-stage">${isVid ? `<video src="${url}" autoplay loop muted playsinline></video>` : `<img src="${url}" alt="">`}<div class="st-ov"></div><div class="st-trash" hidden>🗑</div></div>
-    <div class="st-tray" hidden><div class="st-grid">${STICKERS.map((x, k) => `<button data-s="${k}" class="${x.k ? 'st-tagb' : ''}">${esc(x.v)}${x.a ? '<sup>✨</sup>' : ''}</button>`).join('')}
-      ${(window.LAST_COURT ? `<button data-court class="st-tagb">📍 ${esc(window.LAST_COURT)}</button>` : '')}</div><p class="mu" style="font-size:12px;margin:6px 0 0">✨ = animated. Drag stickers to move them, drag onto 🗑 to remove.</p></div>
+    <div class="st-tray" hidden><p class="st-h">GIFs</p><div class="st-gifs">${GIFS.map(n => `<button data-gif="${n}"><img src="${gifUrl(n)}" alt="${n}" loading="lazy"></button>`).join('')}</div><p class="st-h">Stickers</p><div class="st-grid">${STICKERS.map((x, k) => `<button data-s="${k}" class="${x.k ? 'st-tagb' : ''}">${esc(x.v)}${x.a ? '<sup>✨</sup>' : ''}</button>`).join('')}
+      ${(window.LAST_COURT ? `<button data-court class="st-tagb">📍 ${esc(window.LAST_COURT)}</button>` : '')}</div><p class="mu" style="font-size:12px;margin:6px 0 0">✨ = animated. Drag to move, pinch or use the slider to resize, drag onto 🗑 to remove.</p></div>
     <div class="st-mus" hidden>${BEATS.map(x => `<button data-beat="${x.id}"><b>♫ ${esc(x.n)}</b><span>${esc(x.m)}</span></button>`).join('')}<button data-beat=""><b>No music</b><span>${isVid ? 'Keep the video sound' : 'Silent'}</span></button><p class="mu" style="font-size:12px;margin:6px 2px 0">Jamoja Beats are made for Jamoja. Free to use anywhere you share.</p></div>
+    <div class="st-size" hidden><span>Size</span><input type="range" min="0.4" max="3" step="0.05" value="1"><button data-desel>Done</button></div>
     <div class="st-mchip" hidden></div>
     <form class="st-tin" hidden><input maxlength="60" placeholder="Say something…"><button class="btn">Add</button></form>
     <div class="st-bot"><span class="mu" id="stmsg"></span><button class="btn" data-post>Share to story</button></div>`;
   const ov = el.querySelector('.st-ov'), trash = el.querySelector('.st-trash'); let music = '', au = null;
   if (!window.LAST_COURT && ME) games.mine(ME.id).then(l => { const g = l.find(x => x.place); if (g && el.isConnected) { window.LAST_COURT = g.place; el.querySelector('.st-grid').insertAdjacentHTML('beforeend', `<button data-court class="st-tagb">📍 ${esc(g.place)}</button>`); } }).catch(() => {});
-  const paint = () => { ov.innerHTML = items.map((it, k) => stickerHTML(it, k)).join(''); };
-  const add = it => { items.push({ x: 0.5, y: 0.4, ...it }); paint(); el.querySelector('.st-tray').hidden = true; };
+  let selK = null; const size = el.querySelector('.st-size'), range = size.querySelector('input');
+  const paint = () => { ov.innerHTML = items.map((it, k) => stickerHTML(it, k, k === selK)).join(''); size.hidden = selK === null; if (selK !== null) range.value = items[selK].s || 1; };
+  const select = k => { selK = k; paint(); };
+  range.addEventListener('input', () => { if (selK === null) return; items[selK].s = +range.value; const n = ov.querySelector(`[data-k="${selK}"]`); if (n) n.style.setProperty('--s', range.value); });
+  const add = it => { items.push({ x: 0.5, y: 0.4, s: 1, ...it }); selK = items.length - 1; paint(); el.querySelector('.st-tray').hidden = true; };
   const close = () => { if (au) au.pause(); el.remove(); URL.revokeObjectURL(url); document.documentElement.style.overflow = ''; };
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.x !== undefined) return close();
+    if (b.dataset.desel !== undefined) return select(null);
     if (b.dataset.stk !== undefined) { const t = el.querySelector('.st-tray'); t.hidden = !t.hidden; el.querySelector('.st-mus').hidden = true; return; }
     if (b.dataset.mus !== undefined) { const t = el.querySelector('.st-mus'); t.hidden = !t.hidden; el.querySelector('.st-tray').hidden = true; return; }
     if (b.dataset.beat !== undefined) {
@@ -927,6 +934,7 @@ function storyEditor(file) {
       el.querySelector('.st-mus').hidden = true; return;
     }
     if (b.dataset.text !== undefined) { const f = el.querySelector('.st-tin'); f.hidden = false; f.querySelector('input').focus(); return; }
+    if (b.dataset.gif) return add({ t: 'gif', v: b.dataset.gif, s: 1 });
     if (b.dataset.s !== undefined) { const x = STICKERS[+b.dataset.s]; return add({ t: x.k ? 'tag' : 'emoji', v: x.v, a: x.a || '', big: /big/.test(x.k || '') }); }
     if (b.dataset.court !== undefined) return add({ t: 'tag', v: '📍 ' + window.LAST_COURT });
     if (b.dataset.post !== undefined) {
@@ -950,15 +958,34 @@ function storyEditor(file) {
     }
   });
   el.querySelector('.st-tin').onsubmit = e => { e.preventDefault(); const i = e.target.querySelector('input'); const v = i.value.trim(); if (v) add({ t: 'text', v }); i.value = ''; e.target.hidden = true; i.blur(); };
-  // drag stickers
-  let drag = null;
-  ov.addEventListener('pointerdown', e => { const s2 = e.target.closest('[data-k]'); if (!s2) return; drag = +s2.dataset.k; s2.setPointerCapture(e.pointerId); trash.hidden = false; e.preventDefault(); });
-  ov.addEventListener('pointermove', e => { if (drag === null) return; const r = ov.getBoundingClientRect(); items[drag].x = Math.min(0.98, Math.max(0.02, (e.clientX - r.left) / r.width)); items[drag].y = Math.min(0.98, Math.max(0.02, (e.clientY - r.top) / r.height)); const n = ov.querySelector(`[data-k="${drag}"]`); n.style.left = items[drag].x * 100 + '%'; n.style.top = items[drag].y * 100 + '%'; const t = trash.getBoundingClientRect(); trash.classList.toggle('on', e.clientY > t.top - 20 && Math.abs(e.clientX - (t.left + t.width / 2)) < 60); });
-  ov.addEventListener('pointerup', () => { if (drag === null) return; if (trash.classList.contains('on')) items.splice(drag, 1); drag = null; trash.hidden = true; trash.classList.remove('on'); paint(); });
+  // drag to move, two fingers to pinch-resize, tap to select (then use the size slider)
+  let drag = null, moved = false; const pts = new Map(); let pinch = null;
+  ov.addEventListener('pointerdown', e => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && selK !== null) { const [a, b2] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b2.x, a.y - b2.y), s: items[selK].s || 1 }; drag = null; trash.hidden = true; return; }
+    const s2 = e.target.closest('[data-k]'); if (!s2) { if (pts.size === 1) select(null); return; }
+    drag = +s2.dataset.k; moved = false; if (selK !== drag) select(drag); ov.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  ov.addEventListener('pointermove', e => {
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pts.size >= 2 && selK !== null) { const [a, b2] = [...pts.values()]; const sc = Math.min(3, Math.max(0.4, pinch.s * Math.hypot(a.x - b2.x, a.y - b2.y) / pinch.d)); items[selK].s = sc; const n = ov.querySelector(`[data-k="${selK}"]`); if (n) n.style.setProperty('--s', sc); range.value = sc; return; }
+    if (drag === null) return; moved = true; trash.hidden = false;
+    const r = ov.getBoundingClientRect(); items[drag].x = Math.min(0.98, Math.max(0.02, (e.clientX - r.left) / r.width)); items[drag].y = Math.min(0.98, Math.max(0.02, (e.clientY - r.top) / r.height));
+    const n = ov.querySelector(`[data-k="${drag}"]`); n.style.left = items[drag].x * 100 + '%'; n.style.top = items[drag].y * 100 + '%';
+    const t = trash.getBoundingClientRect(); trash.classList.toggle('on', e.clientY > t.top - 20 && Math.abs(e.clientX - (t.left + t.width / 2)) < 60);
+  });
+  const up = e => {
+    pts.delete(e.pointerId); if (pts.size < 2) pinch = null;
+    if (drag === null) return;
+    if (moved && trash.classList.contains('on')) { items.splice(drag, 1); selK = null; }
+    drag = null; trash.hidden = true; trash.classList.remove('on'); paint();
+  };
+  ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
 }
-function stickerHTML(it, k) {
-  const cls = it.t === 'emoji' ? 'sk-e' : it.t === 'tag' ? 'sk-t' + (it.big ? ' big' : '') : 'sk-x';
-  return `<div class="sk ${cls} ${it.a ? 'an-' + it.a : ''}" ${k != null ? `data-k="${k}"` : ''} style="left:${(it.x * 100).toFixed(1)}%;top:${(it.y * 100).toFixed(1)}%"><span>${esc(it.v)}</span></div>`;
+function stickerHTML(it, k, sel) {
+  const cls = it.t === 'emoji' ? 'sk-e' : it.t === 'tag' ? 'sk-t' + (it.big ? ' big' : '') : it.t === 'gif' ? 'sk-g' : 'sk-x';
+  const inner = it.t === 'gif' ? `<img src="${gifUrl(it.v)}" alt="" draggable="false">` : `<span>${esc(it.v)}</span>`;
+  return `<div class="sk ${cls} ${it.a ? 'an-' + it.a : ''} ${sel ? 'sel' : ''}" ${k != null ? `data-k="${k}"` : ''} style="left:${(it.x * 100).toFixed(1)}%;top:${(it.y * 100).toFixed(1)}%;--s:${it.s || 1}">${inner}</div>`;
 }
 function openStories(groups, gi, onClose) {
   let g = gi, i = Math.max(0, groups[gi].list.findIndex(x => !seenStory(x.id))), timer = null; const au = new Audio(); au.loop = true;
