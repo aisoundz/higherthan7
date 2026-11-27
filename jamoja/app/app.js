@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127zd';
-import * as R from './rec.js?v=20261127zd';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zd';
+import * as E from './engine.js?v=20261127ze';
+import * as R from './rec.js?v=20261127ze';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127ze';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127zd';
+const APP_V = '20261127ze';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1117,21 +1117,55 @@ function openStories(groups, gi, onClose) {
 async function statsPage() {
   if (!ME || !(await events.isAdmin(ME.id).catch(() => false))) { V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`; return; }
   const days = +(qs().get('d') || 7);
-  V.innerHTML = `<h1>Stats</h1><p class="mu">Loading…</p>`;
+  V.innerHTML = `<div class="sx"><div class="sx-head"><h1>Stats</h1></div><div class="sx-hero sx-skel"></div><div class="sx-rings">${'<div class="sx-skel" style="height:110px"></div>'.repeat(4)}</div></div>`;
   let s; try { s = await events.stats(days); } catch (e) { V.innerHTML = `<h1>Stats</h1><p class="err">${esc(e.message)}</p>`; return; }
-  const n = s.now || {}, pv = s.prev || {}, t = s.totals || {};
-  const tile = (label, k, hint) => { const a = n[k] || 0, b = pv[k] || 0, d = a - b; return `<div class="st"><b>${a}</b><span>${label}</span><i class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '▲ ' + d : d < 0 ? '▼ ' + (-d) : 'same'}</i>${hint ? `<small>${hint}</small>` : ''}</div>`; };
-  const daily = s.daily || []; const mx = Math.max(1, ...daily.map(x => x.n));
-  V.innerHTML = `<div class="row" style="justify-content:space-between;align-items:baseline"><h1>Stats</h1><span class="row" style="gap:6px">${[7, 30].map(d => `<a class="chip ${d === days ? 'on' : ''}" href="#/stats?d=${d}">${d} days</a>`).join('')}</span></div>
-    <p class="mu" style="margin-top:-6px">Last ${days} days vs the ${days} before.</p>
-    <h2>Is it growing?</h2><div class="stg">${tile('active people', 'active')}${tile('signups', 'signups')}${tile('active members', 'active_users')}<div class="st"><b>${s.retention == null ? '·' : s.retention + '%'}</b><span>came back</span><small>of last period's members</small></div></div>
-    <div class="card spark">${daily.length ? daily.map(x => `<div title="${esc(x.d)}: ${x.n}"><i style="height:${Math.round(x.n / mx * 100)}%"></i><span>${esc(x.d.split(' ')[1])}</span></div>`).join('') : '<p class="mu">Daily active people show here once the app logs opens.</p>'}</div>
-    <h2>Is the core working?</h2><div class="stg">${tile('runs posted', 'runs_posted')}${tile('games filmed', 'games_filmed')}${tile('highlights made', 'highlights')}${tile('plays claimed', 'claims')}${tile('live streams', 'lives')}${tile('rim scans', 'rim_scans')}${tile('Auto Bucket', 'auto_bucket')}${tile('reviews', 'reviews')}</div>
-    <h2>Is it spreading?</h2><div class="stg">${tile('shares', 'shares')}${tile('reels saved', 'reels')}${tile('follows', 'follows')}${tile('DMs', 'dms')}</div>
-    <h2>Are people engaging?</h2><div class="stg">${tile('posts', 'posts')}${tile('fires', 'fires')}${tile('comments', 'comments')}</div>
-    <h2>All time</h2><div class="stg"><div class="st"><b>${t.users || 0}</b><span>members</span></div><div class="st"><b>${t.highlights || 0}</b><span>highlights</span></div><div class="st"><b>${t.claimed_share == null ? '·' : t.claimed_share + '%'}</b><span>plays claimed</span><small>the growth loop</small></div><div class="st"><b>${t.push_on || 0}</b><span>notifications on</span></div><div class="st"><b>${t.installed || 0}</b><span>on Home Screen</span></div></div>
-    ${(s.top_courts || []).length ? `<h2>Top courts</h2><div class="list">${s.top_courts.map(c => `<a href="${courtUrl(c.place)}"><span>📍 ${esc(c.place)}</span><span class="mu">${c.runs} run${c.runs === 1 ? '' : 's'}</span></a>`).join('')}</div>` : ''}
-    <p class="mu" style="font-size:13px;margin-top:18px">Shares, opens, reels, scans and reviews are counted from today on. Everything else counts from the start.</p>`;
+  if (!s) { V.innerHTML = `<h1>Stats</h1><p class="mu">Stats need the live database.</p>`; return; }
+  renderStats(s, days);
+}
+function renderStats(s, days) {
+  const n = s.now || {}, pv = s.prev || {}, t = s.totals || {}, daily = s.daily || [];
+  const fmt = x => x >= 10000 ? (x / 1000).toFixed(0) + 'k' : x >= 1000 ? (x / 1000).toFixed(1) + 'k' : String(x);
+  const delta = (a, b) => { const d = a - b; if (!d) return `<em class="sx-d">no change</em>`; const pct = b ? Math.round(d / b * 100) : null; return `<em class="sx-d ${d > 0 ? 'up' : 'dn'}">${d > 0 ? '↑' : '↓'} ${pct == null ? 'new' : Math.abs(pct) + '%'}</em>`; };
+  const tile = (ic, label, k) => { const a = n[k] || 0, b = pv[k] || 0, m = Math.max(a, b, 1), z = !a && !b; return `<div class="sx-t${z ? ' z' : ''}"><div class="sx-tt"><span class="sx-ic">${ic}</span>${z ? '' : delta(a, b)}</div><b data-n="${a}">0</b><span class="sx-l">${label}</span>${z ? '' : `<div class="sx-cmp" title="this period vs last"><i style="width:${a / m * 100}%"></i><i class="p" style="width:${b / m * 100}%"></i></div>`}</div>`; };
+  const ring = (pct, label, sub, col) => { const v = pct == null ? 0 : Math.max(0, Math.min(100, pct)); return `<div class="sx-ring"><div class="sx-rc" style="--v:${v};--c:${col}"><b>${pct == null ? '·' : Math.round(pct) + '%'}</b></div><span>${label}</span><small>${sub}</small></div>`; };
+  const acts = daily.reduce((x, d) => x + (d.a || 0), 0), peak = daily.reduce((x, d) => Math.max(x, d.a || 0), 0);
+  const u = t.users || 0, pc = x => u ? x / u * 100 : null;
+  // smooth area chart: actions (filled) and active people (line)
+  const W = 340, H = 130, P = 6, N = Math.max(daily.length, 2), mx = Math.max(1, ...daily.map(d => d.a || 0)), mxn = Math.max(1, ...daily.map(d => d.n || 0));
+  const X = i => P + i * (W - 2 * P) / (N - 1), Y = (v, m) => H - P - (v / m) * (H - 2 * P - 14);
+  const path = (k, m) => daily.map((d, i) => [X(i), Y(d[k] || 0, m)]).reduce((acc, [x, y], i, arr) => { if (!i) return `M${x},${y}`; const [px, py] = arr[i - 1], cx = (px + x) / 2; return acc + ` C${cx},${py} ${cx},${y} ${x},${y}`; }, '');
+  const area = daily.length ? path('a', mx) + ` L${X(daily.length - 1)},${H} L${X(0)},${H} Z` : '';
+  const ticks = daily.map((d, i) => ({ i, d })).filter(({ i }) => daily.length <= 8 || i % Math.ceil(daily.length / 6) === 0 || i === daily.length - 1);
+  V.innerHTML = `<div class="sx">
+    <div class="sx-head"><div><h1>Stats</h1><p class="sx-live"><span></span>Live · last ${days} days vs the ${days} before</p></div>
+      <div class="sx-seg">${[7, 30].map(d => `<a class="${d === days ? 'on' : ''}" href="#/stats?d=${d}">${d}D</a>`).join('')}</div></div>
+    <div class="sx-hero">
+      <div class="sx-hn"><div><b data-n="${acts}">0</b><span>things done</span></div><div><b data-n="${n.active || 0}">0</b><span>people active</span>${delta(n.active || 0, pv.active || 0)}</div><div><b data-n="${n.signups || 0}">0</b><span>signups</span>${delta(n.signups || 0, pv.signups || 0)}</div></div>
+      ${daily.length ? `<div class="sx-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="sxg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5a1f" stop-opacity=".55"/><stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/></linearGradient></defs>
+        ${[0.25, 0.5, 0.75].map(f => `<line x1="0" x2="${W}" y1="${P + f * (H - 2 * P)}" y2="${P + f * (H - 2 * P)}" class="sx-grid"/>`).join('')}
+        <path d="${area}" fill="url(#sxg)" class="sx-area"/><path d="${path('a', mx)}" class="sx-la"/><path d="${path('n', mxn)}" class="sx-ln"/>
+        ${(() => { const L = daily.length - 1; return `<circle cx="${X(L)}" cy="${Y(daily[L].a || 0, mx)}" r="9" class="sx-glow"/><circle cx="${X(L)}" cy="${Y(daily[L].a || 0, mx)}" r="3.5" class="sx-dot"/>`; })()}<line class="sx-cur" x1="0" x2="0" y1="0" y2="${H}" style="display:none"/></svg>
+        <div class="sx-tip" hidden></div>
+        <div class="sx-x">${ticks.map(({ i, d }) => `<span style="left:${X(i) / W * 100}%">${esc(d.d.split(' ')[1].replace(/^0/, ''))}</span>`).join('')}</div></div>
+        <div class="sx-key"><span><i class="a"></i>Things done (posts, clips, comments, fires, stories)</span><span><i class="n"></i>People active</span>${peak ? `<span>Best day: ${peak}</span>` : ''}</div>` : ''}
+    </div>
+    <div class="sx-rings">${ring(s.retention, 'Came back', 'members from last period', '#3ddc84')}${ring(t.claimed_share, 'Plays claimed', 'the growth loop', '#ff5a1f')}${ring(pc(t.push_on || 0), 'Alerts on', `${t.push_on || 0} of ${u}`, '#38bdf8')}${ring(pc(t.installed || 0), 'Home Screen', `${t.installed || 0} of ${u}`, '#a78bfa')}</div>
+    <h2 class="sx-h">🏀 Core loop</h2><div class="sx-g">${tile('📍', 'runs posted', 'runs_posted')}${tile('🎥', 'games filmed', 'games_filmed')}${tile('⚡', 'highlights', 'highlights')}${tile('🙋', 'plays claimed', 'claims')}${tile('🔴', 'live streams', 'lives')}${tile('🎯', 'rim scans', 'rim_scans')}${tile('🤖', 'Auto Bucket', 'auto_bucket')}${tile('✅', 'reviews', 'reviews')}</div>
+    <h2 class="sx-h">🔥 Engagement</h2><div class="sx-g">${tile('📝', 'posts', 'posts')}${tile('🔥', 'fires', 'fires')}${tile('💬', 'comments', 'comments')}${tile('❤️', 'comment likes', 'clikes')}${tile('⭐', 'plays rated', 'ratings')}${tile('⭕', 'stories', 'stories')}${tile('👀', 'story views', 'story_views')}</div>
+    <h2 class="sx-h">📣 Spreading</h2><div class="sx-g">${tile('↗️', 'shares', 'shares')}${tile('🎬', 'reels saved', 'reels')}${tile('➕', 'follows', 'follows')}${tile('✉️', 'DMs', 'dms')}</div>
+    ${(s.top_courts || []).length ? `<h2 class="sx-h">📍 Top courts</h2><div class="sx-courts">${(() => { const cm = Math.max(...s.top_courts.map(c => c.runs)); return s.top_courts.map((c, i) => `<a href="${courtUrl(c.place)}"><span class="sx-rank">${i + 1}</span><span class="sx-cn">${esc(c.place)}<i style="width:${c.runs / cm * 100}%"></i></span><b>${c.runs}</b></a>`).join(''); })()}</div>` : ''}
+    <div class="sx-all"><div><b data-n="${u}">0</b><span>members</span></div><div><b data-n="${t.highlights || 0}">0</b><span>highlights</span></div><div><b data-n="${t.push_on || 0}">0</b><span>alerts on</span></div></div>
+    <p class="mu" style="font-size:12px;margin-top:14px">Shares, opens, reels, scans and reviews count from Nov 26. Everything else counts from the start.</p></div>`;
+  // count up
+  const els = [...V.querySelectorAll('.sx [data-n]')], t0 = performance.now();
+  const step = now => { const k = Math.min(1, (now - t0) / 700), e = 1 - Math.pow(1 - k, 3); els.forEach(el => { el.textContent = fmt(Math.round(+el.dataset.n * e)); }); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+  // tap or drag on the chart to read a day
+  const ch = V.querySelector('.sx-chart'); if (!ch) return;
+  const tip = ch.querySelector('.sx-tip'), cur = ch.querySelector('.sx-cur');
+  const show = e => { const r = ch.getBoundingClientRect(); const fx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); const i = Math.round((fx * W - P) / ((W - 2 * P) / (N - 1))); const d = daily[Math.max(0, Math.min(daily.length - 1, i))]; if (!d) return; const x = X(daily.indexOf(d)); cur.setAttribute('x1', x); cur.setAttribute('x2', x); cur.style.display = ''; tip.hidden = false; tip.innerHTML = `<b>${esc(d.d)}</b><span><i class="a"></i>${d.a} done</span><span><i class="n"></i>${d.n} active</span>`; tip.style.left = Math.min(r.width - 120, Math.max(0, x / W * r.width - 60)) + 'px'; };
+  ch.addEventListener('pointerdown', show); ch.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) show(e); });
+  ch.addEventListener('pointerleave', () => { tip.hidden = true; cur.style.display = 'none'; });
 }
 // ---------- Review plays: one clip at a time, big buttons. A right guess costs one tap (Next).
 const QUICK = { Basketball: ['Bucket', 'Three', 'Layup', 'Rebound', 'Block', 'Steal', 'Dime', 'Miss'] };
