@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127z';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127za';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -491,7 +491,7 @@ export const events = {
 export const stories = {
   async live() {
     const nowIso = now();
-    if (sb) return chk(await sb.from('stories').select('id,user_id,kind,path,overlay,created_at, user:profiles(id,name,handle,avatar)').gt('expires_at', nowIso).order('created_at'));
+    if (sb) return chk(await sb.from('stories').select('id,user_id,kind,path,overlay,created_at, user:profiles!stories_user_id_fkey(id,name,handle,avatar)').gt('expires_at', nowIso).order('created_at'));
     return Object.values(M.stories || {}).filter(x => x.expires_at > nowIso).sort((a, b) => a.created_at < b.created_at ? -1 : 1).map(x => ({ ...x, user: M.profiles[x.user_id] }));
   },
   async add(st) {
