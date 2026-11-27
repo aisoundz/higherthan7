@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127r';
-import * as R from './rec.js?v=20261127r';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127r';
+import * as E from './engine.js?v=20261127s';
+import * as R from './rec.js?v=20261127s';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127s';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127r';
+const APP_V = '20261127s';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -899,7 +899,7 @@ function storyEditor(file) {
   const isVid = file.type.startsWith('video');
   const url = URL.createObjectURL(file); const items = [];
   const el = document.createElement('div'); el.className = 'sted'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
-  el.innerHTML = `<div class="st-top"><button class="st-x" data-x>✕</button><button class="st-aa" data-text>Aa</button><button class="st-aa" data-stk>🙂 Stickers</button><button class="st-aa" data-mus>♫ Music</button></div>
+  el.innerHTML = `<div class="st-top"><button class="st-x" data-x aria-label="Close">✕</button><div class="st-tools"><button class="st-aa" data-text>Aa</button><button class="st-aa" data-stk>🙂 Stickers</button><button class="st-aa" data-mus>♫ Music</button></div></div>
     <div class="st-stage">${isVid ? `<video src="${url}" autoplay loop muted playsinline></video>` : `<img src="${url}" alt="">`}<div class="st-ov"></div><div class="st-trash" hidden>🗑</div></div>
     <div class="st-tray" hidden><div class="st-grid">${STICKERS.map((x, k) => `<button data-s="${k}" class="${x.k ? 'st-tagb' : ''}">${esc(x.v)}${x.a ? '<sup>✨</sup>' : ''}</button>`).join('')}
       ${(window.LAST_COURT ? `<button data-court class="st-tagb">📍 ${esc(window.LAST_COURT)}</button>` : '')}</div><p class="mu" style="font-size:12px;margin:6px 0 0">✨ = animated. Drag stickers to move them, drag onto 🗑 to remove.</p></div>
@@ -923,7 +923,7 @@ function storyEditor(file) {
       if (music) { au = new Audio(beatUrl(music)); au.loop = true; au.play().catch(() => {}); }
       else if (v) { v.muted = false; }
       el.querySelectorAll('[data-beat]').forEach(x => x.classList.toggle('on', x.dataset.beat === music));
-      const ch = el.querySelector('.st-mchip'); const bt = BEATS.find(x => x.id === music); ch.hidden = !bt; ch.textContent = bt ? '♫ ' + bt.n : '';
+      const ch = el.querySelector('.st-mchip'); const bt = BEATS.find(x => x.id === music); ch.hidden = !bt; ch.innerHTML = bt ? `♫ ${esc(bt.n)} <button data-beat="" aria-label="Remove music">✕</button>` : '';
       el.querySelector('.st-mus').hidden = true; return;
     }
     if (b.dataset.text !== undefined) { const f = el.querySelector('.st-tin'); f.hidden = false; f.querySelector('input').focus(); return; }
@@ -933,9 +933,14 @@ function storyEditor(file) {
       b.disabled = true; const msg = el.querySelector('#stmsg');
       try {
         let path, kind;
-        if (isVid) {
+        const fast = isVid && file.size <= 45 * 1048576 && /^video\/(mp4|quicktime)$/.test(file.type);
+        if (fast) {
+          // Upload the phone's own file as is: no converting, so it posts in seconds. The viewer plays the first 15s.
+          const ext = file.type === 'video/quicktime' ? 'mov' : 'mp4';
+          path = `${ME.id}/stories/${Date.now()}.${ext}`; msg.textContent = 'Uploading…'; await storage.upload(path, file, file.type); kind = 'video';
+        } else if (isVid) {
           msg.textContent = 'Preparing video…';
-          const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
+          const src = await E.analyze(file); const end = Math.min(15, src.dur || 15); msg.textContent = 'Preparing video… 0%';
           const c = await E.cut(src, 0, end, pr => { msg.textContent = `Preparing video… ${Math.round(pr * 100)}%`; });
           E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; msg.textContent = 'Uploading…'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
         } else { msg.textContent = 'Uploading…'; const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
@@ -976,7 +981,7 @@ function openStories(groups, gi, onClose) {
     const v = el.querySelector('video'), bar = el.querySelector('.run');
     const dur = v ? null : 5000;
     if (v && bt) v.muted = true;
-    if (v) { v.onloadedmetadata = () => { bar.style.animationDuration = (v.duration || 6) + 's'; }; v.onended = next; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
+    if (v) { v.onloadedmetadata = () => { bar.style.animationDuration = Math.min(15, v.duration || 6) + 's'; }; v.onended = next; v.ontimeupdate = () => { if (v.currentTime >= 15) { v.ontimeupdate = null; next(); } }; v.onerror = () => { timer = setTimeout(next, 1500); }; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
     else { bar.style.animationDuration = dur / 1000 + 's'; timer = setTimeout(next, dur); }
   };
   el.addEventListener('click', async e => {
