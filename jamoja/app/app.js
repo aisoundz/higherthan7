@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127zf';
-import * as R from './rec.js?v=20261127zf';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zf';
+import * as E from './engine.js?v=20261127zg';
+import * as R from './rec.js?v=20261127zg';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zg';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127zf';
+const APP_V = '20261127zg';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -943,8 +943,8 @@ async function storyRail(host) {
   await storage.prep(groups.map(g => g.u.avatar).filter(Boolean));
   const mineG = ME && groups.find(g => g.u.id === ME.id);
   if (!host.isConnected || (!groups.length && !ME)) return;
-  host.innerHTML = `<div class="strail">${ME && !mineG ? `<button class="stb add" data-new>${avatar(MYP, 62)}<i>+</i><span>Your story</span></button>` : ''}
-    ${groups.map((g, k) => `<button class="stb ${g.list.every(x => seenStory(x.id)) ? 'seen' : ''}" data-g="${k}">${avatar(g.u, 62)}<span>${ME && g.u.id === ME.id ? 'Your story' : esc((g.u.name || '').split(' ')[0])}</span></button>`).join('')}</div>`;
+  host.innerHTML = `<div class="strail">${ME && !mineG ? `<button class="stb add" data-new>${avatar(MYP, 62)}<i>+</i><span>Your Journey</span></button>` : ''}
+    ${groups.map((g, k) => `<button class="stb ${g.list.every(x => seenStory(x.id)) ? 'seen' : ''}" data-g="${k}">${avatar(g.u, 62)}<span>${ME && g.u.id === ME.id ? 'Your Journey' : esc((g.u.name || '').split(' ')[0])}</span></button>`).join('')}</div>`;
   host.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.new !== undefined) return newStory(); openStories(groups, +b.dataset.g, () => storyRail(host)); };
 }
 // iPhone needs the file input to live in the page; a detached one can get lost mid-pick and leave the picker stuck.
@@ -967,7 +967,7 @@ function storyEditor(file) {
     <div class="st-size" hidden><span>Size</span><input type="range" min="0.4" max="3" step="0.05" value="1"><button data-desel>Done</button></div>
     <div class="st-mchip" hidden></div>
     <div class="st-ted" hidden><div class="st-ted-top"><button class="st-aa" data-tbg>A̲ Style</button><button class="btn" data-tdone>Done</button></div><div class="st-ted-mid"><div class="st-ted-in sk-x" contenteditable="true" enterkeyhint="done" spellcheck="false"></div></div><div class="st-cols">${TCOLS.map(c => `<button data-tc="${c}" style="background:${c}" aria-label="Color"></button>`).join('')}</div></div>
-    <div class="st-bot"><span class="mu" id="stmsg"></span><button class="btn" data-post>Share to story</button></div>`;
+    <div class="st-bot"><span class="mu" id="stmsg"></span><button class="btn" data-post>Share to Journey</button></div>`;
   const ov = el.querySelector('.st-ov'), trash = el.querySelector('.st-trash'); let music = '', au = null;
   if (!window.LAST_COURT && ME) games.mine(ME.id).then(l => { const g = l.find(x => x.place); if (g && el.isConnected) { window.LAST_COURT = g.place; el.querySelector('.st-grid').insertAdjacentHTML('beforeend', `<button data-court class="st-tagb">📍 ${esc(g.place)}</button>`); } }).catch(() => {});
   let selK = null; const size = el.querySelector('.st-size'), range = size.querySelector('input');
@@ -1002,20 +1002,20 @@ function storyEditor(file) {
       // Close right away and finish in the background, so nobody sits and waits on the upload.
       const overlay = { items: items.map(x => ({ ...x })), music };
       if (au) au.pause(); el.remove(); document.documentElement.style.overflow = ''; if (location.hash !== '' && location.hash !== '#/') go('#/');
-      const pill = document.createElement('div'); pill.className = 'st-pill'; pill.textContent = 'Posting your story… keep Jamoja open'; document.body.append(pill);
+      const pill = document.createElement('div'); pill.className = 'st-pill'; pill.textContent = 'Posting your Journey… keep Jamoja open'; document.body.append(pill);
       try {
         let path, kind;
         const fast = isVid && file.size <= 50 * 1048576 && /^video\/(mp4|quicktime)$/.test(file.type);
         if (fast) { const ext = file.type === 'video/quicktime' ? 'mov' : 'mp4'; path = `${ME.id}/stories/${Date.now()}.${ext}`; await storage.upload(path, file, file.type); kind = 'video'; }
         else if (isVid) {
           const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
-          const c = await E.cut(src, 0, end, pr => { pill.textContent = `Posting your story… ${Math.round(pr * 100)}%`; });
-          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; pill.textContent = 'Posting your story… keep Jamoja open'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
+          const c = await E.cut(src, 0, end, pr => { pill.textContent = `Posting your Journey… ${Math.round(pr * 100)}%`; });
+          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; pill.textContent = 'Posting your Journey… keep Jamoja open'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
         } else { const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
         const row = await stories.add({ kind, path, overlay }); track('story_post', { kind, stickers: overlay.items.length, music });
-        if (fast && file.type === 'video/quicktime' && row && row.id) storyCopy(row.id, path, file);
-        pill.remove(); toast('Your story is up. It stays for 24 hours.'); if (location.hash === '' || location.hash === '#/') home();
-      } catch (err) { pill.remove(); toast('Story did not post: ' + (err.message || err)); }
+        if (fast && row && row.id) storyCopy(row.id, path, file);
+        pill.remove(); toast('Your Journey is up. It stays for 24 hours.'); if (location.hash === '' || location.hash === '#/') home();
+      } catch (err) { pill.remove(); toast('Journey did not post: ' + (err.message || err)); }
       URL.revokeObjectURL(url); return;
     }
   });
@@ -1062,7 +1062,7 @@ async function storyCopy(id, oldPath, file) {
   try {
     const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
     const c = await E.cut(src, 0, end); E.close(src);
-    const p2 = oldPath.replace(/\.mov$/i, '') + '.mp4';
+    const p2 = oldPath.replace(/\.(mov|mp4)$/i, '') + '-s.mp4';
     await storage.upload(p2, c.video, 'video/mp4'); await stories.setPath(id, p2);
     storage.remove([oldPath]).catch(() => {});
     track('story_copy', { ok: 1, codec: src.codec, secs: Math.round((Date.now() - t0) / 1000), mb: Math.round(file.size / 1048576) });
@@ -1092,13 +1092,13 @@ function openStories(groups, gi, onClose) {
     const mins = Math.round((Date.now() - new Date(st.created_at)) / 60e3); const ago = mins < 1 ? 'now' : mins < 60 ? mins + 'm' : Math.round(mins / 60) + 'h';
     el.innerHTML = `<div class="stv-bars">${G.list.map((x, k) => `<i class="${k < i ? 'd' : ''}"><b class="${k === i ? 'run' : ''}"></b></i>`).join('')}</div>
       <div class="stv-h"><a href="#/u/${esc(G.u.handle)}" data-x>${avatar(G.u, 34)}<span class="stv-who"><b>${esc(G.u.name)}</b> <span class="mu">${ago}</span>${bt ? `<br><span class="stv-mus">♫ ${esc(bt.n)} · Jamoja Beats</span>` : ''}</span></a><button data-x>✕</button></div>
-      <div class="stv-m">${st.kind === 'video' ? `<video src="${esc(storage.url(st.path))}" autoplay playsinline></video>` : `<img src="${esc(storage.url(st.path))}" alt="">`}<div class="st-ov">${((st.overlay && st.overlay.items) || []).map(it => stickerHTML(it)).join('')}</div>
+      <div class="stv-m">${st.kind === 'video' ? `<video src="${esc(storage.url(st.path))}" autoplay playsinline preload="auto"></video><div class="stv-spin"><i></i></div>` : `<img src="${esc(storage.url(st.path))}" alt="">`}<div class="st-ov">${((st.overlay && st.overlay.items) || []).map(it => stickerHTML(it)).join('')}</div>
         <button class="stv-l" aria-label="Previous"></button><button class="stv-r" aria-label="Next"></button></div>
       ${mine ? `<div class="stv-f"><button class="btn g" data-seen>👁 Seen by</button><button class="btn g" data-del>Delete</button><button class="btn" data-new>+ Add</button></div>` : ''}`;
     const v = el.querySelector('video'), bar = el.querySelector('.run');
     const dur = v ? null : 5000;
     if (v && bt) v.muted = true;
-    if (v) { v.onloadedmetadata = () => { bar.style.animationDuration = Math.min(15, v.duration || 6) + 's'; }; v.onended = next; v.ontimeupdate = () => { if (v.currentTime >= 15) { v.ontimeupdate = null; next(); } }; v.onerror = () => { timer = setTimeout(next, 1500); }; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
+    if (v) { bar.style.animationPlayState = 'paused'; const sp = el.querySelector('.stv-spin'); v.onplaying = () => { bar.style.animationPlayState = 'running'; if (sp) sp.remove(); }; v.onwaiting = () => { bar.style.animationPlayState = 'paused'; }; v.onloadedmetadata = () => { bar.style.animationDuration = Math.min(15, v.duration || 6) + 's'; }; v.onended = next; v.ontimeupdate = () => { if (v.currentTime >= 15) { v.ontimeupdate = null; next(); } }; v.onerror = () => { timer = setTimeout(next, 1500); }; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
     else { bar.style.animationDuration = dur / 1000 + 's'; timer = setTimeout(next, dur); }
   };
   el.addEventListener('click', async e => {
@@ -1147,11 +1147,11 @@ function renderStats(s, days) {
         ${(() => { const L = daily.length - 1; return `<circle cx="${X(L)}" cy="${Y(daily[L].a || 0, mx)}" r="9" class="sx-glow"/><circle cx="${X(L)}" cy="${Y(daily[L].a || 0, mx)}" r="3.5" class="sx-dot"/>`; })()}<line class="sx-cur" x1="0" x2="0" y1="0" y2="${H}" style="display:none"/></svg>
         <div class="sx-tip" hidden></div>
         <div class="sx-x">${ticks.map(({ i, d }) => `<span style="left:${X(i) / W * 100}%">${esc(d.d.split(' ')[1].replace(/^0/, ''))}</span>`).join('')}</div></div>
-        <div class="sx-key"><span><i class="a"></i>Things done (posts, clips, comments, fires, stories)</span><span><i class="n"></i>People active</span>${peak ? `<span>Best day: ${peak}</span>` : ''}</div>` : ''}
+        <div class="sx-key"><span><i class="a"></i>Things done (posts, clips, comments, fires, Journeys)</span><span><i class="n"></i>People active</span>${peak ? `<span>Best day: ${peak}</span>` : ''}</div>` : ''}
     </div>
     <div class="sx-rings">${ring(s.retention, 'Came back', 'members from last period', '#3ddc84')}${ring(t.claimed_share, 'Plays claimed', 'the growth loop', '#ff5a1f')}${ring(pc(t.push_on || 0), 'Alerts on', `${t.push_on || 0} of ${u}`, '#38bdf8')}${ring(pc(t.installed || 0), 'Home Screen', `${t.installed || 0} of ${u}`, '#a78bfa')}</div>
     <h2 class="sx-h">🏀 Core loop</h2><div class="sx-g">${tile('📍', 'runs posted', 'runs_posted')}${tile('🎥', 'games filmed', 'games_filmed')}${tile('⚡', 'highlights', 'highlights')}${tile('🙋', 'plays claimed', 'claims')}${tile('🔴', 'live streams', 'lives')}${tile('🎯', 'rim scans', 'rim_scans')}${tile('🤖', 'Auto Bucket', 'auto_bucket')}${tile('✅', 'reviews', 'reviews')}</div>
-    <h2 class="sx-h">🔥 Engagement</h2><div class="sx-g">${tile('📝', 'posts', 'posts')}${tile('🔥', 'fires', 'fires')}${tile('💬', 'comments', 'comments')}${tile('❤️', 'comment likes', 'clikes')}${tile('⭐', 'plays rated', 'ratings')}${tile('⭕', 'stories', 'stories')}${tile('👀', 'story views', 'story_views')}</div>
+    <h2 class="sx-h">🔥 Engagement</h2><div class="sx-g">${tile('📝', 'posts', 'posts')}${tile('🔥', 'fires', 'fires')}${tile('💬', 'comments', 'comments')}${tile('❤️', 'comment likes', 'clikes')}${tile('⭐', 'plays rated', 'ratings')}${tile('⭕', 'Journeys', 'stories')}${tile('👀', 'Journey views', 'story_views')}</div>
     <h2 class="sx-h">📣 Spreading</h2><div class="sx-g">${tile('↗️', 'shares', 'shares')}${tile('🎬', 'reels saved', 'reels')}${tile('➕', 'follows', 'follows')}${tile('✉️', 'DMs', 'dms')}</div>
     ${(s.top_courts || []).length ? `<h2 class="sx-h">📍 Top courts</h2><div class="sx-courts">${(() => { const cm = Math.max(...s.top_courts.map(c => c.runs)); return s.top_courts.map((c, i) => `<a href="${courtUrl(c.place)}"><span class="sx-rank">${i + 1}</span><span class="sx-cn">${esc(c.place)}<i style="width:${c.runs / cm * 100}%"></i></span><b>${c.runs}</b></a>`).join(''); })()}</div>` : ''}
     <div class="sx-all"><div><b data-n="${u}">0</b><span>members</span></div><div><b data-n="${t.highlights || 0}">0</b><span>highlights</span></div><div><b data-n="${t.push_on || 0}">0</b><span>alerts on</span></div></div>
@@ -1864,7 +1864,7 @@ async function profileStoryRing(p) {
   const all = await stories.live().catch(() => []); const list = all.filter(x => x.user_id === p.id);
   if (!av.isConnected || !list.length) return;
   const seen = list.every(x => seenStory(x.id));
-  const ring = document.createElement('button'); ring.className = 'pc-story' + (seen ? ' seen' : ''); ring.setAttribute('aria-label', `Watch ${p.name}'s story`);
+  const ring = document.createElement('button'); ring.className = 'pc-story' + (seen ? ' seen' : ''); ring.setAttribute('aria-label', `Watch ${p.name}'s Journey`);
   av.replaceWith(ring); ring.append(av);
   ring.onclick = () => openStories([{ u: p, list }], 0, () => { ring.classList.toggle('seen', list.every(x => seenStory(x.id))); });
 }
