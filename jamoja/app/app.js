@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127zb';
-import * as R from './rec.js?v=20261127zb';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zb';
+import * as E from './engine.js?v=20261127zc';
+import * as R from './rec.js?v=20261127zc';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zc';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127zb';
+const APP_V = '20261127zc';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1078,7 +1078,7 @@ function openStories(groups, gi, onClose) {
       <div class="stv-h"><a href="#/u/${esc(G.u.handle)}" data-x>${avatar(G.u, 34)}<span class="stv-who"><b>${esc(G.u.name)}</b> <span class="mu">${ago}</span>${bt ? `<br><span class="stv-mus">♫ ${esc(bt.n)} · Jamoja Beats</span>` : ''}</span></a><button data-x>✕</button></div>
       <div class="stv-m">${st.kind === 'video' ? `<video src="${esc(storage.url(st.path))}" autoplay playsinline></video>` : `<img src="${esc(storage.url(st.path))}" alt="">`}<div class="st-ov">${((st.overlay && st.overlay.items) || []).map(it => stickerHTML(it)).join('')}</div>
         <button class="stv-l" aria-label="Previous"></button><button class="stv-r" aria-label="Next"></button></div>
-      ${mine ? `<div class="stv-f"><button class="btn g" data-seen>👁 Seen by…</button><button class="btn g" data-del>Delete</button><button class="btn" data-new>+ Add</button></div>` : ''}`;
+      ${mine ? `<div class="stv-f"><button class="btn g" data-seen>👁 Seen by</button><button class="btn g" data-del>Delete</button><button class="btn" data-new>+ Add</button></div>` : ''}`;
     const v = el.querySelector('video'), bar = el.querySelector('.run');
     const dur = v ? null : 5000;
     if (v && bt) v.muted = true;
@@ -1362,6 +1362,8 @@ async function login() {
     } catch (e) { invite = ''; }
   }
   const draw = (msg = '') => {
+    // Keep what they typed when we redraw to show an error.
+    const keep = { em: (document.getElementById('em') || {}).value || '', pw: (document.getElementById('pw') || {}).value || '', age: !!(document.getElementById('age') || {}).checked };
     V.innerHTML = `${inAppCard()}${q.get('expired') ? `<div class="err">That link expired or was already used. Ask for a new one below.</div>` : ''}${invite}<h1>${up ? (gm ? 'Claim your plays' : 'Create your account') : 'Welcome back'}</h1>
       <p class="mu" style="margin-top:-4px">${up ? (gm ? 'Make a free account and these plays go on your profile. Takes 20 seconds.' : 'Free. Takes 20 seconds.') : 'Sign in to see your games and plays.'}</p>
       <form id="lf" novalidate><label class="f" for="em">Email</label><input class="t" id="em" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@email.com" required>
@@ -1370,6 +1372,7 @@ async function login() {
       ${msg ? `<div class="err">${esc(msg)}</div>` : ''}
       <button class="btn w" style="margin-top:14px">${up ? 'Create account' : 'Sign in'}</button></form>
       <p style="margin-top:16px" class="mu">${up ? 'Already have an account?' : 'New to Jamoja?'} <a href="#" id="sw">${up ? 'Sign in' : 'Create one'}</a>${up ? '' : ` · <a href="#/login?mode=forgot">Forgot password?</a>`}</p>`;
+    document.getElementById('em').value = keep.em; document.getElementById('pw').value = keep.pw; const ag = document.getElementById('age'); if (ag) ag.checked = keep.age;
     document.getElementById('sw').onclick = e => { e.preventDefault(); up = !up; draw(); };
     const eye = document.getElementById('eye'), pwi = document.getElementById('pw');
     eye.onclick = () => { const show = pwi.type === 'password'; pwi.type = show ? 'text' : 'password'; eye.classList.toggle('on', show); eye.setAttribute('aria-pressed', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); pwi.focus(); };
