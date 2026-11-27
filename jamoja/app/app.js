@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127zg';
-import * as R from './rec.js?v=20261127zg';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zg';
+import * as E from './engine.js?v=20261127zh';
+import * as R from './rec.js?v=20261127zh';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zh';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127zg';
+const APP_V = '20261127zh';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -630,12 +630,13 @@ const whenLabel = t => { const d = new Date(t), n = new Date(); const same = d.t
 const nextHour = () => { const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0); const p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`; };
 async function runsRail() {
   if (LOCAL) return '';
-  const [list, onAir] = await Promise.all([games.upcoming().catch(() => []), live.now().catch(() => [])]);
+  let [list, onAir] = await Promise.all([games.upcoming().catch(() => []), live.now().catch(() => [])]);
   await storage.prep(onAir.map(x => x.user && x.user.avatar).filter(Boolean));
   const liveIds = new Set(onAir.map(x => x.game_id));
   const banner = onAir.map(x => `<a class="livebar" href="#/g/${x.game_id}">${avatar(x.user, 40)}<span><b><span class="lvdot"></span> LIVE NOW</b><br>${esc(x.user ? x.user.name : 'Someone')} at ${esc(x.game ? x.game.title : 'a run')}</span><span class="btn s">Watch</span></a>`).join('');
   await storage.prep(list.map(g => g.owner && g.owner.avatar).filter(Boolean));
   const soon = g => Math.abs(new Date(g.starts_at) - Date.now()) < 3 * 3600e3 && new Date(g.starts_at) <= Date.now() + 15 * 60e3;
+  list = list.filter(g => liveIds.has(g.id) || new Date(g.starts_at) > Date.now() - 3 * 3600e3); // a run that started over 3 hours ago is over
   return banner + `<div class="runs"><div class="runs-h"><b>Runs</b><a href="#/new">+ Post a run</a></div><div class="rail">${list.length ? list.map(g => `<a class="runc ${liveIds.has(g.id) ? 'onair' : soon(g) ? 'now' : ''}" href="#/g/${g.id}"><span class="rt">${liveIds.has(g.id) ? '🔴 LIVE' : soon(g) ? '● ON NOW' : esc(whenLabel(g.starts_at))}</span><b>${esc(g.title)}</b><span class="mu">${esc(g.place || g.sport)}</span><span class="rg">${g.owner ? avatar(g.owner, 22) : ''}<span>${g.going + 1} in</span></span></a>`).join('')
     : `<a class="runc empty" href="#/new"><b>No runs posted yet</b><span class="mu">Post where and when you're playing so your crew can meet you.</span><span class="rt">+ Post a run</span></a>`}</div></div>`;
 }
@@ -943,9 +944,9 @@ async function storyRail(host) {
   await storage.prep(groups.map(g => g.u.avatar).filter(Boolean));
   const mineG = ME && groups.find(g => g.u.id === ME.id);
   if (!host.isConnected || (!groups.length && !ME)) return;
-  host.innerHTML = `<div class="strail">${ME && !mineG ? `<button class="stb add" data-new>${avatar(MYP, 62)}<i>+</i><span>Your Journey</span></button>` : ''}
-    ${groups.map((g, k) => `<button class="stb ${g.list.every(x => seenStory(x.id)) ? 'seen' : ''}" data-g="${k}">${avatar(g.u, 62)}<span>${ME && g.u.id === ME.id ? 'Your Journey' : esc((g.u.name || '').split(' ')[0])}</span></button>`).join('')}</div>`;
-  host.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.new !== undefined) return newStory(); openStories(groups, +b.dataset.g, () => storyRail(host)); };
+  host.innerHTML = `<div class="strail">${ME && !mineG ? `<button class="stb add" data-new>${avatar(MYP, 62)}<i>+</i><span>Journey</span></button>` : ''}
+    ${groups.map((g, k) => `<button class="stb ${g.list.every(x => seenStory(x.id)) ? 'seen' : ''}" data-g="${k}">${avatar(g.u, 62)}${ME && g.u.id === ME.id ? '<i data-new aria-label="Add to your Journey">+</i>' : ''}<span>${ME && g.u.id === ME.id ? 'Journey' : esc((g.u.name || '').split(' ')[0])}</span></button>`).join('')}</div>`;
+  host.onclick = e => { if (e.target.closest('[data-new]')) return newStory(); const b = e.target.closest('button'); if (!b) return; openStories(groups, +b.dataset.g, () => storyRail(host)); };
 }
 // iPhone needs the file input to live in the page; a detached one can get lost mid-pick and leave the picker stuck.
 function newStory() {
