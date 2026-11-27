@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127u';
-import * as R from './rec.js?v=20261127u';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127u';
+import * as E from './engine.js?v=20261127v';
+import * as R from './rec.js?v=20261127v';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127v';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127u';
+const APP_V = '20261127v';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -268,11 +268,11 @@ async function renderItems(box, items, opt = {}) {
   const folBtn = u => ME && u && u.id !== ME.id && !opt.noFollow ? `<button class="btn s ${fol.includes(u.id) ? 'g' : ''} fb" data-follow="${u.id}">${fol.includes(u.id) ? 'Following' : 'Follow'}</button>` : '';
   const who = h => h.player ? (h.player.user ? `<a href="#/u/${esc(h.player.user.handle)}">@${esc(h.player.user.handle)}</a>` : esc(h.player.label)) : '';
   const whoName = h => h.player ? (h.player.user ? '@' + h.player.user.handle : h.player.label) : '';
-  const hCard = h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" playsinline muted loop preload="none"></video>
+  const hCard = h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" style="background-image:url('${esc(storage.url(h.poster))}')" playsinline muted loop preload="metadata"></video>
     <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-cm="h:${h.id}" aria-label="Comments"><span>💬</span><b>${cch[h.id] || 0}</b></button><button class="fire" data-share="${h.id}" aria-label="Share"><span>↗</span><b>Share</b></button><button class="fire" data-more="h:${h.id}" aria-label="More"><span>⋯</span><b></b></button></div>
     <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · 📍 ' + courtLink(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`;
   const media = x => x.kind === 'photo' ? `<img class="pm" src="${esc(storage.url(x.media))}" alt="" loading="lazy">`
-    : x.kind === 'video' ? `<video class="pm" data-pv="1" src="${esc(storage.url(x.media))}" poster="${esc(storage.url(x.poster))}" playsinline muted loop preload="none"></video>`
+    : x.kind === 'video' ? `<video class="pm" data-pv="1" src="${esc(storage.url(x.media))}" poster="${esc(storage.url(x.poster))}" style="background-image:url('${esc(storage.url(x.poster))}')" playsinline muted loop preload="metadata"></video>`
     : x.kind === 'youtube' ? `<button class="yt" data-yt="${esc(x.youtube_id)}" aria-label="Play YouTube video"><img src="https://i.ytimg.com/vi/${esc(x.youtube_id)}/hqdefault.jpg" alt="" loading="lazy"><span>▶</span></button>` : '';
   const pCard = x => `<article class="card pst" data-pid="${x.id}"><div class="ph"><a href="#/u/${esc(x.user ? x.user.handle : '')}" class="pu">${avatar(x.user, 40)}<span><b>${esc(x.user ? x.user.name : '')}</b> ${lvBadge(x.user)}<br><span class="mu">@${esc(x.user ? x.user.handle : '')} · ${ago(x.created_at)}${x.sport ? ' · ' + esc(x.sport) : ''}</span></span></a>${folBtn(x.user)}</div>
     ${x.body ? `<p class="pb">${nl(x.body)}</p>` : ''}${media(x)}
