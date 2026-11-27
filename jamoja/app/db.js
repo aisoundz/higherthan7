@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127za';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127zb';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -133,7 +133,7 @@ export const games = {
 
 export const players = {
   async list(gameId) {
-    if (sb) return chk(await sb.from('players').select('*, user:profiles(name,handle)').eq('game_id', gameId).order('created_at'));
+    if (sb) return chk(await sb.from('players').select('*, user:profiles!players_user_id_fkey(name,handle)').eq('game_id', gameId).order('created_at'));
     return Object.values(M.players).filter(p => p.game_id === gameId).map(p => ({ ...p, user: p.user_id ? M.profiles[p.user_id] : null }));
   },
   async add(gameId, label) {
@@ -179,7 +179,7 @@ export const highlights = {
     if (sb) {
       let pids = null;
       if (ids) pids = chk(await sb.from('players').select('id').in('user_id', ids)).map(r => r.id);
-      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
+      let q = sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles!players_user_id_fkey(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
       if (sport) q = q.eq('game.sport', sport);
       if (ids) q = q.or(`created_by.in.(${ids.join(',')})` + (pids.length ? `,player_id.in.(${pids.join(',')})` : ''));
       return chk(await q).filter(h => h.play_type !== 'Warmup').map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
@@ -190,7 +190,7 @@ export const highlights = {
     }).filter(h => !h.hidden && (!sport || h.game.sport === sport) && (!ids || ids.includes(h.created_by) || (h.player_id && M.players[h.player_id] && ids.includes(M.players[h.player_id].user_id)))).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
   },
   async atCourt(place, limit = 40) {
-    if (sb) return chk(await sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).ilike('game.place', place).order('created_at', { ascending: false }).limit(limit)).filter(h => h.play_type !== 'Warmup').map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
+    if (sb) return chk(await sb.from('highlights').select('id,label,play_type,views,path,poster,dur_s,created_at,game_id,player_id, game:games!inner(id,title,sport,place,played_on, owner:profiles!games_owner_id_fkey(id,name,handle,avatar,level)), player:players(label, user:profiles!players_user_id_fkey(id,name,handle,avatar,level)), fires(count)').eq('hidden', false).ilike('game.place', place).order('created_at', { ascending: false }).limit(limit)).filter(h => h.play_type !== 'Warmup').map(h => ({ ...h, fire: (h.fires && h.fires[0] && h.fires[0].count) || 0 }));
     return (await this.feed(null, 200)).filter(h => (h.game.place || '').toLowerCase() === place.toLowerCase()).slice(0, limit);
   },
   async add(h) { if (sb) return chk(await sb.from('highlights').insert(h).select().single()); const r = { id: uid(), created_at: now(), player_id: null, ...h }; M.highlights[r.id] = r; await save(); return r; },
@@ -222,7 +222,7 @@ export const posts = {
   async feed(sport, limit = 30, ids = null) {
     if (ids && !ids.length) return [];
     if (sb) {
-      let q = sb.from('posts').select(`*, user:profiles(${PROF}), post_fires(count)`).eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
+      let q = sb.from('posts').select(`*, user:profiles!posts_user_id_fkey(${PROF}), post_fires(count)`).eq('hidden', false).order('created_at', { ascending: false }).limit(limit);
       if (sport) q = q.eq('sport', sport);
       if (ids) q = q.in('user_id', ids);
       return chk(await q).map(x => ({ ...x, fire: (x.post_fires && x.post_fires[0] && x.post_fires[0].count) || 0 }));
@@ -230,7 +230,7 @@ export const posts = {
     return Object.values(M.posts || {}).filter(x => !x.hidden && (!sport || x.sport === sport) && (!ids || ids.includes(x.user_id)))
       .map(x => ({ ...x, user: M.profiles[x.user_id], fire: Object.values(M.pfires || {}).filter(f => f.post_id === x.id).length })).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, limit);
   },
-  async get(id) { if (sb) { const r = chk(await sb.from('posts').select(`*, user:profiles(${PROF}), post_fires(count)`).eq('id', id).maybeSingle()); return r && { ...r, fire: (r.post_fires && r.post_fires[0] && r.post_fires[0].count) || 0 }; } const x = (M.posts || {})[id]; return x ? { ...x, user: M.profiles[x.user_id], fire: 0 } : null; },
+  async get(id) { if (sb) { const r = chk(await sb.from('posts').select(`*, user:profiles!posts_user_id_fkey(${PROF}), post_fires(count)`).eq('id', id).maybeSingle()); return r && { ...r, fire: (r.post_fires && r.post_fires[0] && r.post_fires[0].count) || 0 }; } const x = (M.posts || {})[id]; return x ? { ...x, user: M.profiles[x.user_id], fire: 0 } : null; },
   async byUser(userId) { return posts.feed('', 50, [userId]); },
   async remove(id) { if (sb) { chk(await sb.from('posts').delete().eq('id', id)); return; } delete M.posts[id]; await save(); },
   async setCover(id, poster) { if (sb) { chk(await sb.from('posts').update({ poster }).eq('id', id)); return; } M.posts[id].poster = poster; await save(); },
@@ -288,7 +288,7 @@ export const comments = {
   },
   async list(kind, id) {
     const col = kind === 'post' ? 'post_id' : 'highlight_id';
-    if (sb) return chk(await sb.from('comments').select(`id,body,created_at,user_id, user:profiles(${PROF})`).eq(col, id).order('created_at').limit(100));
+    if (sb) return chk(await sb.from('comments').select(`id,body,created_at,user_id, user:profiles!comments_user_id_fkey(${PROF})`).eq(col, id).order('created_at').limit(100));
     return Object.values(M.comments || {}).filter(c => c[col] === id).sort((a, b) => a.created_at < b.created_at ? -1 : 1).map(c => ({ ...c, user: M.profiles[c.user_id] }));
   },
   async add(kind, id, body) {
@@ -326,7 +326,7 @@ export const ratings = {
     else { const by = {}; for (const r of Object.values(M.ratings || {})) (by[r.highlight_id] = by[r.highlight_id] || []).push(r.score); rows = Object.entries(by).map(([k, v]) => ({ highlight_id: k, avg_score: v.reduce((a, b) => a + b, 0) / v.length, n: v.length, rank_score: v.reduce((a, b) => a + b, 0) / v.length + 1.5 * Math.log(1 + v.length) })).sort((a, b) => b.rank_score - a.rank_score).slice(0, limit); }
     if (!rows.length) return [];
     const ids = rows.map(r => r.highlight_id);
-    const hs = sb ? chk(await sb.from('highlights').select('id,path,poster,play_type,label,game_id, game:games(id,title,place), player:players(label, user:profiles(name,handle,avatar))').in('id', ids))
+    const hs = sb ? chk(await sb.from('highlights').select('id,path,poster,play_type,label,game_id, game:games(id,title,place), player:players(label, user:profiles!players_user_id_fkey(name,handle,avatar))').in('id', ids))
       : ids.map(id => M.highlights[id]).filter(Boolean).map(h => ({ ...h, game: M.games[h.game_id], player: M.players[h.player_id] ? { ...M.players[h.player_id], user: M.profiles[M.players[h.player_id].user_id] } : null }));
     return rows.map(r => ({ ...r, h: hs.find(h => h.id === r.highlight_id) })).filter(r => r.h);
   },
@@ -399,13 +399,13 @@ export const live = {
   },
   async now() {
     const since = new Date(Date.now() - 30000).toISOString();
-    const rows = sb ? chk(await sb.from('live_segments').select(`game_id,session,user_id,ended,created_at, user:profiles(${PROF}), game:games(id,title,place)`).gte('created_at', since).order('created_at', { ascending: false }).limit(50))
+    const rows = sb ? chk(await sb.from('live_segments').select(`game_id,session,user_id,ended,created_at, user:profiles!live_segments_user_id_fkey(${PROF}), game:games(id,title,place)`).gte('created_at', since).order('created_at', { ascending: false }).limit(50))
       : (M.live || []).filter(r => r.created_at >= since).map(r => ({ ...r, user: M.profiles[r.user_id], game: M.games[r.game_id] }));
     const by = {}; for (const r of rows) { if (r.ended) { by[r.session] = null; continue; } if (!(r.session in by)) by[r.session] = r; }
     return Object.values(by).filter(Boolean);
   },
   async sessions(gameId) {
-    const rows = sb ? chk(await sb.from('live_segments').select(`session,user_id,seq,ended,created_at, user:profiles(${PROF})`).eq('game_id', gameId).order('created_at', { ascending: false }).limit(500))
+    const rows = sb ? chk(await sb.from('live_segments').select(`session,user_id,seq,ended,created_at, user:profiles!live_segments_user_id_fkey(${PROF})`).eq('game_id', gameId).order('created_at', { ascending: false }).limit(500))
       : (M.live || []).filter(r => r.game_id === gameId).map(r => ({ ...r, user: M.profiles[r.user_id] })).reverse();
     const by = {};
     for (const r of rows) { const x = by[r.session] || (by[r.session] = { session: r.session, user: r.user, last: r.created_at, first: r.created_at, count: 0, ended: false }); x.count++; if (r.ended) x.ended = true; if (r.created_at > x.last) x.last = r.created_at; if (r.created_at < x.first) x.first = r.created_at; }
