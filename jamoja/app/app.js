@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127l';
-import * as R from './rec.js?v=20261127l';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, storage, mode, ready } from './db.js?v=20261127l';
+import * as E from './engine.js?v=20261127m';
+import * as R from './rec.js?v=20261127m';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, storage, mode, ready } from './db.js?v=20261127m';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127l';
+const APP_V = '20261127m';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -744,6 +744,27 @@ async function nextBox(g, own) {
     ${ME ? (mine ? '' : `<button class="btn w" id="gotnext" style="margin-top:8px">✋ I got next</button>`) : `<a class="btn w" href="#/login?mode=up&next=${encodeURIComponent('#/g/' + g.id)}" style="margin-top:8px">✋ I got next (sign up free)</a>`}
     <p class="mu" style="margin:6px 0 0;font-size:13px">First 5 in line run the next game. No arguing.</p></div>`;
 }
+// Box score: built from tagged plays. Every tag (play type + who) fills it in.
+const SHOT2 = new Set(['Bucket', 'Jumper', 'Layup', 'Drive', 'Dunk', 'Putback', 'And-one', 'Ankle breaker', 'Game winner']);
+function boxScore(ps, hs) {
+  if (!hs.length) return '';
+  const rows = new Map();
+  const row = pid => { if (!rows.has(pid)) { const p = ps.find(x => x.id === pid); rows.set(pid, { p, fgm: 0, tpm: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0 }); } return rows.get(pid); };
+  ps.filter(p => p.user_id).forEach(p => row(p.id)); // claimed players show up even with zeros
+  for (const h of hs) {
+    const r = row(h.player_id || 'none'), t = h.play_type || 'Bucket';
+    if (t === 'Three') { r.fgm++; r.tpm++; r.pts += 3; } else if (SHOT2.has(t)) { r.fgm++; r.pts += t === 'And-one' ? 3 : 2; }
+    else if (t === 'Rebound') r.reb++; else if (t === 'Dime') r.ast++; else if (t === 'Steal') r.stl++; else if (t === 'Block') r.blk++;
+  }
+  const list = [...rows.values()].sort((a, b) => b.pts - a.pts || b.reb + b.ast - a.reb - a.ast);
+  const top = list[0] && list[0].pts ? list[0] : null;
+  const mix = {}; hs.forEach(h => { const t = h.play_type || 'Bucket'; mix[t] = (mix[t] || 0) + 1; });
+  const name = r => r.p ? (r.p.user ? `<a href="#/u/${esc(r.p.user.handle)}">${esc(r.p.user.name)}</a>` : `${esc(r.p.label)} <span class="bx-c">is this you?</span>`) : '<span class="mu">Not tagged yet</span>';
+  return `<div class="card bx"><div class="row" style="justify-content:space-between"><span class="mu" style="letter-spacing:.12em;font-size:12px">BOX SCORE</span><span class="mu" style="font-size:12px">${Object.entries(mix).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${n} ${esc(t.toLowerCase())}${n > 1 && !/s$/.test(t) ? 's' : ''}`).join(' · ')}</span></div>
+    <table><thead><tr><th>Player</th><th>PTS</th><th>FG</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th></tr></thead><tbody>
+    ${list.map(r => `<tr class="${r === top ? 'lead' : ''}"><td>${r === top ? '🔥 ' : ''}${name(r)}</td><td><b>${r.pts}</b></td><td>${r.fgm}</td><td>${r.reb}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td></tr>`).join('')}
+    </tbody></table><p class="mu" style="font-size:12px;margin:8px 0 0">Made from tagged plays. Tag a rebound, dime, steal or block in Review plays and it shows up here. Points count 2 per bucket, 3 per three.</p></div>`;
+}
 // Run Report: the game in one card, built from what was filmed.
 function runReport(g, ps, hs) {
   if (!hs.length) return '';
@@ -1449,7 +1470,7 @@ async function gamePage(id) {
     : `<div class="card"><b>Share this game</b><div class="lnk"><input readonly value="${esc(link)}" aria-label="Game link" id="lk"><button class="btn s" id="cp">Copy</button></div>
       ${navigator.share ? `<button class="btn g w" id="sh" style="margin-top:8px">Send to the group chat</button>` : ''}</div>`;
   const [rbox, lbox] = await Promise.all([runBox(g, own), liveBox(g)]); const nbox = ''; // "Next up" line removed (not needed at pickup)
-  V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place && !g.starts_at ? ' · ' + esc(g.place) : ''}${g.played_on && !g.starts_at ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>${rbox}${runReport(g, ps, hs)}${nbox}${lbox}
+  V.innerHTML = `<h1>${esc(g.title)}</h1><p class="mu">${esc(g.sport)}${g.place && !g.starts_at ? ' · ' + esc(g.place) : ''}${g.played_on && !g.starts_at ? ' · ' + esc(g.played_on) : ''}${g.owner ? ` · by <a href="#/u/${esc(g.owner.handle)}">${esc(g.owner.name)}</a>` : ''}</p>${rbox}${runReport(g, ps, hs)}${boxScore(ps, hs)}${nbox}${lbox}
     ${own && qs().get('fresh') ? `<div class="card" style="border-color:var(--o)"><b>${LOCAL ? 'Next: tag your crew, then send the clips.' : 'Next: tag your crew, then send the link.'}</b><p class="mu" style="margin:4px 0 0">Add each player below, then pick who is in each highlight and what the play was. Tagged plays get shared way more.</p></div>` : ''}
     ${shareCard}
     <h2>Players</h2>
