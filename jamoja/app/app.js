@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127k';
-import * as R from './rec.js?v=20261127k';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, storage, mode, ready } from './db.js?v=20261127k';
+import * as E from './engine.js?v=20261127l';
+import * as R from './rec.js?v=20261127l';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, storage, mode, ready } from './db.js?v=20261127l';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127k';
+const APP_V = '20261127l';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -92,6 +92,12 @@ async function shareClip(h, who, link) {
 
 const V = document.getElementById('view'), TR = document.getElementById('tr');
 const LOCAL = mode === 'local';
+const track = (n, p) => events.log(n, p);
+window.jmTrack = track; // rec.js uses this
+// Count shares wherever they happen.
+if (navigator.share) { const _share = navigator.share.bind(navigator); navigator.share = d => { const r = (location.hash.split('?')[0].split('/')[1]) || 'home'; track(d && d.files ? 'share_clip' : r === 'p' ? 'share_post' : r === 'u' ? 'share_profile' : r === 'g' ? 'share_run' : 'share_link', { route: r }); return _share(d); }; }
+// One "app_open" per phone per day (plus whether it runs from the Home Screen).
+function trackOpen() { try { const k = 'jm.open', d = new Date().toDateString(); if (localStorage.getItem(k) === d + (ME ? ME.id : '')) return; localStorage.setItem(k, d + (ME ? ME.id : '')); } catch (e) { /* private mode */ } track('app_open', { standalone: !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches) || !!navigator.standalone }); }
 let ME = null, MYP = null;
 const POS = { Basketball: 'Point guard', Soccer: 'Striker', 'Flag football': 'Wide receiver', Volleyball: 'Outside hitter', Football: 'Linebacker', Baseball: 'Shortstop', Softball: 'Pitcher', Track: '100m and 200m', Tennis: 'Singles', Training: 'Strength and conditioning', Weightlifting: 'Powerlifting, 93kg', CrossFit: 'Rx', Running: '5K, 10K, marathon', Boxing: 'Welterweight', Other: '' };
 const SPORTS = ['Basketball', 'Football', 'Soccer', 'Training', 'Weightlifting', 'CrossFit', 'Running', 'Baseball', 'Softball', 'Volleyball', 'Flag football', 'Track', 'Tennis', 'Boxing', 'Other'];
@@ -149,7 +155,8 @@ async function route() {
     if (RECOVERY) { RECOVERY = false; history.replaceState(null, '', location.pathname + location.search + '#/reset'); return route(); }
     if (/access_token=/.test(location.hash)) { history.replaceState(null, '', location.pathname + location.search + '#/'); return route(); }
     if (ME && !MYP && parts[0] !== 'setup' && parts[0] !== 'login' && parts[0] !== 'reset') return go('#/setup?next=' + encodeURIComponent(location.hash || '#/'));
-    topbar();
+    topbar(); trackOpen();
+    if (parts[0] === 'stats') return await statsPage();
     if (!parts.length) return await home();
     if (parts[0] === 'login') { TR.innerHTML = ''; return LOCAL ? go('#/') : await login(); }
     if (parts[0] === 'setup') return setup();
@@ -600,6 +607,7 @@ async function liveBox(g) {
 }
 // Broadcaster: records 6-second chunks and uploads each one as it finishes.
 async function goLive(g) {
+  track('live_start');
   if (!R.supported()) return toast('Live is not supported in this browser. Open Jamoja in Safari or Chrome.');
   if (ME && g.owner_id === ME.id && g.lat == null) stampSpot(g);
   const session = 'live-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -784,7 +792,7 @@ async function scanRim(url, rim, dur, onProgress, host) {
 }
 // The run's highlight tape: every play back to back, credited to whoever made it.
 function playTape(g, list, ps) {
-  if (!list.length) return;
+  if (!list.length) return; track('tape_watch', { n: list.length });
   let i = 0;
   const el = document.createElement('div'); el.className = 'rv tape'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
   el.innerHTML = `<div class="rv-top"><b>${esc(g.title)}</b><button class="rv-x" data-x aria-label="Close">✕</button></div>
@@ -809,10 +817,30 @@ function playTape(g, list, ps) {
   });
   show();
 }
+// ---------- Stats (admin only): the numbers that tell us if Jamoja is working.
+async function statsPage() {
+  if (!ME || !(await events.isAdmin(ME.id).catch(() => false))) { V.innerHTML = `<h1>Not found</h1><a class="btn" href="#/">Go home</a>`; return; }
+  const days = +(qs().get('d') || 7);
+  V.innerHTML = `<h1>Stats</h1><p class="mu">Loading…</p>`;
+  let s; try { s = await events.stats(days); } catch (e) { V.innerHTML = `<h1>Stats</h1><p class="err">${esc(e.message)}</p>`; return; }
+  const n = s.now || {}, pv = s.prev || {}, t = s.totals || {};
+  const tile = (label, k, hint) => { const a = n[k] || 0, b = pv[k] || 0, d = a - b; return `<div class="st"><b>${a}</b><span>${label}</span><i class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '▲ ' + d : d < 0 ? '▼ ' + (-d) : 'same'}</i>${hint ? `<small>${hint}</small>` : ''}</div>`; };
+  const daily = s.daily || []; const mx = Math.max(1, ...daily.map(x => x.n));
+  V.innerHTML = `<div class="row" style="justify-content:space-between;align-items:baseline"><h1>Stats</h1><span class="row" style="gap:6px">${[7, 30].map(d => `<a class="chip ${d === days ? 'on' : ''}" href="#/stats?d=${d}">${d} days</a>`).join('')}</span></div>
+    <p class="mu" style="margin-top:-6px">Last ${days} days vs the ${days} before.</p>
+    <h2>Is it growing?</h2><div class="stg">${tile('active people', 'active')}${tile('signups', 'signups')}${tile('active members', 'active_users')}<div class="st"><b>${s.retention == null ? '·' : s.retention + '%'}</b><span>came back</span><small>of last period's members</small></div></div>
+    <div class="card spark">${daily.length ? daily.map(x => `<div title="${esc(x.d)}: ${x.n}"><i style="height:${Math.round(x.n / mx * 100)}%"></i><span>${esc(x.d.split(' ')[1])}</span></div>`).join('') : '<p class="mu">Daily active people show here once the app logs opens.</p>'}</div>
+    <h2>Is the core working?</h2><div class="stg">${tile('runs posted', 'runs_posted')}${tile('games filmed', 'games_filmed')}${tile('highlights made', 'highlights')}${tile('plays claimed', 'claims')}${tile('live streams', 'lives')}${tile('rim scans', 'rim_scans')}${tile('Auto Bucket', 'auto_bucket')}${tile('reviews', 'reviews')}</div>
+    <h2>Is it spreading?</h2><div class="stg">${tile('shares', 'shares')}${tile('reels saved', 'reels')}${tile('follows', 'follows')}${tile('DMs', 'dms')}</div>
+    <h2>Are people engaging?</h2><div class="stg">${tile('posts', 'posts')}${tile('fires', 'fires')}${tile('comments', 'comments')}</div>
+    <h2>All time</h2><div class="stg"><div class="st"><b>${t.users || 0}</b><span>members</span></div><div class="st"><b>${t.highlights || 0}</b><span>highlights</span></div><div class="st"><b>${t.claimed_share == null ? '·' : t.claimed_share + '%'}</b><span>plays claimed</span><small>the growth loop</small></div><div class="st"><b>${t.push_on || 0}</b><span>notifications on</span></div><div class="st"><b>${t.installed || 0}</b><span>on Home Screen</span></div></div>
+    ${(s.top_courts || []).length ? `<h2>Top courts</h2><div class="list">${s.top_courts.map(c => `<a href="${courtUrl(c.place)}"><span>📍 ${esc(c.place)}</span><span class="mu">${c.runs} run${c.runs === 1 ? '' : 's'}</span></a>`).join('')}</div>` : ''}
+    <p class="mu" style="font-size:13px;margin-top:18px">Shares, opens, reels, scans and reviews are counted from today on. Everything else counts from the start.</p>`;
+}
 // ---------- Review plays: one clip at a time, big buttons. A right guess costs one tap (Next).
 const QUICK = { Basketball: ['Bucket', 'Three', 'Layup', 'Rebound', 'Block', 'Steal', 'Dime', 'Miss'] };
 function reviewPlays(g, list, ps, own, gameId) {
-  if (!list.length) return;
+  if (!list.length) return; track('review_open', { n: list.length, own: !!own });
   const types = QUICK[g.sport] || playsFor(g.sport).slice(0, 8);
   const more = [...new Set([...playsFor(g.sport), 'Miss'])].filter(t => !types.includes(t));
   const myPid = () => { const p = ps.find(x => ME && x.user_id === ME.id); return p && p.id; };
@@ -843,8 +871,8 @@ function reviewPlays(g, list, ps, own, gameId) {
     if (b.dataset.fs !== undefined) { const v = el.querySelector('.rv-v'); v.muted = false; try { if (v.webkitEnterFullscreen) v.webkitEnterFullscreen(); else if (v.requestFullscreen) await v.requestFullscreen(); } catch (err) { /* not allowed */ } v.play().catch(() => {}); return; }
     if (b.dataset.next !== undefined) { if (i === list.length - 1) { toast('All set.'); return close(); } return go2(1); }
     if (b.dataset.prev !== undefined) return go2(-1);
-    if (b.dataset.t) { await save1({ play_type: b.dataset.t }); draw(); setTimeout(() => { if (i < list.length - 1) go2(1); }, 250); return; }
-    if (b.dataset.me !== undefined) { try { const pid = await highlights.claimMine(h.id); h.player_id = pid; if (!ps.find(p => p.id === pid)) ps.push({ id: pid, user_id: ME.id, label: (MYP && MYP.name) || 'Me' }); changed = true; draw(); } catch (err) { toast(err.message); } return; }
+    if (b.dataset.t) { track('play_type', { t: b.dataset.t, changed: (list[i].play_type || '') !== b.dataset.t }); await save1({ play_type: b.dataset.t }); draw(); setTimeout(() => { if (i < list.length - 1) go2(1); }, 250); return; }
+    if (b.dataset.me !== undefined) { try { const pid = await highlights.claimMine(h.id); track('play_claim'); h.player_id = pid; if (!ps.find(p => p.id === pid)) ps.push({ id: pid, user_id: ME.id, label: (MYP && MYP.name) || 'Me' }); changed = true; draw(); } catch (err) { toast(err.message); } return; }
     if (b.dataset.notme !== undefined) { try { await highlights.unclaimMine(h.id); h.player_id = null; changed = true; draw(); } catch (err) { toast(err.message); } return; }
     if (b.dataset.del !== undefined) { if (!confirmIn(b)) return; try { await highlights.remove(h.id); list.splice(i, 1); changed = true; if (!list.length) return close(); i = Math.min(i, list.length - 1); draw(); } catch (err) { toast(err.message); } }
   });
@@ -1297,7 +1325,7 @@ async function newGame() {
       const box = card.querySelector('.rimscan'); box.hidden = false;
       try {
         const hits = await scanRim(s.url, rim, s.dur, (p, n) => { box.querySelector('.rsb').style.width = (p * 100) + '%'; box.querySelector('.rst').textContent = `Watching the net… ${Math.round(p * 100)}% · ${n} bucket${n === 1 ? '' : 's'} so far. Keep this screen open.`; }, box.querySelector('.rimhost'));
-        s.rimDone = true;
+        s.rimDone = true; track('rim_scan', { found: hits.length, dur: Math.round(s.dur || 0) });
         if (!hits.length) { box.querySelector('.rst').textContent = 'No makes found at that rim. Try tapping the rim again on a clearer frame, or add plays by hand.'; s.rimDone = false; return; }
         for (const m of s.moments) m.on = false;
         s.moments = [...hits.map(t => ({ start: Math.max(0, t - 6), end: Math.min(s.dur || t + 1.5, t + 1.5), on: true, src: 'rim' })), ...s.moments.filter(m => hits.every(t => Math.abs(m.start - (t - 6)) > 5))].sort((a, b2) => a.start - b2.start);
@@ -1554,6 +1582,7 @@ async function profilePage(handle) {
     else grid.innerHTML = made.length ? (emptyIds.length ? `<button class="btn w g" id="cleanup" style="margin:10px 0">🧹 Delete ${emptyIds.length} empty run${emptyIds.length > 1 ? 's' : ''} (no clips, nobody joined)</button>` : '') + gameList(made) : `<p class="mu">${me ? 'Games you film show up here.' : 'No games filmed yet.'}</p>${me ? `<a class="btn s g" href="#/new">Film a game</a>` : ''}`;
   };
   V.querySelector('.ptabs').onclick = e => { const b2 = e.target.closest('[data-pt2]'); if (b2) show(b2.dataset.pt2); };
+  if (me) events.isAdmin(ME.id).then(ok => { const tb = V.querySelector('.ptabs'); if (ok && tb && tb.isConnected && !V.querySelector('#statsl')) tb.insertAdjacentHTML('beforebegin', `<a id="statsl" class="btn w g" href="#/stats" style="margin:10px 0">📊 Stats (only you see this)</a>`); }).catch(() => {});
   grid.addEventListener('click', async e => {
     const mr = e.target.closest('#myreel');
     if (mr) { playTape({ title: (me ? 'My reel' : p.name + "'s reel") }, [...hs].sort((a, b) => a.created_at < b.created_at ? -1 : 1), tags); return; }
@@ -1567,7 +1596,7 @@ async function profilePage(handle) {
         msg.textContent = 'Putting your reel together… keep this screen open.';
         const out = await E.reel(blobs, pr => { msg.textContent = `Putting your reel together… ${Math.round(pr * 100)}%`; });
         await E.reset().catch(() => {});
-        const file = new File([out], `${p.handle}-jamoja-reel.mp4`, { type: 'video/mp4' });
+        const file = new File([out], `${p.handle}-jamoja-reel.mp4`, { type: 'video/mp4' }); track('reel_saved', { n: list.length });
         if (navigator.canShare && navigator.canShare({ files: [file] })) { msg.textContent = 'Ready. Pick "Save Video" or send it.'; await navigator.share({ files: [file], title: 'My Jamoja reel' }).catch(() => {}); }
         else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); msg.textContent = 'Saved to your downloads.'; }
       } catch (err) { msg.textContent = 'Could not make the reel: ' + (err.message || err); }

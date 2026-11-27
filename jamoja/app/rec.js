@@ -1,7 +1,7 @@
 // Film in Jamoja: full-screen camera with a Bucket button.
 // Records in parts (a new part every few minutes) and saves each part on the phone as soon as it ends,
 // so a long run never becomes one giant file and nothing is lost if the browser closes.
-import { local } from './db.js?v=20261127k';
+import { local } from './db.js?v=20261127l';
 
 const PART_SECONDS = 120;
 const CHECKPOINT_SECONDS = 20;
@@ -140,6 +140,7 @@ export function record(opts = {}) {
       const ring = $('rring'); ring.style.left = (ev.clientX - r.left) + 'px'; ring.style.top = (ev.clientY - r.top) + 'px'; ring.hidden = false;
       $('rauto').hidden = false; if (recording()) $('rwarm').hidden = false; $('rh').innerHTML = 'Auto Bucket is on. Jamoja marks every make at this rim. Tap BUCKET for anything else.';
       try { localStorage.setItem('jm.autobucket', '1'); } catch (e) { /* private mode */ }
+      try { window.jmTrack && window.jmTrack('auto_bucket'); } catch (e) { /* analytics only */ }
     });
     const box = (x0, y0, w, h) => { let a = 0, n = 0; return { x0: Math.max(0, Math.round(x0)), y0: Math.max(0, Math.round(y0)), x1: Math.min(160, Math.round(x0 + w)), y1: Math.min(90, Math.round(y0 + h)) }; };
     const avgDiff = (cur, prev, b) => { let t = 0, n = 0; for (let y = b.y0; y < b.y1; y++) for (let x = b.x0; x < b.x1; x++) { const i = (y * 160 + x); t += Math.abs(cur[i] - prev[i]); n++; } return n ? t / n : 0; };

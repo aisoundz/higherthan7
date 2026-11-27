@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127k';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127l';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -439,4 +439,17 @@ export const nextUp = {
   },
   async join(gameId) { if (sb) { const r = await sb.from('next_up').insert({ game_id: gameId }); if (r.error && !/duplicate/i.test(r.error.message)) throw new Error(r.error.message); return; } M.next = M.next || {}; M.next[gameId + ':' + M.session.id] = { game_id: gameId, user_id: M.session.id, created_at: now() }; await save(); },
   async leave(gameId, userId) { if (sb) { chk(await sb.from('next_up').delete().eq('game_id', gameId).eq('user_id', userId)); return; } delete (M.next || {})[gameId + ':' + userId]; await save(); },
+};
+
+// Analytics: a light event log. Fire and forget, never blocks the app.
+const DEV = (() => { try { let d = localStorage.getItem('jm.dev'); if (!d) { d = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('jm.dev', d); } return d; } catch (e) { return 'nodev'; } })();
+export const events = {
+  log(name, props) {
+    try {
+      if (!sb) { (M.events = M.events || []).push({ name, props, created_at: now() }); return; }
+      sb.from('events').insert({ name, props: props || null, device: DEV }) /* user_id fills in from the login */.then(() => {}, () => {});
+    } catch (e) { /* never break the app for analytics */ }
+  },
+  async isAdmin(uidv) { if (!sb || !uidv) return false; const r = await sb.from('admins').select('user_id').eq('user_id', uidv).maybeSingle(); return !!(r.data); },
+  async stats(days) { if (!sb) return null; const r = await sb.rpc('admin_stats', { p_days: days }); if (r.error) throw new Error(r.error.message); return r.data; },
 };
