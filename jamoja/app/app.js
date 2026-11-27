@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127q';
-import * as R from './rec.js?v=20261127q';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127q';
+import * as E from './engine.js?v=20261127r';
+import * as R from './rec.js?v=20261127r';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127r';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127q';
+const APP_V = '20261127r';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -887,8 +887,11 @@ async function storyRail(host) {
     ${groups.map((g, k) => `<button class="stb ${g.list.every(x => seenStory(x.id)) ? 'seen' : ''}" data-g="${k}">${avatar(g.u, 62)}<span>${ME && g.u.id === ME.id ? 'Your story' : esc((g.u.name || '').split(' ')[0])}</span></button>`).join('')}</div>`;
   host.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.new !== undefined) return newStory(); openStories(groups, +b.dataset.g, () => storyRail(host)); };
 }
+// iPhone needs the file input to live in the page; a detached one can get lost mid-pick and leave the picker stuck.
 function newStory() {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,video/*';
+  let inp = document.getElementById('storypick');
+  if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'storypick'; inp.accept = 'image/*,video/*'; inp.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0'; document.body.append(inp); }
+  inp.value = '';
   inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) storyEditor(f); };
   inp.click();
 }
