@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127o';
-import * as R from './rec.js?v=20261127o';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, storage, mode, ready } from './db.js?v=20261127o';
+import * as E from './engine.js?v=20261127p';
+import * as R from './rec.js?v=20261127p';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, storage, mode, ready } from './db.js?v=20261127p';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127o';
+const APP_V = '20261127p';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -194,12 +194,13 @@ async function home() {
       <div class="row"><a class="btn" href="#/login?mode=up">Create free account</a><a class="btn g" href="#/login">Sign in</a></div></section>`
     : `${parts.length ? `<div class="card" id="savedrec" style="border-color:var(--o)"><b>Your recording is saved</b><br><span class="mu">${mmss(parts.reduce((x, p) => x + (p.dur || 0), 0))} of video on this phone${parts.reduce((x, p) => x + (p.marks || []).length, 0) ? `, ${parts.reduce((x, p) => x + (p.marks || []).length, 0)} plays marked` : ''}. Turn it into highlights, or delete it.</span><div class="row" style="margin-top:10px"><a class="btn s" href="#/new?auto=1">Make highlights</a><button class="btn s g" id="delrec">Delete</button></div></div>` : ''}
       <a class="card compose" href="#/post">${avatar(MYP, 40)}<span class="mu">What's up, ${esc((MYP.name || '').split(' ')[0])}? Post a play, a workout, a run…</span><span class="ic">📷</span></a>`;
-  V.innerHTML = `${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
+  V.innerHTML = `<div id="strail"></div>${top}<div id="rail"></div>${ME ? `<div class="tabs" role="tablist"><button role="tab" data-tab="all" class="${FEED_TAB === 'all' ? 'on' : ''}">For You</button><button role="tab" data-tab="following" class="${FEED_TAB === 'following' ? 'on' : ''}">Following</button></div>` : ''}
     <div class="row sports" id="sp">${['All', ...SPORTS].map(x => `<button class="chip ${(x === 'All' ? '' : x) === FEED_SPORT ? 'on' : ''}" data-sp="${x === 'All' ? '' : esc(x)}">${esc(x)}</button>`).join('')}</div>
     <div id="feed"><p class="mu">Loading…</p></div>
     ${ME && !LOCAL ? '<div id="mine"></div>' : ''}<p class="foot">Jamoja beta${LOCAL ? ' · saved on this phone' : mode === 'mock' ? ' · test mode' : ''}. 18 and older during testing.</p>`;
   const dr = V.querySelector('#delrec'); if (dr) dr.onclick = async () => { if (!confirmIn(dr)) return; await R.clearParts(parts.map(p => p.id)); V.querySelector('#savedrec').remove(); toast('Recording deleted.'); };
   V.querySelector('#sp').onclick = e => { const b = e.target.closest('[data-sp]'); if (!b) return; FEED_SPORT = b.dataset.sp; home(); };
+  storyRail(V.querySelector('#strail'));
   const railEl = V.querySelector('#rail');
   const fillRail = () => runsRail().then(h => { if (railEl.isConnected) railEl.innerHTML = h; }).catch(() => {});
   fillRail(); clearInterval(window.RAIL_T); window.RAIL_T = setInterval(() => { if (railEl.isConnected) fillRail(); else clearInterval(window.RAIL_T); }, 20000);
@@ -859,6 +860,113 @@ function playTape(g, list, ps) {
     if (b.dataset.next !== undefined) { if (i < list.length - 1) { i++; show(); } else close(); return; }
     if (b.dataset.prev !== undefined) { i = Math.max(0, i - 1); show(); return; }
     if (b.dataset.fs !== undefined) { try { if (v.webkitEnterFullscreen) v.webkitEnterFullscreen(); else if (v.requestFullscreen) await v.requestFullscreen(); } catch (err) { /* not allowed */ } }
+  });
+  show();
+}
+// ---------- Stories: 24-hour photo/video posts with stickers, like IG but built for hoopers.
+const STICKERS = [
+  { v: '🏀', a: 'spin' }, { v: '🔥', a: 'pulse' }, { v: '💯', a: 'bounce' }, { v: '😤', a: 'shake' }, { v: '🙏🏾' }, { v: '👑', a: 'bounce' }, { v: '💪🏾', a: 'pulse' }, { v: '🎯' }, { v: '🪣', a: 'bounce' }, { v: '🧊' }, { v: '🥶', a: 'shake' }, { v: '👀' },
+  { v: 'BUCKETS', k: 'tag', a: 'pulse' }, { v: 'LOCKED IN', k: 'tag' }, { v: 'GAME TIME', k: 'tag', a: 'bounce' }, { v: 'RUN IT BACK', k: 'tag' }, { v: 'COOKING', k: 'tag', a: 'shake' }, { v: 'W', k: 'tag big', a: 'pulse' }, { v: 'WHO GOT NEXT?', k: 'tag' }, { v: 'GET UP EARLY', k: 'tag' },
+];
+const seenStory = id => { try { return (localStorage.getItem('jm.ss') || '').includes(id); } catch (e) { return false; } };
+const markStory = id => { try { const v = (localStorage.getItem('jm.ss') || '').split(',').slice(-300); if (!v.includes(id)) v.push(id); localStorage.setItem('jm.ss', v.join(',')); } catch (e) { /* private */ } };
+async function storyRail(host) {
+  if (!host) return;
+  if (ME && !window.LAST_COURT) games.mine(ME.id).then(l => { const g = l.find(x => x.place); if (g) window.LAST_COURT = g.place; }).catch(() => {});
+  const all = await stories.live().catch(() => []);
+  const fol = ME ? await follows.ids(ME.id).catch(() => []) : [];
+  const by = new Map(); for (const st of all) { if (!st.user) continue; if (!by.has(st.user_id)) by.set(st.user_id, { u: st.user, list: [] }); by.get(st.user_id).list.push(st); }
+  const groups = [...by.values()].sort((a, b) => (ME && b.u.id === ME.id) - (ME && a.u.id === ME.id) || fol.includes(b.u.id) - fol.includes(a.u.id) || (a.list.every(x => seenStory(x.id)) - b.list.every(x => seenStory(x.id))));
+  await storage.prep(groups.map(g => g.u.avatar).filter(Boolean));
+  const mineG = ME && groups.find(g => g.u.id === ME.id);
+  if (!host.isConnected || (!groups.length && !ME)) return;
+  host.innerHTML = `<div class="strail">${ME && !mineG ? `<button class="stb add" data-new>${avatar(MYP, 62)}<i>+</i><span>Your story</span></button>` : ''}
+    ${groups.map((g, k) => `<button class="stb ${g.list.every(x => seenStory(x.id)) ? 'seen' : ''}" data-g="${k}">${avatar(g.u, 62)}<span>${ME && g.u.id === ME.id ? 'Your story' : esc((g.u.name || '').split(' ')[0])}</span></button>`).join('')}</div>`;
+  host.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.new !== undefined) return newStory(); openStories(groups, +b.dataset.g, () => storyRail(host)); };
+}
+function newStory() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,video/*';
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) storyEditor(f); };
+  inp.click();
+}
+function storyEditor(file) {
+  const isVid = file.type.startsWith('video');
+  const url = URL.createObjectURL(file); const items = [];
+  const el = document.createElement('div'); el.className = 'sted'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
+  el.innerHTML = `<div class="st-top"><button class="st-x" data-x>✕</button><button class="st-aa" data-text>Aa</button><button class="st-aa" data-stk>🙂 Stickers</button></div>
+    <div class="st-stage">${isVid ? `<video src="${url}" autoplay loop muted playsinline></video>` : `<img src="${url}" alt="">`}<div class="st-ov"></div><div class="st-trash" hidden>🗑</div></div>
+    <div class="st-tray" hidden><div class="st-grid">${STICKERS.map((x, k) => `<button data-s="${k}" class="${x.k ? 'st-tagb' : ''}">${esc(x.v)}${x.a ? '<sup>✨</sup>' : ''}</button>`).join('')}
+      ${(window.LAST_COURT ? `<button data-court class="st-tagb">📍 ${esc(window.LAST_COURT)}</button>` : '')}</div><p class="mu" style="font-size:12px;margin:6px 0 0">✨ = animated. Drag stickers to move them, drag onto 🗑 to remove.</p></div>
+    <form class="st-tin" hidden><input maxlength="60" placeholder="Say something…"><button class="btn">Add</button></form>
+    <div class="st-bot"><span class="mu" id="stmsg"></span><button class="btn" data-post>Share to story</button></div>`;
+  const ov = el.querySelector('.st-ov'), trash = el.querySelector('.st-trash');
+  if (!window.LAST_COURT && ME) games.mine(ME.id).then(l => { const g = l.find(x => x.place); if (g && el.isConnected) { window.LAST_COURT = g.place; el.querySelector('.st-grid').insertAdjacentHTML('beforeend', `<button data-court class="st-tagb">📍 ${esc(g.place)}</button>`); } }).catch(() => {});
+  const paint = () => { ov.innerHTML = items.map((it, k) => stickerHTML(it, k)).join(''); };
+  const add = it => { items.push({ x: 0.5, y: 0.4, ...it }); paint(); el.querySelector('.st-tray').hidden = true; };
+  const close = () => { el.remove(); URL.revokeObjectURL(url); document.documentElement.style.overflow = ''; };
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.x !== undefined) return close();
+    if (b.dataset.stk !== undefined) { const t = el.querySelector('.st-tray'); t.hidden = !t.hidden; return; }
+    if (b.dataset.text !== undefined) { const f = el.querySelector('.st-tin'); f.hidden = false; f.querySelector('input').focus(); return; }
+    if (b.dataset.s !== undefined) { const x = STICKERS[+b.dataset.s]; return add({ t: x.k ? 'tag' : 'emoji', v: x.v, a: x.a || '', big: /big/.test(x.k || '') }); }
+    if (b.dataset.court !== undefined) return add({ t: 'tag', v: '📍 ' + window.LAST_COURT });
+    if (b.dataset.post !== undefined) {
+      b.disabled = true; const msg = el.querySelector('#stmsg');
+      try {
+        let path, kind;
+        if (isVid) {
+          msg.textContent = 'Preparing video…';
+          const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
+          const c = await E.cut(src, 0, end, pr => { msg.textContent = `Preparing video… ${Math.round(pr * 100)}%`; });
+          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; msg.textContent = 'Uploading…'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
+        } else { msg.textContent = 'Uploading…'; const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
+        await stories.add({ kind, path, overlay: { items } }); track('story_post', { kind, stickers: items.length });
+        toast('Shared to your story. It stays up for 24 hours.'); close(); if (location.hash === '' || location.hash === '#/') home(); else go('#/');
+      } catch (err) { msg.textContent = 'Could not share: ' + (err.message || err); b.disabled = false; }
+    }
+  });
+  el.querySelector('.st-tin').onsubmit = e => { e.preventDefault(); const i = e.target.querySelector('input'); const v = i.value.trim(); if (v) add({ t: 'text', v }); i.value = ''; e.target.hidden = true; i.blur(); };
+  // drag stickers
+  let drag = null;
+  ov.addEventListener('pointerdown', e => { const s2 = e.target.closest('[data-k]'); if (!s2) return; drag = +s2.dataset.k; s2.setPointerCapture(e.pointerId); trash.hidden = false; e.preventDefault(); });
+  ov.addEventListener('pointermove', e => { if (drag === null) return; const r = ov.getBoundingClientRect(); items[drag].x = Math.min(0.98, Math.max(0.02, (e.clientX - r.left) / r.width)); items[drag].y = Math.min(0.98, Math.max(0.02, (e.clientY - r.top) / r.height)); const n = ov.querySelector(`[data-k="${drag}"]`); n.style.left = items[drag].x * 100 + '%'; n.style.top = items[drag].y * 100 + '%'; const t = trash.getBoundingClientRect(); trash.classList.toggle('on', e.clientY > t.top - 20 && Math.abs(e.clientX - (t.left + t.width / 2)) < 60); });
+  ov.addEventListener('pointerup', () => { if (drag === null) return; if (trash.classList.contains('on')) items.splice(drag, 1); drag = null; trash.hidden = true; trash.classList.remove('on'); paint(); });
+}
+function stickerHTML(it, k) {
+  const cls = it.t === 'emoji' ? 'sk-e' : it.t === 'tag' ? 'sk-t' + (it.big ? ' big' : '') : 'sk-x';
+  return `<div class="sk ${cls} ${it.a ? 'an-' + it.a : ''}" ${k != null ? `data-k="${k}"` : ''} style="left:${(it.x * 100).toFixed(1)}%;top:${(it.y * 100).toFixed(1)}%"><span>${esc(it.v)}</span></div>`;
+}
+function openStories(groups, gi, onClose) {
+  let g = gi, i = Math.max(0, groups[gi].list.findIndex(x => !seenStory(x.id))), timer = null;
+  const el = document.createElement('div'); el.className = 'stv'; document.body.append(el); document.documentElement.style.overflow = 'hidden';
+  const close = () => { clearTimeout(timer); el.remove(); document.documentElement.style.overflow = ''; onClose && onClose(); };
+  const next = () => { if (i < groups[g].list.length - 1) i++; else if (g < groups.length - 1) { g++; i = 0; } else return close(); show(); };
+  const prev = () => { if (i > 0) i--; else if (g > 0) { g--; i = groups[g].list.length - 1; } show(); };
+  const show = async () => {
+    clearTimeout(timer); const G = groups[g], st = G.list[i], mine = ME && G.u.id === ME.id;
+    markStory(st.id); if (!mine && ME) stories.view(st.id);
+    await storage.prep([st.path]);
+    const mins = Math.round((Date.now() - new Date(st.created_at)) / 60e3); const ago = mins < 1 ? 'now' : mins < 60 ? mins + 'm' : Math.round(mins / 60) + 'h';
+    el.innerHTML = `<div class="stv-bars">${G.list.map((x, k) => `<i class="${k < i ? 'd' : ''}"><b class="${k === i ? 'run' : ''}"></b></i>`).join('')}</div>
+      <div class="stv-h"><a href="#/u/${esc(G.u.handle)}" data-x>${avatar(G.u, 34)}<b>${esc(G.u.name)}</b><span class="mu">${ago}</span></a><button data-x>✕</button></div>
+      <div class="stv-m">${st.kind === 'video' ? `<video src="${esc(storage.url(st.path))}" autoplay playsinline></video>` : `<img src="${esc(storage.url(st.path))}" alt="">`}<div class="st-ov">${((st.overlay && st.overlay.items) || []).map(it => stickerHTML(it)).join('')}</div>
+        <button class="stv-l" aria-label="Previous"></button><button class="stv-r" aria-label="Next"></button></div>
+      ${mine ? `<div class="stv-f"><button class="btn g" data-seen>👁 Seen by…</button><button class="btn g" data-del>Delete</button><button class="btn" data-new>+ Add</button></div>` : ''}`;
+    const v = el.querySelector('video'), bar = el.querySelector('.run');
+    const dur = v ? null : 5000;
+    if (v) { v.onloadedmetadata = () => { bar.style.animationDuration = (v.duration || 6) + 's'; }; v.onended = next; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
+    else { bar.style.animationDuration = dur / 1000 + 's'; timer = setTimeout(next, dur); }
+  };
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('button,a'); if (!b) return;
+    if (b.dataset.x !== undefined) return close();
+    if (b.classList.contains('stv-r')) return next();
+    if (b.classList.contains('stv-l')) return prev();
+    const st = groups[g].list[i];
+    if (b.dataset.new !== undefined) { close(); return newStory(); }
+    if (b.dataset.del !== undefined) { if (!confirmIn(b)) return; await stories.remove(st.id).catch(err => toast(err.message)); groups[g].list.splice(i, 1); if (!groups[g].list.length) return close(); i = Math.min(i, groups[g].list.length - 1); return show(); }
+    if (b.dataset.seen !== undefined) { clearTimeout(timer); const vs = await stories.viewers(st.id).catch(() => []); b.textContent = vs.length ? `👁 ${vs.length}: ${vs.slice(0, 4).map(x => x.name.split(' ')[0]).join(', ')}${vs.length > 4 ? '…' : ''}` : '👁 No views yet'; }
   });
   show();
 }

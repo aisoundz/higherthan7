@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127o';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127p';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -452,4 +452,24 @@ export const events = {
   },
   async isAdmin(uidv) { if (!sb || !uidv) return false; const r = await sb.from('admins').select('user_id').eq('user_id', uidv).maybeSingle(); return !!(r.data); },
   async stats(days) { if (!sb) return null; const r = await sb.rpc('admin_stats', { p_days: days }); if (r.error) throw new Error(r.error.message); return r.data; },
+};
+
+// Stories: 24-hour posts with stickers drawn on top.
+export const stories = {
+  async live() {
+    const nowIso = now();
+    if (sb) return chk(await sb.from('stories').select('id,user_id,kind,path,overlay,created_at, user:profiles(id,name,handle,avatar)').gt('expires_at', nowIso).order('created_at'));
+    return Object.values(M.stories || {}).filter(x => x.expires_at > nowIso).sort((a, b) => a.created_at < b.created_at ? -1 : 1).map(x => ({ ...x, user: M.profiles[x.user_id] }));
+  },
+  async add(st) {
+    if (sb) return chk(await sb.from('stories').insert(st).select().single());
+    M.stories = M.stories || {}; const r = { id: uid(), user_id: M.session.id, created_at: now(), expires_at: new Date(Date.now() + 864e5).toISOString(), ...st }; M.stories[r.id] = r; await save(); return r;
+  },
+  async remove(id) { if (sb) { chk(await sb.from('stories').delete().eq('id', id)); return; } delete (M.stories || {})[id]; await save(); },
+  async view(id) { if (sb) { await sb.from('story_views').insert({ story_id: id }).then(() => {}, () => {}); } },
+  async viewers(id) {
+    if (!sb) return [];
+    const rows = chk(await sb.from('story_views').select('viewer_id').eq('story_id', id)); if (!rows.length) return [];
+    return chk(await sb.from('profiles').select(PROF).in('id', rows.map(r => r.viewer_id)));
+  },
 };
