@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127y';
-import * as R from './rec.js?v=20261127y';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127y';
+import * as E from './engine.js?v=20261127z';
+import * as R from './rec.js?v=20261127z';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127z';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127y';
+const APP_V = '20261127z';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1002,7 +1002,7 @@ function storyEditor(file) {
       // Close right away and finish in the background, so nobody sits and waits on the upload.
       const overlay = { items: items.map(x => ({ ...x })), music };
       if (au) au.pause(); el.remove(); document.documentElement.style.overflow = ''; if (location.hash !== '' && location.hash !== '#/') go('#/');
-      const pill = document.createElement('div'); pill.className = 'st-pill'; pill.textContent = 'Posting your story…'; document.body.append(pill);
+      const pill = document.createElement('div'); pill.className = 'st-pill'; pill.textContent = 'Posting your story… keep Jamoja open'; document.body.append(pill);
       try {
         let path, kind;
         const fast = isVid && file.size <= 50 * 1048576 && /^video\/(mp4|quicktime)$/.test(file.type);
@@ -1010,7 +1010,7 @@ function storyEditor(file) {
         else if (isVid) {
           const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
           const c = await E.cut(src, 0, end, pr => { pill.textContent = `Posting your story… ${Math.round(pr * 100)}%`; });
-          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; pill.textContent = 'Posting your story…'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
+          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; pill.textContent = 'Posting your story… keep Jamoja open'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
         } else { const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
         await stories.add({ kind, path, overlay }); track('story_post', { kind, stickers: overlay.items.length, music });
         pill.remove(); toast('Your story is up. It stays for 24 hours.'); if (location.hash === '' || location.hash === '#/') home();
