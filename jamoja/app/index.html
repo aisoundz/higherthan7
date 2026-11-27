@@ -268,7 +268,17 @@ nav.bn .me .avi{width:26px!important;height:26px!important}
 .strail{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 12px;margin:0 -2px}.stb{flex:none;background:none;border:0;color:#fff;display:flex;flex-direction:column;align-items:center;gap:5px;width:72px;position:relative;padding:0}.stb .avi{padding:3px;border-radius:50%;background:conic-gradient(#ff5c1a,#ffd23f,#ff2d55,#ff5c1a);box-sizing:content-box}.stb.seen .avi{background:#3a3a40}.stb.add .avi{background:none}.stb i{position:absolute;right:6px;top:48px;width:22px;height:22px;border-radius:50%;background:var(--o);color:#0a0a0b;font-style:normal;font-weight:900;line-height:20px;border:2px solid #0a0a0b}.stb span{font-size:12px;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sted,.stv{position:fixed;inset:0;z-index:130;background:#000;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 6px) 10px calc(env(safe-area-inset-bottom) + 10px)}.st-top{display:flex;gap:8px;align-items:center;padding-top:4px}.st-tools{display:flex;gap:6px;margin-left:auto;min-width:0}.st-x{background:none;border:0;color:#fff;font-size:24px;margin-right:auto;padding:6px}.st-aa{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:999px;padding:8px 12px;font-weight:700;font-size:15px;white-space:nowrap}
 .st-stage,.stv-m{flex:1;min-height:0;position:relative;margin:8px 0;border-radius:16px;overflow:hidden;background:#111;display:flex;align-items:center;justify-content:center}.st-stage img,.st-stage video,.stv-m img,.stv-m video{width:100%;height:100%;object-fit:cover}.st-ov{position:absolute;inset:0;touch-action:none}
-.sk{position:absolute;transform:translate(-50%,-50%) scale(var(--s,1));transform-origin:center;touch-action:none;user-select:none;cursor:grab}.sk-e span{font-size:64px;line-height:1;display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}.sk-t span{display:block;font:800 26px/1 var(--hd);letter-spacing:.04em;background:#ffd23f;color:#0a0a0b;padding:8px 12px 6px;border-radius:10px;transform:rotate(-4deg);white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}.sk-t.big span{font-size:72px;padding:6px 18px 2px;background:var(--o)}.sk-x span{display:block;font-weight:800;font-size:24px;color:#fff;background:rgba(0,0,0,.55);padding:8px 12px;border-radius:10px;max-width:80vw;text-align:center}
+.sk{position:absolute;transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(var(--s,1));transform-origin:center;touch-action:none;user-select:none;cursor:grab}.sk-e span{font-size:64px;line-height:1;display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}.sk-t span{display:block;font:800 26px/1 var(--hd);letter-spacing:.04em;background:#ffd23f;color:#0a0a0b;padding:8px 12px 6px;border-radius:10px;transform:rotate(-4deg);white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}.sk-t.big span{font-size:72px;padding:6px 18px 2px;background:var(--o)}.sk-x span,.st-ted-in{display:block;font:800 30px/1.15 var(--hd,system-ui);letter-spacing:.01em;color:var(--tc,#fff);background:var(--tbg,transparent);padding:6px 12px;border-radius:10px;max-width:78vw;text-align:center;white-space:pre-wrap;word-break:break-word;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.sk-x.tb0 span,.st-ted-in.tb0{text-shadow:0 2px 6px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.6)}
+.st-ted{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 10px) 12px 12px}
+.sted.editing .st-top,.sted.editing .st-bot,.sted.editing .st-size,.sted.editing .st-mchip{visibility:hidden}
+.st-ted-top{display:flex;justify-content:space-between;align-items:center}
+.st-ted-mid{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.st-ted-in{min-width:40px;min-height:1.2em;outline:none;caret-color:var(--o,#ff5a1f);font-size:34px}
+.st-ted-in:empty:before{content:'Type something';opacity:.5}
+.st-cols{display:flex;gap:10px;justify-content:center;padding:8px 0}
+.st-cols button{width:30px;height:30px;border-radius:50%;border:2px solid #fff;padding:0}
+.st-pill{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 64px);transform:translateX(-50%);z-index:60;background:#1c1c20;color:#fff;border:1px solid #333;border-radius:999px;padding:8px 14px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .an-spin span{animation:skspin 2s linear infinite}.an-pulse span{animation:skpulse 1s ease-in-out infinite}.an-bounce span{animation:skbounce .9s ease-in-out infinite}.an-shake span{animation:skshake .6s ease-in-out infinite}
 @keyframes skspin{to{transform:rotate(360deg)}}@keyframes skpulse{50%{transform:scale(1.15)}}@keyframes skbounce{50%{transform:translateY(-14px)}}@keyframes skshake{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
 .sk-t.an-pulse span{animation:sktpulse 1s ease-in-out infinite}@keyframes sktpulse{50%{transform:rotate(-4deg) scale(1.12)}}.sk-t.an-bounce span{animation:sktb .9s ease-in-out infinite}@keyframes sktb{50%{transform:rotate(-4deg) translateY(-12px)}}.sk-t.an-shake span{animation:skts .6s ease-in-out infinite}@keyframes skts{25%{transform:rotate(-10deg)}75%{transform:rotate(2deg)}}
@@ -291,8 +301,8 @@ nav.bn .me .avi{width:26px!important;height:26px!important}
 <header class="top"><a class="logo" href="#/" aria-label="Jamoja home">JAM<i></i>JA</a><div class="tr" id="tr"></div></header>
 <nav class="bn" id="nav" hidden aria-label="Main"></nav>
 <main id="view" aria-live="polite"><p class="mu">Loading…</p></main>
-<script>window.JM_V='20261127x';</script>
-<script src="vendor/supabase.js?v=20261127x"></script>
-<script type="module" src="app.js?v=20261127x"></script>
+<script>window.JM_V='20261127y';</script>
+<script src="vendor/supabase.js?v=20261127y"></script>
+<script type="module" src="app.js?v=20261127y"></script>
 </body>
 </html>

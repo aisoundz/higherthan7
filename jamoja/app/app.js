@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127x';
-import * as R from './rec.js?v=20261127x';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127x';
+import * as E from './engine.js?v=20261127y';
+import * as R from './rec.js?v=20261127y';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127y';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127x';
+const APP_V = '20261127y';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -966,7 +966,7 @@ function storyEditor(file) {
     <div class="st-mus" hidden>${BEATS.map(x => `<button data-beat="${x.id}"><b>♫ ${esc(x.n)}</b><span>${esc(x.m)}</span></button>`).join('')}<button data-beat=""><b>No music</b><span>${isVid ? 'Keep the video sound' : 'Silent'}</span></button><p class="mu" style="font-size:12px;margin:6px 2px 0">Jamoja Beats are made for Jamoja. Free to use anywhere you share.</p></div>
     <div class="st-size" hidden><span>Size</span><input type="range" min="0.4" max="3" step="0.05" value="1"><button data-desel>Done</button></div>
     <div class="st-mchip" hidden></div>
-    <form class="st-tin" hidden><input maxlength="60" placeholder="Say something…"><button class="btn">Add</button></form>
+    <div class="st-ted" hidden><div class="st-ted-top"><button class="st-aa" data-tbg>A̲ Style</button><button class="btn" data-tdone>Done</button></div><div class="st-ted-mid"><div class="st-ted-in sk-x" contenteditable="true" enterkeyhint="done" spellcheck="false"></div></div><div class="st-cols">${TCOLS.map(c => `<button data-tc="${c}" style="background:${c}" aria-label="Color"></button>`).join('')}</div></div>
     <div class="st-bot"><span class="mu" id="stmsg"></span><button class="btn" data-post>Share to story</button></div>`;
   const ov = el.querySelector('.st-ov'), trash = el.querySelector('.st-trash'); let music = '', au = null;
   if (!window.LAST_COURT && ME) games.mine(ME.id).then(l => { const g = l.find(x => x.place); if (g && el.isConnected) { window.LAST_COURT = g.place; el.querySelector('.st-grid').insertAdjacentHTML('beforeend', `<button data-court class="st-tagb">📍 ${esc(g.place)}</button>`); } }).catch(() => {});
@@ -991,59 +991,75 @@ function storyEditor(file) {
       const ch = el.querySelector('.st-mchip'); const bt = BEATS.find(x => x.id === music); ch.hidden = !bt; ch.innerHTML = bt ? `♫ ${esc(bt.n)} <button data-beat="" aria-label="Remove music">✕</button>` : '';
       el.querySelector('.st-mus').hidden = true; return;
     }
-    if (b.dataset.text !== undefined) { const f = el.querySelector('.st-tin'); f.hidden = false; f.querySelector('input').focus(); return; }
+    if (b.dataset.text !== undefined) return openText(null);
+    if (b.dataset.tc) { ted.c = b.dataset.tc; styleTed(); tin.focus(); return; }
+    if (b.dataset.tbg !== undefined) { ted.bg = ((ted.bg || 0) + 1) % 3; styleTed(); tin.focus(); return; }
+    if (b.dataset.tdone !== undefined) return doneText();
     if (b.dataset.gif) return add({ t: 'gif', v: b.dataset.gif, s: 1 });
     if (b.dataset.s !== undefined) { const x = STICKERS[+b.dataset.s]; return add({ t: x.k ? 'tag' : 'emoji', v: x.v, a: x.a || '', big: /big/.test(x.k || '') }); }
     if (b.dataset.court !== undefined) return add({ t: 'tag', v: '📍 ' + window.LAST_COURT });
     if (b.dataset.post !== undefined) {
-      b.disabled = true; const msg = el.querySelector('#stmsg');
+      // Close right away and finish in the background, so nobody sits and waits on the upload.
+      const overlay = { items: items.map(x => ({ ...x })), music };
+      if (au) au.pause(); el.remove(); document.documentElement.style.overflow = ''; if (location.hash !== '' && location.hash !== '#/') go('#/');
+      const pill = document.createElement('div'); pill.className = 'st-pill'; pill.textContent = 'Posting your story…'; document.body.append(pill);
       try {
         let path, kind;
-        const fast = isVid && file.size <= 45 * 1048576 && /^video\/(mp4|quicktime)$/.test(file.type);
-        if (fast) {
-          // Upload the phone's own file as is: no converting, so it posts in seconds. The viewer plays the first 15s.
-          const ext = file.type === 'video/quicktime' ? 'mov' : 'mp4';
-          path = `${ME.id}/stories/${Date.now()}.${ext}`; msg.textContent = 'Uploading…'; await storage.upload(path, file, file.type); kind = 'video';
-        } else if (isVid) {
-          msg.textContent = 'Preparing video…';
-          const src = await E.analyze(file); const end = Math.min(15, src.dur || 15); msg.textContent = 'Preparing video… 0%';
-          const c = await E.cut(src, 0, end, pr => { msg.textContent = `Preparing video… ${Math.round(pr * 100)}%`; });
-          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; msg.textContent = 'Uploading…'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
-        } else { msg.textContent = 'Uploading…'; const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
-        await stories.add({ kind, path, overlay: { items, music } }); track('story_post', { kind, stickers: items.length, music });
-        toast('Shared to your story. It stays up for 24 hours.'); close(); if (location.hash === '' || location.hash === '#/') home(); else go('#/');
-      } catch (err) { msg.textContent = 'Could not share: ' + (err.message || err); b.disabled = false; }
+        const fast = isVid && file.size <= 50 * 1048576 && /^video\/(mp4|quicktime)$/.test(file.type);
+        if (fast) { const ext = file.type === 'video/quicktime' ? 'mov' : 'mp4'; path = `${ME.id}/stories/${Date.now()}.${ext}`; await storage.upload(path, file, file.type); kind = 'video'; }
+        else if (isVid) {
+          const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
+          const c = await E.cut(src, 0, end, pr => { pill.textContent = `Posting your story… ${Math.round(pr * 100)}%`; });
+          E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; pill.textContent = 'Posting your story…'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
+        } else { const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
+        await stories.add({ kind, path, overlay }); track('story_post', { kind, stickers: overlay.items.length, music });
+        pill.remove(); toast('Your story is up. It stays for 24 hours.'); if (location.hash === '' || location.hash === '#/') home();
+      } catch (err) { pill.remove(); toast('Story did not post: ' + (err.message || err)); }
+      URL.revokeObjectURL(url); return;
     }
   });
-  el.querySelector('.st-tin').onsubmit = e => { e.preventDefault(); const i = e.target.querySelector('input'); const v = i.value.trim(); if (v) add({ t: 'text', v }); i.value = ''; e.target.hidden = true; i.blur(); };
-  // drag to move, two fingers to pinch-resize, tap to select (then use the size slider)
-  let drag = null, moved = false; const pts = new Map(); let pinch = null;
+  // Text like Instagram: big text typed right on top of the photo, pick a color and a style, tap Done. Tap text later to edit it.
+  const tedEl = el.querySelector('.st-ted'), tin = el.querySelector('.st-ted-in'); let ted = null;
+  const styleTed = () => { tin.className = 'st-ted-in ' + textCls(ted); tin.style.cssText = textCss(ted); };
+  const openText = k => { ted = k === null ? { t: 'text', v: '', c: '#ffffff', bg: 0, x: 0.5, y: 0.4, s: 1, r: 0 } : { ...items[k], k }; tin.textContent = ted.v; styleTed(); tedEl.hidden = false; select(null); ov.style.visibility = 'hidden'; el.classList.add('editing'); setTimeout(() => { tin.focus(); const r = document.createRange(); r.selectNodeContents(tin); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }, 30); };
+  const doneText = () => { if (!ted) return; const v = tin.innerText.replace(/\s+$/, '').slice(0, 120); const k = ted.k; delete ted.k; ted.v = v;
+    if (k != null) { if (v) items[k] = ted; else items.splice(k, 1); } else if (v) items.push(ted);
+    ted = null; tin.blur(); tedEl.hidden = true; ov.style.visibility = ''; el.classList.remove('editing'); selK = null; paint(); };
+  tin.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doneText(); } });
+  // One finger drags. Two fingers pinch to resize and twist to rotate (the second finger can land anywhere). Tap text to edit it.
+  let drag = null, moved = false, downAt = 0; const pts = new Map(); let pinch = null;
+  const ang = (a, b2) => Math.atan2(b2.y - a.y, b2.x - a.x) * 180 / Math.PI;
+  const setT = k => { const n = ov.querySelector(`[data-k="${k}"]`); if (n) { n.style.setProperty('--s', items[k].s || 1); n.style.setProperty('--r', (items[k].r || 0) + 'deg'); } };
   ov.addEventListener('pointerdown', e => {
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pts.size === 2 && selK !== null) { const [a, b2] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b2.x, a.y - b2.y), s: items[selK].s || 1 }; drag = null; trash.hidden = true; return; }
-    const s2 = e.target.closest('[data-k]'); if (!s2) { if (pts.size === 1) select(null); return; }
-    drag = +s2.dataset.k; moved = false; if (selK !== drag) select(drag); ov.setPointerCapture(e.pointerId); e.preventDefault();
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { ov.setPointerCapture(e.pointerId); } catch (x) {} e.preventDefault();
+    if (pts.size === 2) { const k = drag !== null ? drag : selK !== null ? selK : items.length - 1; if (k < 0) return; if (selK !== k) select(k); const [a, b2] = [...pts.values()]; pinch = { k, d: Math.hypot(a.x - b2.x, a.y - b2.y) || 1, a: ang(a, b2), s: items[k].s || 1, r: items[k].r || 0 }; drag = null; trash.hidden = true; return; }
+    const s2 = e.target.closest('[data-k]'); if (!s2) { select(null); return; }
+    drag = +s2.dataset.k; moved = false; downAt = Date.now(); if (selK !== drag) select(drag);
   });
   ov.addEventListener('pointermove', e => {
-    if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pinch && pts.size >= 2 && selK !== null) { const [a, b2] = [...pts.values()]; const sc = Math.min(3, Math.max(0.4, pinch.s * Math.hypot(a.x - b2.x, a.y - b2.y) / pinch.d)); items[selK].s = sc; const n = ov.querySelector(`[data-k="${selK}"]`); if (n) n.style.setProperty('--s', sc); range.value = sc; return; }
-    if (drag === null) return; moved = true; trash.hidden = false;
+    if (!pts.has(e.pointerId)) return; const p0 = pts.get(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pts.size >= 2) { const [a, b2] = [...pts.values()]; const it = items[pinch.k]; it.s = Math.min(4, Math.max(0.3, pinch.s * Math.hypot(a.x - b2.x, a.y - b2.y) / pinch.d)); let r = pinch.r + ang(a, b2) - pinch.a; const snap = Math.round(r / 90) * 90; if (Math.abs(r - snap) < 4) r = snap; it.r = Math.round(r); setT(pinch.k); range.value = it.s; return; }
+    if (drag === null) return; if (!moved && Math.hypot(e.clientX - p0.x, e.clientY - p0.y) < 2) return; moved = true; trash.hidden = false;
     const r = ov.getBoundingClientRect(); items[drag].x = Math.min(0.98, Math.max(0.02, (e.clientX - r.left) / r.width)); items[drag].y = Math.min(0.98, Math.max(0.02, (e.clientY - r.top) / r.height));
     const n = ov.querySelector(`[data-k="${drag}"]`); n.style.left = items[drag].x * 100 + '%'; n.style.top = items[drag].y * 100 + '%';
     const t = trash.getBoundingClientRect(); trash.classList.toggle('on', e.clientY > t.top - 20 && Math.abs(e.clientX - (t.left + t.width / 2)) < 60);
   });
   const up = e => {
     pts.delete(e.pointerId); if (pts.size < 2) pinch = null;
-    if (drag === null) return;
-    if (moved && trash.classList.contains('on')) { items.splice(drag, 1); selK = null; }
-    drag = null; trash.hidden = true; trash.classList.remove('on'); paint();
+    if (drag === null) return; const k = drag; drag = null;
+    if (moved && trash.classList.contains('on')) { items.splice(k, 1); selK = null; }
+    else if (!moved && Date.now() - downAt < 350 && items[k] && items[k].t === 'text') { trash.hidden = true; return openText(k); }
+    trash.hidden = true; trash.classList.remove('on'); paint();
   };
   ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
 }
+const TCOLS = ['#ffffff', '#0a0a0b', '#ff5a1f', '#ffd23f', '#3ddc84', '#38bdf8', '#a78bfa', '#ff4d6d'];
+function textCls(it) { return 'sk-x tb' + (it.bg || 0); }
+function textCss(it) { const c = it.c || '#ffffff', dark = /^#(0a|00|11)/.test(c); return it.bg === 1 ? `--tc:${dark ? '#fff' : '#0a0a0b'};--tbg:${c}` : it.bg === 2 ? `--tc:${c};--tbg:rgba(0,0,0,.6)` : `--tc:${c};--tbg:transparent`; }
 function stickerHTML(it, k, sel) {
-  const cls = it.t === 'emoji' ? 'sk-e' : it.t === 'tag' ? 'sk-t' + (it.big ? ' big' : '') : it.t === 'gif' ? 'sk-g' : 'sk-x';
+  const cls = it.t === 'emoji' ? 'sk-e' : it.t === 'tag' ? 'sk-t' + (it.big ? ' big' : '') : it.t === 'gif' ? 'sk-g' : textCls(it);
   const inner = it.t === 'gif' ? `<img src="${gifUrl(it.v)}" alt="" draggable="false">` : `<span>${esc(it.v)}</span>`;
-  return `<div class="sk ${cls} ${it.a ? 'an-' + it.a : ''} ${sel ? 'sel' : ''}" ${k != null ? `data-k="${k}"` : ''} style="left:${(it.x * 100).toFixed(1)}%;top:${(it.y * 100).toFixed(1)}%;--s:${it.s || 1}">${inner}</div>`;
+  return `<div class="sk ${cls} ${it.a ? 'an-' + it.a : ''} ${sel ? 'sel' : ''}" ${k != null ? `data-k="${k}"` : ''} style="left:${(it.x * 100).toFixed(1)}%;top:${(it.y * 100).toFixed(1)}%;--s:${it.s || 1};--r:${it.r || 0}deg;${it.t === 'text' ? textCss(it) : ''}">${inner}</div>`;
 }
 function openStories(groups, gi, onClose) {
   let g = gi, i = Math.max(0, groups[gi].list.findIndex(x => !seenStory(x.id))), timer = null; const au = new Audio(); au.loop = true;
