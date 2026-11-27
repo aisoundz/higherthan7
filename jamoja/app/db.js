@@ -2,7 +2,7 @@
 //  live  : Supabase (when config.js has a URL and key)
 //  local : everything saved on this phone in IndexedDB (no database connected yet)
 //  mock  : in memory, for automated tests (?mock=1)
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127zc';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=20261127zd';
 
 const MOCK = new URLSearchParams(location.search).has('mock');
 const configured = !!(SUPABASE_URL && SUPABASE_KEY);
@@ -499,6 +499,7 @@ export const stories = {
     M.stories = M.stories || {}; const r = { id: uid(), user_id: M.session.id, created_at: now(), expires_at: new Date(Date.now() + 864e5).toISOString(), ...st }; M.stories[r.id] = r; await save(); return r;
   },
   async remove(id) { if (sb) { chk(await sb.from('stories').delete().eq('id', id)); return; } delete (M.stories || {})[id]; await save(); },
+  async setPath(id, path) { if (sb) { chk(await sb.from('stories').update({ path }).eq('id', id)); return; } if ((M.stories || {})[id]) { M.stories[id].path = path; await save(); } },
   async view(id) { if (sb) { await sb.from('story_views').insert({ story_id: id }).then(() => {}, () => {}); } },
   async viewers(id) {
     if (!sb) return [];

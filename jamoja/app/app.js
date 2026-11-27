@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127zc';
-import * as R from './rec.js?v=20261127zc';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zc';
+import * as E from './engine.js?v=20261127zd';
+import * as R from './rec.js?v=20261127zd';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zd';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127zc';
+const APP_V = '20261127zd';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1012,7 +1012,8 @@ function storyEditor(file) {
           const c = await E.cut(src, 0, end, pr => { pill.textContent = `Posting your story… ${Math.round(pr * 100)}%`; });
           E.close(src); path = `${ME.id}/stories/${Date.now()}.mp4`; pill.textContent = 'Posting your story… keep Jamoja open'; await storage.upload(path, c.video, 'video/mp4'); kind = 'video';
         } else { const j = await toJpeg(file); path = `${ME.id}/stories/${Date.now()}.jpg`; await storage.upload(path, j, 'image/jpeg'); kind = 'photo'; }
-        await stories.add({ kind, path, overlay }); track('story_post', { kind, stickers: overlay.items.length, music });
+        const row = await stories.add({ kind, path, overlay }); track('story_post', { kind, stickers: overlay.items.length, music });
+        if (fast && file.type === 'video/quicktime' && row && row.id) storyCopy(row.id, path, file);
         pill.remove(); toast('Your story is up. It stays for 24 hours.'); if (location.hash === '' || location.hash === '#/') home();
       } catch (err) { pill.remove(); toast('Story did not post: ' + (err.message || err)); }
       URL.revokeObjectURL(url); return;
@@ -1052,6 +1053,21 @@ function storyEditor(file) {
     trash.hidden = true; trash.classList.remove('on'); paint();
   };
   ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
+}
+// iPhone videos are saved in Apple's own format, which most Android phones cannot play.
+// After the story is already up, this phone quietly makes a standard MP4 copy and swaps it in. If the app closes first, the original stays.
+let STORY_COPYING = false;
+async function storyCopy(id, oldPath, file) {
+  if (STORY_COPYING) return; STORY_COPYING = true; const t0 = Date.now();
+  try {
+    const src = await E.analyze(file); const end = Math.min(15, src.dur || 15);
+    const c = await E.cut(src, 0, end); E.close(src);
+    const p2 = oldPath.replace(/\.mov$/i, '') + '.mp4';
+    await storage.upload(p2, c.video, 'video/mp4'); await stories.setPath(id, p2);
+    storage.remove([oldPath]).catch(() => {});
+    track('story_copy', { ok: 1, codec: src.codec, secs: Math.round((Date.now() - t0) / 1000), mb: Math.round(file.size / 1048576) });
+  } catch (err) { track('story_copy', { ok: 0, err: String(err && err.message || err).slice(0, 120), secs: Math.round((Date.now() - t0) / 1000) }); }
+  finally { STORY_COPYING = false; }
 }
 const TCOLS = ['#ffffff', '#0a0a0b', '#ff5a1f', '#ffd23f', '#3ddc84', '#38bdf8', '#a78bfa', '#ff4d6d'];
 function textCls(it) { return 'sk-x tb' + (it.bg || 0); }
