@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127m';
-import * as R from './rec.js?v=20261127m';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, storage, mode, ready } from './db.js?v=20261127m';
+import * as E from './engine.js?v=20261127o';
+import * as R from './rec.js?v=20261127o';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, storage, mode, ready } from './db.js?v=20261127o';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127m';
+const APP_V = '20261127o';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -765,6 +765,30 @@ function boxScore(ps, hs) {
     ${list.map(r => `<tr class="${r === top ? 'lead' : ''}"><td>${r === top ? '🔥 ' : ''}${name(r)}</td><td><b>${r.pts}</b></td><td>${r.fgm}</td><td>${r.reb}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td></tr>`).join('')}
     </tbody></table><p class="mu" style="font-size:12px;margin:8px 0 0">Made from tagged plays. Tag a rebound, dime, steal or block in Review plays and it shows up here. Points count 2 per bucket, 3 per three.</p></div>`;
 }
+// Pickup player card: per-game averages across every run this athlete claimed. A résumé built from film.
+function pickupCard(p, tags, hs) {
+  const games = new Map();
+  for (const t of tags) if (t.game) games.set(t.game.id, { g: t.game, pts: 0, fgm: 0, tpm: 0, reb: 0, ast: 0, stl: 0, blk: 0, jum: 0, lay: 0 });
+  if (!games.size) return '';
+  const pid2game = new Map(tags.map(t => [t.id, t.game && t.game.id]));
+  for (const h of hs) {
+    const gid = h.game_id || pid2game.get(h.player_id); const r = games.get(gid); if (!r) continue; const t = h.play_type || 'Bucket';
+    if (t === 'Three') { r.fgm++; r.tpm++; r.pts += 3; r.jum++; } else if (SHOT2.has(t)) { r.fgm++; r.pts += t === 'And-one' ? 3 : 2; if (t === 'Jumper') r.jum++; if (t === 'Layup' || t === 'Drive' || t === 'Dunk' || t === 'Putback') r.lay++; }
+    else if (t === 'Rebound') r.reb++; else if (t === 'Dime') r.ast++; else if (t === 'Steal') r.stl++; else if (t === 'Block') r.blk++;
+  }
+  const L = [...games.values()].sort((a, b) => (b.g.played_on || '') < (a.g.played_on || '') ? -1 : 1);
+  const n = L.length, sum = k => L.reduce((a, r) => a + r[k], 0), avg = k => (sum(k) / n).toFixed(1).replace(/\.0$/, '');
+  const shots = sum('jum') + sum('lay');
+  const best = [...L].sort((a, b) => b.pts - a.pts)[0];
+  const courts = [...new Set(L.map(r => r.g.place).filter(Boolean))];
+  const d = r => r.g.played_on ? new Date(r.g.played_on + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+  return `<div class="card pk"><div class="row" style="justify-content:space-between"><span class="mu" style="letter-spacing:.12em;font-size:12px">PICKUP STATS</span><span class="mu" style="font-size:12px">${n} game${n > 1 ? 's' : ''} on film${courts.length ? ' · ' + courts.length + ' court' + (courts.length > 1 ? 's' : '') : ''}</span></div>
+    <div class="pk-avg">${[['PPG', 'pts'], ['RPG', 'reb'], ['APG', 'ast'], ['SPG', 'stl'], ['BPG', 'blk']].map(([l, k]) => `<div><b>${avg(k)}</b><span>${l}</span></div>`).join('')}</div>
+    ${shots ? `<div class="pk-mix"><i style="width:${Math.round(sum('jum') / shots * 100)}%"></i></div><p class="mu" style="font-size:12px;margin:4px 0 0">${Math.round(sum('jum') / shots * 100)}% jumpers · ${Math.round(sum('lay') / shots * 100)}% at the rim${sum('tpm') ? ' · ' + sum('tpm') + ' threes' : ''}</p>` : ''}
+    ${best && best.pts ? `<p style="margin:10px 0 0;font-size:14px">Best game: <b>${best.pts} pts</b> at <a href="#/g/${best.g.id}">${esc(best.g.title)}</a></p>` : ''}
+    <table class="pk-log"><thead><tr><th>Game</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th></tr></thead><tbody>${L.slice(0, 5).map(r => `<tr><td><a href="#/g/${r.g.id}">${esc(d(r))} ${esc(r.g.title)}</a></td><td><b>${r.pts}</b></td><td>${r.reb}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td></tr>`).join('')}</tbody></table>
+    <p class="mu" style="font-size:11px;margin:8px 0 0">Built from plays tagged on film. Every tagged rebound, dime, steal and block counts.</p></div>`;
+}
 // Run Report: the game in one card, built from what was filmed.
 function runReport(g, ps, hs) {
   if (!hs.length) return '';
@@ -880,7 +904,7 @@ function reviewPlays(g, list, ps, own, gameId) {
         <div class="rv-l" style="margin-top:12px">Who?</div>
         <div class="rv-c">${mine ? `<span class="chip on">✓ You</span><button class="chip" data-notme>Not me</button>`
           : who && who.user_id ? `<span class="chip on">${esc(who.label || 'Tagged')}</span>`
-          : `<button class="chip me" data-me>🙋 That's me</button><span class="mu rv-nm">Not you? Just tap Next. It stays in the run's tape.</span>${own ? `<select data-who aria-label="Someone else"><option value="">Someone else…</option>${ps.filter(p => !p.user_id || p.id !== myPid()).map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>` : ''}`}</div>
+          : `${h.suggest ? '<span class="chip sug">👀 Might be you</span>' : ''}<button class="chip me" data-me>🙋 That's me</button><span class="mu rv-nm">Not you? Just tap Next. It stays in the run's tape.</span>${own ? `<select data-who aria-label="Someone else"><option value="">Someone else…</option>${ps.filter(p => !p.user_id || p.id !== myPid()).map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>` : ''}`}</div>
       </div>
       <div class="rv-nav"><button class="btn g" data-prev ${i ? '' : 'disabled'}>‹ Back</button>${own ? `<button class="btn g" data-del title="Delete for everyone">Bad clip</button>` : ''}<button class="btn" data-next>${i === list.length - 1 ? 'Done ✓' : 'Next ›'}</button></div>`;
   };
@@ -1553,6 +1577,7 @@ async function profilePage(handle) {
   const [tags, made, cnt, fol, mine] = await Promise.all([players.mine(p.id), games.mine(p.id), follows.counts(p.id).catch(() => ({ followers: 0, following: 0 })), ME ? follows.ids(ME.id).catch(() => []) : [], posts.byUser(p.id).catch(() => [])]);
   const tagged = await highlights.forPlayers(tags.map(t => t.id));
   const hs = tagged; // only plays tagged to this athlete. Plays they filmed live on the game page (the run's tape).
+  const card = pickupCard(p, tags, hs);
   await storage.prep([...hs.flatMap(h => [h.path, h.poster]), p.avatar].filter(Boolean));
   const link = shareBase() + '#/u/' + encodeURIComponent(p.handle);
   const following = fol.includes(p.id);
@@ -1584,6 +1609,7 @@ async function profilePage(handle) {
     ${me && !LOCAL ? `<a class="scout" href="#/viewers"><span class="sc-n">${pv.length}</span><span><b>Who's watching</b><br><span class="mu">profile view${pv.length === 1 ? '' : 's'} in the last 30 days · see who →</span></span></a>` : ''}
     ${nextRun ? `<a class="card pnext" href="#/g/${nextRun.id}"><span class="mu" style="font-size:12px;letter-spacing:.1em">${new Date(nextRun.starts_at) <= Date.now() ? 'PLAYING NOW' : 'NEXT RUN'}</span><b>${esc(nextRun.title)}</b><span class="mu">${esc(whenLabel(nextRun.starts_at))}${nextRun.place ? ' · ' + esc(nextRun.place) : ''}</span><span class="pn-go">${me ? 'Open · go live' : "I'm in →"}</span></a>` : ''}
     ${courts.length ? `<div class="pcourts">${courts.slice(0, 6).map(([c, n]) => `<a href="${courtUrl(c)}">📍 ${esc(c)} <span>${n}</span></a>`).join('')}</div>` : me ? `<a class="pcourts-empty mu" href="#/post">📍 Tap + then Go live at your court to add it to your card</a>` : ''}
+    ${card}
     <div class="ptabs" role="tablist"><button data-pt2="posts" class="on">Posts <span>${mine.length}</span></button><button data-pt2="plays">Highlights <span>${plays}</span></button><button data-pt2="games">Games <span>${made.length}</span></button></div>
     <div id="pgrid"></div>
     ${LOCAL && me ? `<p class="foot">Everything is saved on this phone. Clearing your browser data deletes it.</p>` : ''}`;
