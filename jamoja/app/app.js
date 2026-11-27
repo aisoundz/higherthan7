@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127ze';
-import * as R from './rec.js?v=20261127ze';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127ze';
+import * as E from './engine.js?v=20261127zf';
+import * as R from './rec.js?v=20261127zf';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127zf';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127ze';
+const APP_V = '20261127zf';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -1858,6 +1858,16 @@ async function gamePage(id) {
 function confirmIn(b) { if (b.dataset.sure) return true; b.dataset.sure = '1'; const t = b.textContent; b.textContent = 'Tap again to confirm'; setTimeout(() => { delete b.dataset.sure; b.textContent = t; }, 3000); return false; }
 
 // ---------------- Profile
+// Like Instagram: the ring around a player's picture means they have a live story. Tap the picture to watch it. No story, no ring.
+async function profileStoryRing(p) {
+  const av = V.querySelector('.pc-main .avi'); if (!av) return;
+  const all = await stories.live().catch(() => []); const list = all.filter(x => x.user_id === p.id);
+  if (!av.isConnected || !list.length) return;
+  const seen = list.every(x => seenStory(x.id));
+  const ring = document.createElement('button'); ring.className = 'pc-story' + (seen ? ' seen' : ''); ring.setAttribute('aria-label', `Watch ${p.name}'s story`);
+  av.replaceWith(ring); ring.append(av);
+  ring.onclick = () => openStories([{ u: p, list }], 0, () => { ring.classList.toggle('seen', list.every(x => seenStory(x.id))); });
+}
 async function profilePage(handle) {
   const p = await profiles.byHandle(handle);
   if (!p) { V.innerHTML = `<h1>Player not found</h1><a class="btn g" href="#/">Go home</a>`; return; }
@@ -1952,6 +1962,7 @@ async function profilePage(handle) {
   };
   show('posts');
   countViews(V); bindFollow(V, fol);
+  profileStoryRing(p);
   const cp = document.getElementById('cp'); if (cp) cp.onclick = async () => { if (navigator.share) { navigator.share({ title: p.name + ' on Jamoja', text: `Check out ${p.name} on Jamoja`, url: link }).catch(() => {}); return; } try { await navigator.clipboard.writeText(link); toast('Profile link copied.'); } catch (e) { toast(link); } };
   const so = document.getElementById('so'); if (so) so.onclick = async () => { await auth.signOut(); toast('Signed out.'); go('#/'); };
 }
