@@ -1,6 +1,6 @@
-import * as E from './engine.js?v=20261127w';
-import * as R from './rec.js?v=20261127w';
-import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127w';
+import * as E from './engine.js?v=20261127x';
+import * as R from './rec.js?v=20261127x';
+import { auth, profiles, games, players, highlights, fires, posts, postFires, follows, comments, profileViews, notes, pushSubs, dms, blocks, rsvps, live, nextUp, events, stories, ratings, storage, mode, ready } from './db.js?v=20261127x';
 const LEVELS = ['Recreation', 'High school', 'College', 'Pro'];
 const LV = { Recreation: 'REC', 'High school': 'HS', College: 'COLLEGE', Pro: 'PRO' };
 const lvBadge = p => p && p.level ? `<span class="lv">${LV[p.level]}</span>` : '';
@@ -17,7 +17,7 @@ async function toJpeg(file, max = 1440) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.85));
 }
-const APP_V = '20261127w';
+const APP_V = '20261127x';
 // If the phone kept an older copy of the page, reload once to get everything matching.
 if (window.JM_V !== APP_V) { try { if (sessionStorage.getItem('jm.rl') !== APP_V) { sessionStorage.setItem('jm.rl', APP_V); location.replace(location.pathname + '?v=' + Date.now() + location.hash); } } catch (e) { /* private mode */ } }
 const PLAYS = {
@@ -241,8 +241,12 @@ async function drawFeed() {
   box.querySelectorAll('.pin ~ video').forEach(v => playWhenSeen(v));
   bindFollow(box, fol);
 }
-const IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 }) : null;
-function playWhenSeen(v) { if (IO) IO.observe(v); v.onclick = () => { const art = v.closest('article'); const capEl = art && art.querySelector('.meta, .pb'); openViewer({ video: v.currentSrc || v.src, poster: v.poster, hid: v.dataset.hid, start: v.currentTime, cap: capEl ? capEl.innerHTML : '', ck: v.dataset.hid ? 'highlight' : art && art.dataset.pid ? 'post' : '', cid: v.dataset.hid || (art && art.dataset.pid) }); }; }
+// One feed video decodes at a time. iPhones run out of video decoders when every card holds a loaded <video>, and the extra cards paint black.
+// Cards keep only their poster; the card in view gets its source, and a card that scrolls away gives it back.
+function vOn(v) { if (!v.getAttribute('src') && v.dataset.src) { v.src = v.dataset.src; } v.play().catch(() => {}); }
+function vOff(v) { v.pause(); if (v.dataset.src && v.getAttribute('src')) { v.removeAttribute('src'); v.load(); } }
+const IO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { const v = en.target; if (en.isIntersecting) vOn(v); else vOff(v); }), { threshold: 0.6 }) : null;
+function playWhenSeen(v) { if (v.getAttribute('src') && !v.dataset.src) { v.dataset.src = v.getAttribute('src'); v.removeAttribute('src'); v.preload = 'none'; v.load(); } if (IO) IO.observe(v); else vOn(v); v.onclick = () => { const art = v.closest('article'); const capEl = art && art.querySelector('.meta, .pb'); const src = v.dataset.src || v.currentSrc || v.src; openViewer({ video: src, poster: v.poster, hid: v.dataset.hid, start: v.getAttribute('src') ? v.currentTime : 0, cap: capEl ? capEl.innerHTML : '', ck: v.dataset.hid ? 'highlight' : art && art.dataset.pid ? 'post' : '', cid: v.dataset.hid || (art && art.dataset.pid) }); v.pause(); }; }
 function bindFollow(root, fol) {
   if (root._fh) root.removeEventListener('click', root._fh);
   root.addEventListener('click', root._fh = async e => {
@@ -268,11 +272,11 @@ async function renderItems(box, items, opt = {}) {
   const folBtn = u => ME && u && u.id !== ME.id && !opt.noFollow ? `<button class="btn s ${fol.includes(u.id) ? 'g' : ''} fb" data-follow="${u.id}">${fol.includes(u.id) ? 'Following' : 'Follow'}</button>` : '';
   const who = h => h.player ? (h.player.user ? `<a href="#/u/${esc(h.player.user.handle)}">@${esc(h.player.user.handle)}</a>` : esc(h.player.label)) : '';
   const whoName = h => h.player ? (h.player.user ? '@' + h.player.user.handle : h.player.label) : '';
-  const hCard = h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" style="background-image:url('${esc(storage.url(h.poster))}')" playsinline muted loop preload="metadata"></video>
+  const hCard = h => `<article class="post" data-id="${h.id}"><video data-hid="${h.id}" data-src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" style="background-image:url('${esc(storage.url(h.poster))}')" playsinline muted loop preload="none"></video>
     <div class="side"><button class="fire ${lit.has(h.id) ? 'on' : ''}" data-fire="${h.id}" aria-label="Fire"><span>🔥</span><b>${h.fire || 0}</b></button><button class="fire" data-cm="h:${h.id}" aria-label="Comments"><span>💬</span><b>${cch[h.id] || 0}</b></button><button class="fire" data-share="${h.id}" aria-label="Share"><span>↗</span><b>Share</b></button><button class="fire" data-more="h:${h.id}" aria-label="More"><span>⋯</span><b></b></button></div>
     <div class="meta">${h.play_type ? `<span class="cap">${esc(h.play_type)}</span>` : ''}<b>${who(h) || (h.game.owner && MYP && h.game.owner.handle === MYP.handle ? `<a href="#/g/${h.game_id}">Who is this? Tag them</a>` : 'Who is this?')}</b><a href="#/g/${h.game_id}">${esc(h.game.title)}</a><span class="mu">${esc(h.game.sport)}${h.game.place ? ' · 📍 ' + courtLink(h.game.place) : ''}${h.game.owner ? ` · filmed by <a href="#/u/${esc(h.game.owner.handle)}">@${esc(h.game.owner.handle)}</a>` : ''}${h.views ? ' · ' + views(h.views) : ''}</span>${!h.player ? `<a class="mu" href="#/g/${h.game_id}">In this play? Claim it</a>` : ''}</div></article>`;
   const media = x => x.kind === 'photo' ? `<img class="pm" src="${esc(storage.url(x.media))}" alt="" loading="lazy">`
-    : x.kind === 'video' ? `<video class="pm" data-pv="1" src="${esc(storage.url(x.media))}" poster="${esc(storage.url(x.poster))}" style="background-image:url('${esc(storage.url(x.poster))}')" playsinline muted loop preload="metadata"></video>`
+    : x.kind === 'video' ? `<video class="pm" data-pv="1" data-src="${esc(storage.url(x.media))}" poster="${esc(storage.url(x.poster))}" style="background-image:url('${esc(storage.url(x.poster))}')" playsinline muted loop preload="none"></video>`
     : x.kind === 'youtube' ? `<button class="yt" data-yt="${esc(x.youtube_id)}" aria-label="Play YouTube video"><img src="https://i.ytimg.com/vi/${esc(x.youtube_id)}/hqdefault.jpg" alt="" loading="lazy"><span>▶</span></button>` : '';
   const pCard = x => `<article class="card pst" data-pid="${x.id}"><div class="ph"><a href="#/u/${esc(x.user ? x.user.handle : '')}" class="pu">${avatar(x.user, 40)}<span><b>${esc(x.user ? x.user.name : '')}</b> ${lvBadge(x.user)}<br><span class="mu">@${esc(x.user ? x.user.handle : '')} · ${ago(x.created_at)}${x.sport ? ' · ' + esc(x.sport) : ''}</span></span></a>${folBtn(x.user)}</div>
     ${x.body ? `<p class="pb">${nl(x.body)}</p>` : ''}${media(x)}
@@ -1720,7 +1724,7 @@ async function gamePage(id) {
     ${hs.length ? `<div class="row" style="gap:8px;margin:14px 0 0;flex-wrap:nowrap"><button class="btn g" id="tape" style="flex:1">▶ Watch the run (${hs.length})</button>${mineN ? `<button class="btn" id="tapeme" style="flex:1">▶ Just mine (${mineN})</button>` : ''}</div>` : ''}
     ${hs.length && ME ? `<button class="btn w" id="rvgo" style="margin:14px 0 4px">⚡ Review plays (${hs.length})</button><p class="mu" style="margin:0 0 8px;font-size:13px">Swipe through. Fix the play type, tap "That's me" on yours. Right guesses take one tap.</p>` : ''}
     <h2>Highlights</h2>${warm && own ? `<p class="mu" style="margin-top:-6px">${warm} warmup clip${warm > 1 ? 's' : ''} left out of the game.</p>` : ''}
-    ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}${h.views ? ' · ' + views(h.views) : ''}</span>
+    ${hs.length ? `<div class="grid">${hs.map(h => `<div class="hl"><video data-hid="${h.id}" data-src="${esc(storage.url(h.path))}" poster="${esc(storage.url(h.poster))}" controls playsinline preload="none"></video><div class="b"><b>${esc(h.play_type || h.label)}</b><span class="mu">${h.player_id ? esc(pname(h.player_id)) : own ? 'Who is this?' : ''}${h.views ? ' · ' + views(h.views) : ''}</span>
       ${own ? `<select data-hp="${h.id}" aria-label="Player in ${esc(h.label)}"><option value="">Who is this?</option>${ps.map(p => `<option value="${p.id}" ${h.player_id === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
       <select data-pt="${h.id}" aria-label="Play type for ${esc(h.label)}"><option value="">What was the play?</option>${[...playsFor(g.sport), 'Warmup'].map(t => `<option ${h.play_type === t ? 'selected' : ''}>${esc(t === 'Warmup' ? 'Warmup (hide it)' : t)}</option>`.replace('>Warmup (hide it)<', ' value="Warmup">Warmup (hide it)<')).join('')}</select>` : ''}
       <div class="row" style="margin-top:6px">${LOCAL ? `<button class="btn s g" data-s1="${h.id}" style="flex:1">${canFiles ? 'Send' : 'Save'}</button>` : ''}${own ? `<button class="btn s g" data-hd="${h.id}" style="flex:1">Delete</button>` : ''}</div></div></div>`).join('')}</div>` : `<p class="mu">No highlights yet.</p>`}
